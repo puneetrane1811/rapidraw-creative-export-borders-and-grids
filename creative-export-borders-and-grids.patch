@@ -1099,7 +1099,7 @@ index 0000000..b34830c
 +  );
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..d80f7e8 100644
+index 267e321..3e3438f 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -29,7 +29,9 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -1173,7 +1173,19 @@ index 267e321..d80f7e8 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -412,6 +461,61 @@ export default function ExportPanel({
+@@ -370,8 +419,10 @@ export default function ExportPanel({
+         }
+         setIsEstimating(true);
+         try {
++          const isCollage = enableCollageGrid && paths.length > 1;
++          const pathsToEstimate = isCollage ? [paths[0]] : paths;
+           const size: number = await invoke(Invokes.EstimateExportSizes, {
+-            paths,
++            paths: pathsToEstimate,
+             exportSettings,
+             outputFormat: format,
+             currentEditPath: currentPath || null,
+@@ -412,6 +463,61 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1235,7 +1247,7 @@ index 267e321..d80f7e8 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -453,6 +557,28 @@ export default function ExportPanel({
+@@ -453,6 +559,28 @@ export default function ExportPanel({
      watermarkScale,
      watermarkSpacing,
      watermarkOpacity,
@@ -1264,7 +1276,7 @@ index 267e321..d80f7e8 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -498,6 +624,61 @@ export default function ExportPanel({
+@@ -498,6 +626,61 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1326,7 +1338,7 @@ index 267e321..d80f7e8 100644
      };
  
      const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
-@@ -507,13 +688,15 @@ export default function ExportPanel({
+@@ -507,13 +690,15 @@ export default function ExportPanel({
  
        let outputFolderOrFile = '';
        const isOriginalFolder = destinationType === 'originalFolder';
@@ -1344,7 +1356,42 @@ index 267e321..d80f7e8 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -758,6 +941,319 @@ export default function ExportPanel({
+@@ -592,8 +777,32 @@ export default function ExportPanel({
+ 
+   const canExport = numImages > 0;
+   const isLut = fileFormat === FileFormats.Cube;
+-  const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
+-  const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
++  const isCollageActive = enableCollageGrid && numImages > 1;
++  const isTileSplitActive = enableTileSplit;
++
++  const exportOutputCount = useMemo(() => {
++    const base = isCollageActive ? 1 : numImages;
++    if (isTileSplitActive) {
++      return base * tileSplitColumns * tileSplitRows;
++    }
++    return base;
++  }, [isCollageActive, numImages, isTileSplitActive, tileSplitColumns, tileSplitRows]);
++
++  const itemLabel = isLut
++    ? t('export.labels.lut')
++    : isTileSplitActive
++      ? t('export.labels.gridTile', 'Grid Tile')
++      : isCollageActive
++        ? t('export.labels.gridPhoto', 'Grid Photo')
++        : t('export.labels.image');
++
++  const itemLabelPlural = isLut
++    ? t('export.labels.lut_plural')
++    : isTileSplitActive
++      ? t('export.labels.gridTile_plural', 'Grid Tiles')
++      : isCollageActive
++        ? t('export.labels.gridPhoto_plural', 'Grid Photos')
++        : t('export.labels.image_plural');
+ 
+   return (
+     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
+@@ -758,6 +967,319 @@ export default function ExportPanel({
                    )}
                  </Section>
  
@@ -1664,6 +1711,35 @@ index 267e321..d80f7e8 100644
                  {fileFormat == FileFormats.Jpeg && (
                    <Section title={t('export.sections.metadata')}>
                      <Switch
+@@ -938,11 +1460,11 @@ export default function ExportPanel({
+             <span className="italic">{t('export.status.estimatingSize')}</span>
+           ) : estimatedSize !== null ? (
+             <span>
+-              {numImages > 1
++              {exportOutputCount > 1
+                 ? t('export.status.estimatedTotalSize', { size: formatBytes(estimatedSize, t) }) ||
+                   t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })
+                 : t('export.status.estimatedSize', { size: formatBytes(estimatedSize, t) })}
+-              {numImages > 1 && ` (~${formatBytes(estimatedSize / numImages, t)})`}
++              {exportOutputCount > 1 && ` (~${formatBytes(estimatedSize / exportOutputCount, t)})`}
+             </span>
+           ) : null}
+         </Text>
+@@ -1001,9 +1523,11 @@ export default function ExportPanel({
+             ) : (
+               <>
+                 <FileInput size={18} className="mr-2" />{' '}
+-                {numImages > 1
+-                  ? t('export.status.exportMultiple', { count: numImages, label: itemLabelPlural })
+-                  : t('export.status.exportSingle', { label: itemLabel })}
++                {exportOutputCount > 1
++                  ? t('export.status.exportMultiple', { count: exportOutputCount, label: itemLabelPlural })
++                  : isCollageActive
++                    ? t('export.status.exportGridPhoto', 'Export 1 Grid Photo')
++                    : t('export.status.exportSingle', { label: itemLabel })}
+               </>
+             )}
+           </Button>
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
 index 86285cd..78a1a15 100644
 --- a/src/components/ui/ExportImportProperties.tsx
@@ -1922,7 +1998,7 @@ index 598487c..1e01f42 100644
      setDestinationType,
      subfolder,
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 5de22d6..1be60db 100644
+index 5de22d6..9727c54 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
 @@ -786,6 +786,41 @@
@@ -1967,7 +2043,18 @@ index 5de22d6..1be60db 100644
      "destination": {
        "customFolder": "Custom folder",
        "originalFolder": "Original image folder",
-@@ -828,6 +863,7 @@
+@@ -806,6 +841,10 @@
+       "tiffBitDepth8": "8-bit"
+     },
+     "labels": {
++      "gridPhoto": "Grid Photo",
++      "gridPhoto_plural": "Grid Photos",
++      "gridTile": "Grid Tile",
++      "gridTile_plural": "Grid Tiles",
+       "image": "Image",
+       "image_plural": "Images",
+       "lut": "LUT",
+@@ -828,6 +867,7 @@
      },
      "sections": {
        "advanced": "Advanced",
@@ -1975,3 +2062,11 @@ index 5de22d6..1be60db 100644
        "destination": "Destination",
        "fileNaming": "File Naming",
        "fileSettings": "File Settings",
+@@ -843,6 +883,7 @@
+       "estimatedSize": "Estimated file size: ~{{size}}",
+       "estimatedTotalSize": "Estimated total size: ~{{size}}",
+       "estimatingSize": "Estimating size...",
++      "exportGridPhoto": "Export 1 Grid Photo",
+       "exportMultiple": "Export {{count}} {{label}}",
+       "exportMultiple_one": "Export {{count}} {{label}}",
+       "exportMultiple_other": "Export {{count}} {{label}}",
