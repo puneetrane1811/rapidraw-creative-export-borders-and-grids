@@ -24,8 +24,9 @@ This project introduces a native **Export Image Borders** feature directly into 
 - [Included Files](#-included-files)
 - [Continuous Cloud Automation (CI/CD)](#-continuous-cloud-automation-cicd)
   - [Auto Rebuild on Upstream Releases](#1-auto-rebuild-on-upstream-releases)
-  - [On-Demand Windows Builder](#2-on-demand-windows-builder)
-  - [On-Demand Linux Builder](#3-on-demand-linux-builder)
+  - [On-Demand macOS Builder](#2-on-demand-macos-builder)
+  - [On-Demand Windows Builder](#3-on-demand-windows-builder)
+  - [On-Demand Linux Builder](#4-on-demand-linux-builder)
 - [Local Development & Building](#-local-development--building)
   - [Automated Local Script](#option-a-automated-local-rebuild)
   - [Manual Git Patch Workflow](#option-b-manual-git-patch-workflow)
@@ -146,6 +147,7 @@ RapidRAW Source Tree
 | [`export-borders.patch`](./export-borders.patch) | Complete, clean unified diff patch against the RapidRAW codebase. |
 | [`update-and-build.sh`](./update-and-build.sh) | Local shell script to download any RapidRAW version, apply the patch, and build a `.dmg`. |
 | [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS, Windows, & Linux, and publishes releases. |
+| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | Dedicated workflow to compile native macOS `.dmg` installers on demand. |
 | [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml) | Dedicated workflow to compile native Windows `.exe` installers on demand. |
 | [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml) | Dedicated workflow to package Linux `.AppImage` and `.deb` installers on demand. |
 
@@ -192,12 +194,18 @@ Rather than checking at an arbitrary midnight hour, the `22:00 UTC` schedule is 
 4. **Why `22:00 UTC`**: Running at 22:00 UTC (midnight Central European Time) catches newly published releases within 1–2 hours of release without unnecessary midday poll checks.
 
 
-### 2. On-Demand Windows Builder
+### 2. On-Demand macOS Builder
+
+- File: [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml)
+- Runs on Apple Silicon (`macos-latest` M-series runners).
+- Can be triggered manually at any time to compile a native macOS `.dmg` installer against any specified branch or tag.
+
+### 3. On-Demand Windows Builder
 
 - File: [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml)
-- Can be triggered manually at any time to compile a Windows `.exe` against any specified branch or tag.
+- Can be triggered manually at any time to compile a Windows `.exe` setup installer against any specified branch or tag.
 
-### 3. On-Demand Linux Builder
+### 4. On-Demand Linux Builder
 
 - File: [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml)
 - Runs on Ubuntu 24.04 with WebKitGTK and AppIndicator system libraries.
