@@ -1,0 +1,346 @@
+--- a/src/components/ui/ExportImportProperties.tsx
++++ b/src/components/ui/ExportImportProperties.tsx
+@@ -45,6 +45,7 @@
+   } | null;
+   stripGps: boolean;
+   watermark: WatermarkSettings | null;
++  border?: BorderSettings | null;
+   exportMasks?: boolean;
+   preserveFolders?: boolean;
+   destinationType?: string;
+@@ -69,6 +70,12 @@
+   scale: number;
+   spacing: number;
+   opacity: number;
++}
++
++interface BorderSettings {
++  /** Border thickness as a percentage of each corresponding image dimension. */
++  size: number;
++  color: string;
+ }
+ 
+ export interface ExportState {
+@@ -122,6 +129,9 @@
+   watermarkScale: number;
+   watermarkSpacing: number;
+   watermarkOpacity: number;
++  enableBorder?: boolean;
++  borderSize?: number;
++  borderColor?: string;
+   lastExportPath?: string;
+   destinationType?: string;
+   subfolder?: string;
+--- a/src/hooks/useExportSettings.ts
++++ b/src/hooks/useExportSettings.ts
+@@ -21,6 +21,9 @@
+   const [watermarkScale, setWatermarkScale] = useState(10);
+   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
+   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
++  const [enableBorder, setEnableBorder] = useState(false);
++  const [borderSize, setBorderSize] = useState(1);
++  const [borderColor, setBorderColor] = useState('#ffffff');
+   const [destinationType, setDestinationType] = useState<string>('customFolder');
+   const [subfolder, setSubfolder] = useState<string>('');
+ 
+@@ -44,6 +47,9 @@
+     setWatermarkScale(preset.watermarkScale);
+     setWatermarkSpacing(preset.watermarkSpacing);
+     setWatermarkOpacity(preset.watermarkOpacity);
++    setEnableBorder(preset.enableBorder ?? false);
++    setBorderSize(preset.borderSize ?? 1);
++    setBorderColor(preset.borderColor ?? '#ffffff');
+     setDestinationType(preset.destinationType || 'customFolder');
+     setSubfolder(preset.subfolder || '');
+   }, []);
+@@ -69,6 +75,9 @@
+       watermarkScale,
+       watermarkSpacing,
+       watermarkOpacity,
++      enableBorder,
++      borderSize,
++      borderColor,
+       destinationType,
+       subfolder,
+     }),
+@@ -92,6 +101,9 @@
+       watermarkScale,
+       watermarkSpacing,
+       watermarkOpacity,
++      enableBorder,
++      borderSize,
++      borderColor,
+       destinationType,
+       subfolder,
+     ],
+@@ -136,6 +148,12 @@
+     setWatermarkSpacing,
+     watermarkOpacity,
+     setWatermarkOpacity,
++    enableBorder,
++    setEnableBorder,
++    borderSize,
++    setBorderSize,
++    borderColor,
++    setBorderColor,
+     destinationType,
+     setDestinationType,
+     subfolder,
+--- a/src/hooks/useExternalEditSession.ts
++++ b/src/hooks/useExternalEditSession.ts
+@@ -66,6 +66,7 @@
+       stripGps: false,
+       exportMasks: false,
+       watermark: null,
++      border: null,
+     };
+ 
+     setIsFinishing(true);
+--- a/src/components/panel/right/ExportPanel.tsx
++++ b/src/components/panel/right/ExportPanel.tsx
+@@ -242,6 +242,12 @@
+     setWatermarkSpacing,
+     watermarkOpacity,
+     setWatermarkOpacity,
++    enableBorder,
++    setEnableBorder,
++    borderSize,
++    setBorderSize,
++    borderColor,
++    setBorderColor,
+     preserveFolders,
+     setPreserveFolders,
+     handleApplyPreset,
+@@ -412,6 +418,7 @@
+               opacity: watermarkOpacity,
+             }
+           : null,
++      border: enableBorder ? { size: borderSize, color: borderColor } : null,
+     };
+     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
+     const runEstimate = () =>
+@@ -453,6 +460,9 @@
+     watermarkScale,
+     watermarkSpacing,
+     watermarkOpacity,
++    enableBorder,
++    borderSize,
++    borderColor,
+     debouncedEstimateSize,
+     exportMasks,
+     preserveFolders,
+@@ -498,6 +508,7 @@
+               opacity: watermarkOpacity,
+             }
+           : null,
++      border: enableBorder ? { size: borderSize, color: borderColor } : null,
+     };
+ 
+     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
+@@ -754,6 +765,41 @@
+                         onChange={setDontEnlarge}
+                         trackClassName="bg-surface"
+                       />
++                    </div>
++                  )}
++                </Section>
++
++                <Section title={t('export.sections.border')}>
++                  <Switch
++                    label={t('export.border.addBorder')}
++                    checked={enableBorder}
++                    onChange={setEnableBorder}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                  {enableBorder && (
++                    <div className="space-y-4 pl-2 border-l-2 border-surface">
++                      <Slider
++                        label={t('export.border.size')}
++                        min={0.1}
++                        max={20}
++                        step={0.1}
++                        value={borderSize}
++                        onChange={(e) => setBorderSize(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={1}
++                      />
++                      <div className="flex items-center justify-between gap-3">
++                        <Text variant={TextVariants.label}>{t('export.border.color')}</Text>
++                        <input
++                          aria-label={t('export.border.color')}
++                          className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                          disabled={isExporting}
++                          onChange={(e) => setBorderColor(e.target.value)}
++                          type="color"
++                          value={borderColor}
++                        />
++                      </div>
+                     </div>
+                   )}
+                 </Section>
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -786,6 +786,11 @@
+       "mb": "MB",
+       "tb": "TB"
+     },
++    "border": {
++      "addBorder": "Add Border",
++      "color": "Color",
++      "size": "Size (%)"
++    },
+     "destination": {
+       "customFolder": "Custom folder",
+       "originalFolder": "Original image folder",
+@@ -828,6 +833,7 @@
+     },
+     "sections": {
+       "advanced": "Advanced",
++      "border": "Border",
+       "destination": "Destination",
+       "fileNaming": "File Naming",
+       "fileSettings": "File Settings",
+--- a/src-tauri/src/export_processing.rs
++++ b/src-tauri/src/export_processing.rs
+@@ -7,7 +7,7 @@
+ use std::sync::{Arc, Mutex};
+ 
+ use image::codecs::jpeg::JpegEncoder;
+-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
++use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgba, imageops};
+ use jxl_encoder::{
+     LosslessConfig, LossyConfig, PixelLayout,
+     api::{calibrated_jxl_quality, quality_to_distance},
+@@ -102,6 +102,8 @@
+     pub filename_template: Option<String>,
+     pub watermark: Option<WatermarkSettings>,
+     #[serde(default)]
++    pub border: Option<BorderSettings>,
++    #[serde(default)]
+     pub export_masks: bool,
+     #[serde(default)]
+     pub preserve_folders: bool,
+@@ -142,6 +144,49 @@
+     pub scale: f32,
+     pub spacing: f32,
+     pub opacity: f32,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct BorderSettings {
++    /// Border thickness as a percentage of each corresponding image dimension.
++    pub size: f32,
++    pub color: String,
++}
++
++fn parse_border_color(color: &str) -> Result<Rgba<u8>, String> {
++    let hex = color.trim().strip_prefix('#').unwrap_or(color.trim());
++    let expanded = match hex.len() {
++        3 => hex.chars().flat_map(|c| [c, c]).collect::<String>(),
++        6 => hex.to_owned(),
++        _ => return Err("Border color must be a hex color such as #ffffff.".to_string()),
++    };
++
++    let channel = |start| {
++        u8::from_str_radix(&expanded[start..start + 2], 16)
++            .map_err(|_| "Border color must be a valid hex color such as #ffffff.".to_string())
++    };
++    Ok(Rgba([channel(0)?, channel(2)?, channel(4)?, 255]))
++}
++
++fn border_dimensions(width: u32, height: u32, size: f32) -> Result<(u32, u32, u32, u32), String> {
++    if !size.is_finite() || size < 0.0 {
++        return Err("Border size must be a non-negative number.".to_string());
++    }
++    let horizontal = ((width as f32 * size / 100.0).round() as u32).max(1);
++    let vertical = ((height as f32 * size / 100.0).round() as u32).max(1);
++    let output_width = width.checked_add(horizontal.saturating_mul(2)).ok_or("Border makes image too wide.")?;
++    let output_height = height.checked_add(vertical.saturating_mul(2)).ok_or("Border makes image too tall.")?;
++    Ok((horizontal, vertical, output_width, output_height))
++}
++
++fn apply_border(image: DynamicImage, border_settings: &BorderSettings) -> Result<DynamicImage, String> {
++    let (width, height) = image.dimensions();
++    let (horizontal, vertical, output_width, output_height) =
++        border_dimensions(width, height, border_settings.size)?;
++    let mut bordered = ImageBuffer::from_pixel(output_width, output_height, parse_border_color(&border_settings.color)?);
++    imageops::overlay(&mut bordered, &image.to_rgba8(), horizontal as i64, vertical as i64);
++    Ok(DynamicImage::ImageRgba8(bordered))
+ }
+ 
+ fn apply_watermark(
+@@ -340,6 +385,9 @@
+ 
+     if let Some(watermark_settings) = &export_settings.watermark {
+         apply_watermark(&mut image, watermark_settings)?;
++    }
++    if let Some(border_settings) = &export_settings.border {
++        image = apply_border(image, border_settings)?;
+     }
+     Ok(image)
+ }
+@@ -1490,6 +1538,7 @@
+         strip_gps: false,
+         filename_template: None,
+         watermark: None,
++        border: None,
+         export_masks: false,
+         preserve_folders: true,
+         destination_type: None,
+@@ -1693,11 +1742,18 @@
+             apply_all_transformations(&loaded_image.image, &adjustments_clone);
+         let (full_w, full_h) = transformed_full_res.dimensions();
+ 
+-        let (final_full_w, final_full_h) = if let Some(resize_opts) = &export_settings.resize {
++        let (mut final_full_w, mut final_full_h) = if let Some(resize_opts) = &export_settings.resize {
+             calculate_resize_target(full_w, full_h, resize_opts)
+         } else {
+             (full_w, full_h)
+         };
++
++        if let Some(border_settings) = &export_settings.border {
++            let (_, _, bordered_w, bordered_h) =
++                border_dimensions(final_full_w, final_full_h, border_settings.size)?;
++            final_full_w = bordered_w;
++            final_full_h = bordered_h;
++        }
+ 
+         let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
+         let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
+--- a/src-tauri/src/app_settings.rs
++++ b/src-tauri/src/app_settings.rs
+@@ -240,6 +240,12 @@
+     pub watermark_spacing: u32,
+     pub watermark_opacity: u32,
+     #[serde(default)]
++    pub enable_border: Option<bool>,
++    #[serde(default)]
++    pub border_size: Option<f32>,
++    #[serde(default)]
++    pub border_color: Option<String>,
++    #[serde(default)]
+     pub export_masks: Option<bool>,
+     #[serde(default)]
+     pub preserve_folders: Option<bool>,
+@@ -271,6 +277,9 @@
+             watermark_scale: 10,
+             watermark_spacing: 5,
+             watermark_opacity: 75,
++            enable_border: Some(false),
++            border_size: Some(1.0),
++            border_color: Some("#ffffff".to_string()),
+             export_masks: Some(false),
+             preserve_folders: Some(false),
+             last_export_path: None,
+@@ -295,6 +304,9 @@
+             watermark_scale: 10,
+             watermark_spacing: 5,
+             watermark_opacity: 75,
++            enable_border: Some(false),
++            border_size: Some(1.0),
++            border_color: Some("#ffffff".to_string()),
+             export_masks: Some(false),
+             preserve_folders: Some(false),
+             last_export_path: None,
