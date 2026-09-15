@@ -128,12 +128,24 @@ This repository includes a GitHub Actions workflow to build native Windows insta
 1. Go to your repository on GitHub and click the **Actions** tab.
 2. Under All workflows, select **Build Windows Release (.exe)**.
 3. Click the **Run workflow** dropdown button:
-   - **RapidRAW Release Tag**: Choose the version (e.g., `v1.6.3`).
+   - **RapidRAW Release Tag**: Choose the version (default: `main`).
    - **Attach to an existing GitHub Release**: Checked by default.
    - **GitHub Release Tag**: `v1.6.3-borders`
 4. Click **Run workflow**.
 
 GitHub's Windows runner will automatically check out RapidRAW, apply `export-borders.patch`, compile the NSIS installer (`.exe`), and attach it to your release or provide it as a downloadable artifact!
+
+---
+
+### Option E: Continuous Auto-Rebuild on Upstream Release (Zero-Maintenance)
+
+The workflow [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) runs automatically on a **daily schedule**:
+1. Checks [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) for any new tagged release.
+2. Compiles both **macOS (`.dmg`)** and **Windows (`.exe`)** in parallel on GitHub runners.
+3. Automatically publishes a new release under your repository's Releases page with both installer binaries attached.
+
+You can also trigger it on demand anytime from the **Actions** tab under **Auto Rebuild on Upstream Release**.
+
 
 
 ---

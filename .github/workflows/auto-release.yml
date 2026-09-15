@@ -1,0 +1,197 @@
+name: Auto Rebuild on Upstream Release
+
+on:
+  schedule:
+    # Check daily at 00:00 UTC for new RapidRAW releases
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: 'Upstream git branch or tag to build (e.g. "main", "v1.7.0", or "latest")'
+        required: true
+        default: 'main'
+      force_build:
+        description: 'Force build even if release tag already exists?'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  check-upstream:
+    name: Check Upstream Version
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      build_ref: ${{ steps.check.outputs.build_ref }}
+      release_tag: ${{ steps.check.outputs.release_tag }}
+      release_name: ${{ steps.check.outputs.release_name }}
+    steps:
+      - name: Determine Target Version
+        id: check
+        shell: bash
+        run: |
+          set -e
+          INPUT_REF="${{ github.event.inputs.target_ref }}"
+          FORCE="${{ github.event.inputs.force_build }}"
+
+          if [ -z "$INPUT_REF" ] || [ "$INPUT_REF" = "latest" ]; then
+            echo "Fetching latest upstream release tag..."
+            LATEST_TAG=$(curl -sL https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest | jq -r .tag_name)
+            if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
+              echo "Could not fetch latest release tag, falling back to main"
+              BUILD_REF="main"
+              RELEASE_TAG="latest-main-borders"
+            else
+              BUILD_REF="$LATEST_TAG"
+              RELEASE_TAG="${LATEST_TAG}-borders"
+            fi
+          elif [ "$INPUT_REF" = "main" ]; then
+            BUILD_REF="main"
+            RELEASE_TAG="main-build-borders"
+          else
+            BUILD_REF="$INPUT_REF"
+            RELEASE_TAG="${INPUT_REF}-borders"
+          fi
+
+          echo "Target build reference: $BUILD_REF"
+          echo "Target release tag: $RELEASE_TAG"
+
+          # Check if release already exists in our repository
+          HTTP_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" https://api.github.com/repos/${{ github.repository }}/releases/tags/${RELEASE_TAG})
+          echo "Existing release check HTTP status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" = "200" ] && [ "$FORCE" != "true" ] && [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "Release $RELEASE_TAG already exists and force_build is false. Skipping."
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "build_ref=$BUILD_REF" >> $GITHUB_OUTPUT
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "release_name=RapidRAW ${BUILD_REF} with Export Image Borders" >> $GITHUB_OUTPUT
+
+  build-packages:
+    name: Build (${{ matrix.platform }})
+    needs: check-upstream
+    if: needs.check-upstream.outputs.should_build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macOS
+            bundle: dmg
+            target_flag: ''
+            artifact_glob: '*.dmg'
+          - os: windows-latest
+            platform: Windows
+            bundle: nsis
+            target_flag: '--target x86_64-pc-windows-msvc'
+            artifact_glob: '*.exe'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout patch repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.platform == 'Windows' && 'x86_64-pc-windows-msvc' || '' }}
+
+      - name: Clone RapidRAW source
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          echo "Cloning ${{ needs.check-upstream.outputs.build_ref }}..."
+          git clone --depth 1 --branch ${{ needs.check-upstream.outputs.build_ref }} https://github.com/CyberTimon/RapidRAW.git rapidraw-src
+
+      - name: Apply Export Borders Patch
+        shell: bash
+        run: |
+          cd rapidraw-src
+          git apply --ignore-whitespace --ignore-space-change ../export-borders.patch
+          echo "Patch successfully applied!"
+
+      - name: Install Frontend Dependencies
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm ci || npm install
+
+      - name: Build Installer Package
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm run tauri -- build --bundles ${{ matrix.bundle }} --no-sign ${{ matrix.target_flag }}
+
+      - name: Stage Artifact
+        id: stage
+        shell: bash
+        run: |
+          mkdir -p dist_artifacts
+          PKG=$(find rapidraw-src/src-tauri/target -type f \( -name "${{ matrix.artifact_glob }}" \) | head -n 1)
+          if [ -z "$PKG" ]; then
+            echo "::error::Built installer matching ${{ matrix.artifact_glob }} not found!"
+            exit 1
+          fi
+          echo "Found built package: $PKG"
+          cp "$PKG" dist_artifacts/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-installer
+          path: dist_artifacts/*
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish Multi-Platform Release
+    needs: [check-upstream, build-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all built installers
+        uses: actions/download-artifact@v4
+        with:
+          path: all_installers
+          merge-multiple: true
+
+      - name: Inspect Downloaded Installers
+        shell: bash
+        run: |
+          ls -lh all_installers
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-upstream.outputs.release_tag }}
+          name: ${{ needs.check-upstream.outputs.release_name }}
+          body: |
+            ## RapidRAW with Export Image Borders
+
+            Automated cross-platform build of **RapidRAW** with custom export border support.
+
+            ### ✨ What's Included
+            - **Configurable border thickness**: Slider from 0.1% to 20% of image dimensions.
+            - **Custom border color**: Native RGB color picker (default white `#ffffff`).
+            - **Preset persistence**: Saved border configurations in export presets.
+
+            ### 📦 Available Downloads
+            - **macOS (Apple Silicon)**: `.dmg` installer
+            - **Windows**: `.exe` setup installer
+
+            Built automatically from source using [puneetrane1811/rapidraw-export-borders](https://github.com/${{ github.repository }}).
+          files: all_installers/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
