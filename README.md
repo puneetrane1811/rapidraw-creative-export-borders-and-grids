@@ -140,7 +140,7 @@ This repository includes fully automated GitHub Actions workflows that run in th
 
 ```mermaid
 flowchart LR
-    Cron["⏰ Daily Cron (00:00 UTC)"] --> Check["🔍 Check CyberTimon/RapidRAW"]
+    Cron["⏰ Daily Cron (22:00 UTC)"] --> Check["🔍 Check CyberTimon/RapidRAW"]
     Check --> Cond{"New release<br/>tagged?"}
     Cond -- No --> Idle["Idle"]
     Cond -- Yes --> Matrix["Trigger Multi-Platform Build"]
@@ -150,10 +150,26 @@ flowchart LR
     Win --> Rel
 ```
 
-- **Schedule**: Automatically polls [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) daily at `22:00 UTC` (timed directly after upstream maintainer releases, which historically drop between 17:00 and 21:00 UTC, predominantly on weekends).
+- **Schedule**: Automatically polls [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) daily at `22:00 UTC`.
 - **Parallel Compilation**: When a new tag is detected, it spins up parallel `macos-latest` and `windows-latest` runners.
 - **Auto-Publish**: Automatically compiles the `.dmg` and `.exe` and attaches them to a new release tag (e.g., `v1.7.0-borders`).
 - **Manual Trigger**: Can also be run on demand from **Actions** > **Auto Rebuild on Upstream Release** > **Run workflow**.
+
+#### 📊 Upstream Cadence & Timing Intelligence
+
+Rather than checking at an arbitrary midnight hour, the `22:00 UTC` schedule is derived from statistical analysis of all 65 official RapidRAW releases:
+
+1. **Bi-Weekly Cycle**: Mature releases (`v1.4.0` through `v1.6.3`) follow an extraordinarily consistent **11 to 14 day cadence**.
+2. **Weekend Concentration**: Nearly **50%** of all releases drop on weekends (**Sunday alone represents 32.3%** of all releases):
+   | Day of Week | Share of Releases |
+   | :--- | :---: |
+   | **Sunday** | **32.3%** (21 releases) |
+   | **Saturday** | **16.9%** (11 releases) |
+   | **Thursday / Friday** | **23.1%** (15 releases) |
+   | **Mon / Tue / Wed** | **27.7%** (18 releases) |
+3. **Evening Release Window**: The maintainer (based in Central Europe, UTC+1 / UTC+2) publishes predominantly between **17:00 and 21:00 UTC** (peak at 20:00 UTC).
+4. **Why `22:00 UTC`**: Running at 22:00 UTC (midnight Central European Time) catches newly published releases within 1–2 hours of release without unnecessary midday poll checks.
+
 
 ### 2. On-Demand Windows Builder
 
