@@ -4,7 +4,7 @@
 [![macOS Support](https://img.shields.io/badge/macOS-Apple_Silicon-brightgreen.svg)]()
 [![Windows Support](https://img.shields.io/badge/Windows-x64_NSIS-blue.svg)]()
 [![Linux Support](https://img.shields.io/badge/Linux-AppImage_%7C_deb-orange.svg)]()
-[![Auto-Release Workflow](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml/badge.svg)](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml)
+[![Auto-Release Workflow](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/actions/workflows/auto-release.yml/badge.svg)](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/actions/workflows/auto-release.yml)
 
 A custom feature extension and automated CI/CD distribution pipeline for **[RapidRAW](https://github.com/CyberTimon/RapidRAW)**—the modern, high-performance open-source RAW photo editor built with Tauri, Rust, and React.
 
@@ -86,11 +86,11 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 
 ## 📦 Downloads & Installation
 
-Pre-compiled, ready-to-install packages are available on the **[Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases)** page. **No programming tools or developer environments are needed.**
+Pre-compiled, ready-to-install packages are available on the **[Releases](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/releases)** page. **No programming tools or developer environments are needed.**
 
 ### macOS (.dmg)
 
-1. Download `RapidRAW_<version>_aarch64.dmg` from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases).
+1. Download `RapidRAW_<version>_aarch64.dmg` from [Releases](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/releases).
 2. Double-click the `.dmg` file and drag **RapidRAW** into your `/Applications` folder.
 3. **First-launch Gatekeeper Bypass** (required for unsigned local builds):
    - **Finder**: Right-click (or <kbd>Control</kbd>-click) `RapidRAW.app` in `/Applications`, select **Open**, and click **Open** on the confirmation dialog.
@@ -101,12 +101,12 @@ Pre-compiled, ready-to-install packages are available on the **[Releases](https:
 
 ### Windows (.exe)
 
-1. Download `RapidRAW_<version>_x64-setup.exe` from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases) or the [Actions Artifacts](https://github.com/puneetrane1811/rapidraw-export-borders/actions).
+1. Download `RapidRAW_<version>_x64-setup.exe` from [Releases](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/releases) or the [Actions Artifacts](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/actions).
 2. Run the setup installer and follow the on-screen instructions.
 
 ### Linux (.AppImage & .deb)
 
-Packages are available from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases):
+Packages are available from [Releases](https://github.com/puneetrane1811/rapidraw-creative-export-borders-and-grids/releases):
 
 - **Universal AppImage** (runs on Ubuntu, Fedora, Arch, Debian, openSUSE, etc.):
   ```bash
@@ -167,8 +167,8 @@ RapidRAW Source Tree
 
 | File | Description |
 | :--- | :--- |
-| [`export-borders.patch`](./export-borders.patch) | Complete, clean unified diff patch against the RapidRAW codebase. |
-| [`update-and-build.sh`](./update-and-build.sh) | Local shell script to download any RapidRAW version, apply the patch, and build a `.dmg`. |
+| [`creative-export-borders-and-grids.patch`](./creative-export-borders-and-grids.patch) | Complete, clean unified diff patch against the RapidRAW codebase. |
+| [`build-creative-export-borders-and-grids.sh`](./build-creative-export-borders-and-grids.sh) | Local shell script to download any RapidRAW version, apply the patch, and build a `.dmg`. |
 | [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS, Windows, & Linux, and publishes releases. |
 | [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | Dedicated workflow to compile native macOS `.dmg` installers on demand. |
 | [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml) | Dedicated workflow to compile native Windows `.exe` installers on demand. |
@@ -246,10 +246,10 @@ If you prefer building locally on your Mac:
 Use the included helper script:
 ```bash
 # Build against latest main branch:
-./update-and-build.sh
+./build-creative-export-borders-and-grids.sh
 
 # Build against a specific tag (e.g. v1.7.0):
-./update-and-build.sh v1.7.0
+./build-creative-export-borders-and-grids.sh v1.7.0
 ```
 
 ### Option B: Manual Git Patch Workflow
@@ -262,7 +262,7 @@ Use the included helper script:
 
 2. **Apply the patch**:
    ```bash
-   git apply --ignore-whitespace /path/to/export-borders.patch
+   git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
    ```
 
 3. **Build the macOS DMG**:
@@ -286,7 +286,7 @@ Because this patch is small and modular (isolated strictly to export UI, preset 
 If RapidRAW significantly refactors the export panel in a future release:
 1. Run:
    ```bash
-   git apply --reject export-borders.patch
+   git apply --reject creative-export-borders-and-grids.patch
    ```
 2. Any conflicting hunks will be written to `.rej` files.
 3. Review the `.rej` file and manually reposition the small UI block in `ExportPanel.tsx` or hook in `export_processing.rs`.

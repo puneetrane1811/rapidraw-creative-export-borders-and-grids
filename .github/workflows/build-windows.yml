@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "Applying patch..."
           cd rapidraw-src
-          git apply --ignore-whitespace --ignore-space-change ../export-borders.patch
+          git apply --ignore-whitespace --ignore-space-change ../creative-export-borders-and-grids.patch
           echo "Patch applied successfully!"
           git status
 

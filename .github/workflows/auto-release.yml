@@ -139,7 +139,7 @@ jobs:
         shell: bash
         run: |
           cd rapidraw-src
-          git apply --ignore-whitespace --ignore-space-change ../export-borders.patch
+          git apply --ignore-whitespace --ignore-space-change ../creative-export-borders-and-grids.patch
           echo "Patch successfully applied!"
 
       - name: Install Frontend Dependencies
@@ -208,7 +208,7 @@ jobs:
             - **Windows**: `.exe` setup installer
             - **Linux**: `.AppImage` (universal portable) and `.deb` package (Ubuntu/Debian)
 
-            Built automatically from source using [puneetrane1811/rapidraw-export-borders](https://github.com/${{ github.repository }}).
+            Built automatically from source using [puneetrane1811/rapidraw-creative-export-borders-and-grids](https://github.com/${{ github.repository }}).
           files: all_installers/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

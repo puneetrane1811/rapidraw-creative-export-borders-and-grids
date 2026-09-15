@@ -611,11 +611,12 @@ index b0e31f5..7f7bec6 100644
              (final_full_w as f64 * final_full_h as f64)
 diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
 new file mode 100644
-index 0000000..7c1a074
+index 0000000..b34830c
 --- /dev/null
 +++ b/src/components/panel/right/ExportLivePreview.tsx
-@@ -0,0 +1,478 @@
+@@ -0,0 +1,483 @@
 +import React, { useEffect, useRef, useState } from 'react';
++import { createPortal } from 'react-dom';
 +import { useTranslation } from 'react-i18next';
 +import { Maximize2, X, Image as ImageIcon, Grid, Layers, SplitSquareVertical } from 'lucide-react';
 +import Text from '../../ui/Text';
@@ -1041,55 +1042,59 @@ index 0000000..7c1a074
 +      </div>
 +
 +      {/* Fullscreen / Enlarged Preview Modal */}
-+      {isModalOpen && (
-+        <div
-+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
-+          onClick={() => setIsModalOpen(false)}
-+        >
-+          <div
-+            className="relative max-w-4xl w-full bg-surface-lowest rounded-xl border border-surface shadow-2xl p-4 flex flex-col space-y-3"
-+            onClick={(e) => e.stopPropagation()}
-+          >
-+            <div className="flex items-center justify-between border-b border-surface pb-2">
-+              <div className="flex items-center gap-2">
-+                <Layers className="w-4 h-4 text-accent" />
-+                <Text variant={TextVariants.heading}>
-+                  {t('export.preview.highResTitle', 'Export Output Inspector')}
-+                </Text>
-+              </div>
-+              <button
-+                type="button"
++      {isModalOpen &&
++        (typeof document !== 'undefined'
++          ? createPortal(
++              <div
++                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
 +                onClick={() => setIsModalOpen(false)}
-+                className="p-1 rounded-md hover:bg-surface text-subtext hover:text-white"
 +              >
-+                <X className="w-5 h-5" />
-+              </button>
-+            </div>
++                <div
++                  className="relative max-w-4xl w-full bg-surface-lowest rounded-xl border border-surface shadow-2xl p-4 flex flex-col space-y-3"
++                  onClick={(e) => e.stopPropagation()}
++                >
++                  <div className="flex items-center justify-between border-b border-surface pb-2">
++                    <div className="flex items-center gap-2">
++                      <Layers className="w-4 h-4 text-accent" />
++                      <Text variant={TextVariants.heading}>
++                        {t('export.preview.highResTitle', 'Export Output Inspector')}
++                      </Text>
++                    </div>
++                    <button
++                      type="button"
++                      onClick={() => setIsModalOpen(false)}
++                      className="p-1 rounded-md hover:bg-surface text-subtext hover:text-white"
++                    >
++                      <X className="w-5 h-5" />
++                    </button>
++                  </div>
 +
-+            <div className="w-full h-[65vh] flex items-center justify-center bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] bg-black/70 rounded-lg overflow-auto p-4 border border-surface/40">
-+              <canvas
-+                ref={modalCanvasRef}
-+                className="max-h-full max-w-full object-contain rounded shadow-2xl"
-+              />
-+            </div>
++                  <div className="w-full h-[65vh] flex items-center justify-center bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] bg-black/70 rounded-lg overflow-auto p-4 border border-surface/40">
++                    <canvas
++                      ref={modalCanvasRef}
++                      className="max-h-full max-w-full object-contain rounded shadow-2xl"
++                    />
++                  </div>
 +
-+            <div className="flex items-center justify-between text-xs text-subtext pt-1">
-+              <span>
-+                {enableCollageGrid && multiSelectedPaths.length > 1
-+                  ? `Multi-Photo Collage: ${multiSelectedPaths.length} photos (${collageColumns} cols × ${collageRows} rows)`
-+                  : `Single Image Export`}
-+              </span>
-+              <button
-+                type="button"
-+                onClick={() => setIsModalOpen(false)}
-+                className="px-3 py-1 bg-surface hover:bg-surface/80 text-white rounded text-xs"
-+              >
-+                {t('common.close', 'Close')}
-+              </button>
-+            </div>
-+          </div>
-+        </div>
-+      )}
++                  <div className="flex items-center justify-between text-xs text-subtext pt-1">
++                    <span>
++                      {enableCollageGrid && multiSelectedPaths.length > 1
++                        ? `Multi-Photo Collage: ${multiSelectedPaths.length} photos (${collageColumns} cols × ${collageRows} rows)`
++                        : `Single Image Export`}
++                    </span>
++                    <button
++                      type="button"
++                      onClick={() => setIsModalOpen(false)}
++                      className="px-3 py-1 bg-surface hover:bg-surface/80 text-white rounded text-xs"
++                    >
++                      {t('common.close', 'Close')}
++                    </button>
++                  </div>
++                </div>
++              </div>,
++              document.body,
++            )
++          : null)}
 +    </div>
 +  );
 +}
