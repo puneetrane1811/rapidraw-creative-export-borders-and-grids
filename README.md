@@ -1,17 +1,118 @@
-# RapidRAW - Export Image Borders Patch
+# RapidRAW with Export Image Borders 🖼️
 
-This directory contains the custom patch and automated build tools to add an **Export Image Borders** feature to [RapidRAW](https://github.com/CyberTimon/RapidRAW).
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![macOS Support](https://img.shields.io/badge/macOS-Apple_Silicon-brightgreen.svg)]()
+[![Windows Support](https://img.shields.io/badge/Windows-x64_NSIS-blue.svg)]()
+[![Auto-Release Workflow](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml/badge.svg)](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml)
+
+A custom feature extension and automated CI/CD distribution pipeline for **[RapidRAW](https://github.com/CyberTimon/RapidRAW)**—the modern, high-performance open-source RAW photo editor built with Tauri, Rust, and React.
+
+This project introduces a native **Export Image Borders** feature directly into RapidRAW's UI and export pipeline, eliminating the need for external scripts or post-processing tools like ImageMagick.
 
 ---
 
-## 📌 Feature Overview
+## Table of Contents
 
-This modification brings an ImageMagick-style border capability (`magick "$file" -border 1%x1% "border_${file}"`) directly into RapidRAW's native export workflow:
-- **Toggle switch**: Enable/disable borders on export (`Add Border`).
-- **Adjustable thickness**: Slider from `0.1%` to `20.0%` of image dimensions (default: `1.0%`).
-- **Color picker**: Native RGB color picker (default: `#ffffff` white).
-- **Preset integration**: Border configurations persist across custom export presets and default presets.
-- **Full pipeline compatibility**: Seamlessly integrates with single-image exports, batch exports, resizing, and watermarking.
+- [Motivation](#-motivation)
+- [Features](#-features)
+- [Downloads & Installation](#-downloads--installation)
+  - [macOS (.dmg)](#macos-dmg)
+  - [Windows (.exe)](#windows-exe)
+- [How It Works (Code Architecture)](#-how-it-works-code-architecture)
+- [Included Files](#-included-files)
+- [Continuous Cloud Automation (CI/CD)](#-continuous-cloud-automation-cicd)
+  - [Auto Rebuild on Upstream Releases](#1-auto-rebuild-on-upstream-releases)
+  - [On-Demand Windows Builder](#2-on-demand-windows-builder)
+- [Local Development & Building](#-local-development--building)
+  - [Automated Local Script](#option-a-automated-local-rebuild)
+  - [Manual Git Patch Workflow](#option-b-manual-git-patch-workflow)
+- [Future Upstream Maintenance & Conflicts](#-future-upstream-maintenance--conflicts)
+- [License & Acknowledgments](#-license--acknowledgments)
+
+---
+
+## 💡 Motivation
+
+Photographers often add borders to photos for social media presentation (e.g., maintaining consistent aspect ratios on Instagram without cropping), white margins for prints, or aesthetic framing.
+
+Previously, achieving this required exporting images from RapidRAW and running terminal scripts with ImageMagick:
+```bash
+# Prior workaround:
+for file in *.jpg; do 
+  magick "$file" -border 1%x1% "border_${file}"
+done
+```
+
+This project integrates that capability natively into RapidRAW so borders can be applied seamlessly during single-image or batch exports.
+
+---
+
+## ✨ Features
+
+- **Toggle Switch**: Enable or disable borders on export with one click (`Add Border`).
+- **Configurable Thickness**: Fine-tune border size using a smooth slider from `0.1%` up to `20.0%` of image dimensions (default: `1.0%`).
+- **Color Picker**: Integrated native RGB color picker to select any hex color (default: `#ffffff` pure white).
+- **Preset Persistence**: Border configurations are automatically remembered in default presets (`High Quality`, `Fast Web`) and custom user presets.
+- **Pipeline Integration**: Fully compatible with resizing, watermarking, GPS stripping, and metadata retention.
+- **Batch Export Support**: Applies borders consistently across bulk photo exports.
+
+---
+
+## 📦 Downloads & Installation
+
+Pre-compiled, ready-to-install packages are available on the **[Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases)** page. **No programming tools or developer environments are needed.**
+
+### macOS (.dmg)
+
+1. Download `RapidRAW_<version>_aarch64.dmg` from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases).
+2. Double-click the `.dmg` file and drag **RapidRAW** into your `/Applications` folder.
+3. **First-launch Gatekeeper Bypass** (required for unsigned local builds):
+   - **Finder**: Right-click (or <kbd>Control</kbd>-click) `RapidRAW.app` in `/Applications`, select **Open**, and click **Open** on the confirmation dialog.
+   - **Or via Terminal**:
+     ```bash
+     xattr -cr /Applications/RapidRAW.app
+     ```
+
+### Windows (.exe)
+
+1. Download `RapidRAW_<version>_x64-setup.exe` from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases) or the [Actions Artifacts](https://github.com/puneetrane1811/rapidraw-export-borders/actions).
+2. Run the setup installer and follow the on-screen instructions.
+
+---
+
+## 🧠 How It Works (Code Architecture)
+
+The feature is cleanly separated across the Rust backend and React frontend:
+
+```
+RapidRAW Source Tree
+├── src-tauri/
+│   ├── src/
+│   │   ├── export_processing.rs   <-- Border math, hex parsing & canvas overlay
+│   │   └── app_settings.rs        <-- Preset schema & default preset values
+├── src/
+│   ├── components/
+│   │   ├── panel/right/
+│   │   │   └── ExportPanel.tsx    <-- Switch, slider & color picker UI
+│   │   └── ui/
+│   │       └── ExportImportProperties.tsx <-- TypeScript interface definitions
+│   ├── hooks/
+│   │   ├── useExportSettings.ts   <-- State management & preset synchronization
+│   │   └── useExternalEditSession.ts <-- External session payload defaults
+│   └── i18n/locales/
+│       └── en.json                <-- English UI localization keys
+```
+
+### Technical Details
+
+1. **Dimension Math (`export_processing.rs`)**:
+   Calculates border padding as a percentage of the respective image dimensions with checked arithmetic:
+   $$\text{horizontal} = \max\left(1, \operatorname{round}\left(\text{width} \times \frac{\text{size}}{100}\right)\right)$$
+   $$\text{vertical} = \max\left(1, \operatorname{round}\left(\text{height} \times \frac{\text{size}}{100}\right)\right)$$
+2. **Buffer Allocation & Blending**:
+   Allocates a new RGBA canvas sized $(\text{width} + 2 \times \text{horizontal}, \text{height} + 2 \times \text{vertical})$ initialized to the chosen hex color, and overlays the processed image into the center.
+3. **Resolution Metadata Preservation**:
+   Updates `final_full_w` and `final_full_h` in `determine_export_dimensions` so exported sidecars and EXIF records match the final bordered canvas size.
 
 ---
 
@@ -19,60 +120,59 @@ This modification brings an ImageMagick-style border capability (`magick "$file"
 
 | File | Description |
 | :--- | :--- |
-| [`export-borders.patch`](./export-borders.patch) | Standard unified diff patch modifying Rust backend and React frontend. |
-| [`update-and-build.sh`](./update-and-build.sh) | One-command shell script to fetch any new RapidRAW release, apply the patch, and build the macOS `.dmg`. |
-| [`RapidRAW_1.6.3_aarch64.dmg`](./RapidRAW_1.6.3_aarch64.dmg) | Ready-to-install Apple Silicon macOS installer containing this feature. |
+| [`export-borders.patch`](./export-borders.patch) | Complete, clean unified diff patch against the RapidRAW codebase. |
+| [`update-and-build.sh`](./update-and-build.sh) | Local shell script to download any RapidRAW version, apply the patch, and build a `.dmg`. |
+| [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS and Windows, and publishes releases. |
+| [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml) | Dedicated workflow to compile native Windows `.exe` installers on demand. |
 
 ---
 
-## 🛠️ Modified Source Files in the Patch
+## 🚀 Continuous Cloud Automation (CI/CD)
 
-The patch touches 7 files cleanly across the codebase:
+This repository includes fully automated GitHub Actions workflows that run in the cloud on Microsoft and Apple runners.
 
-1. **`src-tauri/src/export_processing.rs`**:
-   - Defines `BorderSettings` struct (`size: f32`, `color: String`).
-   - Implements `parse_border_color` (hex color parsing to `Rgba<u8>`).
-   - Implements `border_dimensions` (percentage calculation with integer overflow safety).
-   - Implements `apply_border` (overlaying image onto padded background canvas).
-   - Updates `determine_export_dimensions` so exported metadata and pixel ratios reflect the border.
-2. **`src-tauri/src/app_settings.rs`**:
-   - Adds `enable_border`, `border_size`, and `border_color` to `ExportPreset` serialization.
-3. **`src/components/panel/right/ExportPanel.tsx`**:
-   - Adds the "Border" section in the right-hand export sidebar.
-   - Includes toggle switch, percentage slider, and color picker.
-   - Passes `border` payload to both single and batch export routines.
-4. **`src/hooks/useExportSettings.ts`**:
-   - Manages state hooks and preset synchronization.
-5. **`src/components/ui/ExportImportProperties.tsx`**:
-   - Updates TypeScript interfaces for preset properties and export states.
-6. **`src/hooks/useExternalEditSession.ts`**:
-   - Initializes `border: null` in external edit sessions.
-7. **`src/i18n/locales/en.json`**:
-   - Adds localization strings for `export.border.*`.
+### 1. Auto Rebuild on Upstream Releases
+
+```mermaid
+flowchart LR
+    Cron["⏰ Daily Cron (00:00 UTC)"] --> Check["🔍 Check CyberTimon/RapidRAW"]
+    Check --> Cond{"New release<br/>tagged?"}
+    Cond -- No --> Idle["Idle"]
+    Cond -- Yes --> Matrix["Trigger Multi-Platform Build"]
+    Matrix --> Mac["🍎 macOS Runner<br/>Compiles .dmg"]
+    Matrix --> Win["🪟 Windows Runner<br/>Compiles .exe"]
+    Mac --> Rel["🎉 Auto-Publish GitHub Release<br/>(Attaches both .dmg & .exe)"]
+    Win --> Rel
+```
+
+- **Schedule**: Automatically polls [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) daily at `00:00 UTC`.
+- **Parallel Compilation**: When a new tag is detected, it spins up parallel `macos-latest` and `windows-latest` runners.
+- **Auto-Publish**: Automatically compiles the `.dmg` and `.exe` and attaches them to a new release tag (e.g., `v1.7.0-borders`).
+- **Manual Trigger**: Can also be run on demand from **Actions** > **Auto Rebuild on Upstream Release** > **Run workflow**.
+
+### 2. On-Demand Windows Builder
+
+- File: [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml)
+- Can be triggered manually at any time to compile a Windows `.exe` against any specified branch or tag.
 
 ---
 
-## 🚀 How to Apply the Patch
+## 💻 Local Development & Building
 
-### Option A: Using the Automated Script (Quickest)
+If you prefer building locally on your Mac:
 
-If you have the workspace toolchain in place:
+### Option A: Automated Local Rebuild
 
+Use the included helper script:
 ```bash
-cd /path/to/so-x20/outputs
-
-# Rebuild against latest main branch:
+# Build against latest main branch:
 ./update-and-build.sh
 
-# Or rebuild against a specific release tag (e.g., v1.7.0):
+# Build against a specific tag (e.g. v1.7.0):
 ./update-and-build.sh v1.7.0
 ```
 
-The script will fetch the release source, apply `export-borders.patch`, run the build, and place the new `.dmg` in this folder.
-
----
-
-### Option B: Applying Manually to a Git Clone
+### Option B: Manual Git Patch Workflow
 
 1. **Clone RapidRAW**:
    ```bash
@@ -80,92 +180,40 @@ The script will fetch the release source, apply `export-borders.patch`, run the 
    cd RapidRAW
    ```
 
-2. **Check out the target release or branch**:
+2. **Apply the patch**:
    ```bash
-   git checkout v1.7.0   # or your desired version
+   git apply --ignore-whitespace /path/to/export-borders.patch
    ```
 
-3. **Apply the patch**:
-   ```bash
-   git apply /path/to/export-borders.patch
-   ```
-   *(Alternative using standard patch tool: `patch -p1 < /path/to/export-borders.patch`)*
-
-4. **Verify changes**:
-   ```bash
-   git status
-   git diff
-   ```
-
-5. **Build the macOS DMG**:
+3. **Build the macOS DMG**:
    ```bash
    npm ci
    npm run tauri -- build --bundles dmg --no-sign
    ```
-   The resulting installer will be located in:
-   `src-tauri/target/release/bundle/dmg/RapidRAW_<version>_aarch64.dmg`
 
----
-
-### Option C: Personal GitHub Fork (Cloud Rebuild)
-
-1. Fork `https://github.com/CyberTimon/RapidRAW` to your GitHub account.
-2. Create a custom branch:
+4. **Build the Windows EXE (on a Windows PC)**:
    ```bash
-   git checkout -b custom-borders
-   git apply export-borders.patch
-   git commit -am "feat: export image borders"
-   git push origin custom-borders
+   npm ci
+   npm run tauri -- build --bundles nsis
    ```
-3. Whenever a new RapidRAW release is published, sync your fork or rebase `custom-borders` on top of the new release tag. RapidRAW's GitHub Actions workflow will automatically build and publish the `.dmg` in your repository's **Actions** tab.
 
 ---
 
-### Option D: Automated Windows (.exe) Cloud Build
+## ⚠️ Future Upstream Maintenance & Conflicts
 
-This repository includes a GitHub Actions workflow to build native Windows installers (`.exe`) directly in the cloud:
+Because this patch is small and modular (isolated strictly to export UI, preset storage, and export processing), it applies cleanly across versions.
 
-1. Go to your repository on GitHub and click the **Actions** tab.
-2. Under All workflows, select **Build Windows Release (.exe)**.
-3. Click the **Run workflow** dropdown button:
-   - **RapidRAW Release Tag**: Choose the version (default: `main`).
-   - **Attach to an existing GitHub Release**: Checked by default.
-   - **GitHub Release Tag**: `v1.6.3-borders`
-4. Click **Run workflow**.
-
-GitHub's Windows runner will automatically check out RapidRAW, apply `export-borders.patch`, compile the NSIS installer (`.exe`), and attach it to your release or provide it as a downloadable artifact!
+If RapidRAW significantly refactors the export panel in a future release:
+1. Run:
+   ```bash
+   git apply --reject export-borders.patch
+   ```
+2. Any conflicting hunks will be written to `.rej` files.
+3. Review the `.rej` file and manually reposition the small UI block in `ExportPanel.tsx` or hook in `export_processing.rs`.
 
 ---
 
-### Option E: Continuous Auto-Rebuild on Upstream Release (Zero-Maintenance)
+## 📄 License & Acknowledgments
 
-The workflow [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) runs automatically on a **daily schedule**:
-1. Checks [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) for any new tagged release.
-2. Compiles both **macOS (`.dmg`)** and **Windows (`.exe`)** in parallel on GitHub runners.
-3. Automatically publishes a new release under your repository's Releases page with both installer binaries attached.
-
-You can also trigger it on demand anytime from the **Actions** tab under **Auto Rebuild on Upstream Release**.
-
-
-
----
-
-## 🍏 Installing on macOS (Gatekeeper Bypass)
-
-Because local or personal builds are unsigned, macOS Gatekeeper may block the app on first launch.
-
-After dragging `RapidRAW.app` into `/Applications`:
-- **Finder**: Right-click (or <kbd>Control</kbd>-click) `RapidRAW.app`, select **Open**, and click **Open** on the confirmation prompt.
-- **Terminal**: Run:
-  ```bash
-  xattr -cr /Applications/RapidRAW.app
-  ```
-
----
-
-## ⚠️ Troubleshooting Future Conflicts
-
-If RapidRAW significantly refactors the export panel in a future update, `git apply` may fail with a conflict. To resolve:
-1. Run `git apply --reject export-borders.patch` (this applies matching parts and writes `.rej` files for conflicting hunks).
-2. Open the `.rej` file to see what lines couldn't be automatically placed.
-3. Manually place the border UI in `ExportPanel.tsx` or processing call in `export_processing.rs`.
+- **RapidRAW** is created by [Timon Käch (CyberTimon)](https://github.com/CyberTimon) and licensed under the **[GNU Affero General Public License v3 (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0)**.
+- This patch and all workflows in this repository are distributed under the same **AGPL-3.0** license.
