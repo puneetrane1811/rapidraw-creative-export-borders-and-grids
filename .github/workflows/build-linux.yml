@@ -1,0 +1,106 @@
+name: Build Linux Packages (.AppImage & .deb)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rapidraw_version:
+        description: 'RapidRAW Release Tag or Branch (Use "main" for current codebase)'
+        required: true
+        default: 'main'
+      upload_to_release:
+        description: 'Attach to an existing GitHub Release?'
+        type: boolean
+        required: false
+        default: true
+      release_tag:
+        description: 'GitHub Release Tag to attach to (if above is true)'
+        required: false
+        default: 'v1.6.3-borders'
+
+jobs:
+  build-linux:
+    name: Build Linux (.AppImage & .deb)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout patch repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (GTK, WebKit, AppIndicator)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            pkg-config
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Clone RapidRAW source
+        shell: bash
+        run: |
+          echo "Cloning RapidRAW ${{ github.event.inputs.rapidraw_version }}..."
+          git clone --depth 1 --branch ${{ github.event.inputs.rapidraw_version }} https://github.com/CyberTimon/RapidRAW.git rapidraw-src
+
+      - name: Apply Export Borders Patch
+        shell: bash
+        run: |
+          echo "Applying patch..."
+          cd rapidraw-src
+          git apply --ignore-whitespace --ignore-space-change ../export-borders.patch
+          echo "Patch applied successfully!"
+          git status
+
+      - name: Install Frontend Dependencies
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm ci || npm install
+
+      - name: Build Linux Installers (AppImage & deb)
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm run tauri -- build --bundles appimage,deb
+
+      - name: Collect Linux Artifacts
+        id: collect
+        shell: bash
+        run: |
+          mkdir -p linux_dist
+          find rapidraw-src/src-tauri/target/release/bundle -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec cp {} linux_dist/ \;
+          echo "Collected Linux packages:"
+          ls -lh linux_dist/
+
+      - name: Upload Linux Packages as Workflow Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: linux_dist/*
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release
+        if: ${{ github.event.inputs.upload_to_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: linux_dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

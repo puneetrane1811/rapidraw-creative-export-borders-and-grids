@@ -3,6 +3,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![macOS Support](https://img.shields.io/badge/macOS-Apple_Silicon-brightgreen.svg)]()
 [![Windows Support](https://img.shields.io/badge/Windows-x64_NSIS-blue.svg)]()
+[![Linux Support](https://img.shields.io/badge/Linux-AppImage_%7C_deb-orange.svg)]()
 [![Auto-Release Workflow](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml/badge.svg)](https://github.com/puneetrane1811/rapidraw-export-borders/actions/workflows/auto-release.yml)
 
 A custom feature extension and automated CI/CD distribution pipeline for **[RapidRAW](https://github.com/CyberTimon/RapidRAW)**—the modern, high-performance open-source RAW photo editor built with Tauri, Rust, and React.
@@ -18,11 +19,13 @@ This project introduces a native **Export Image Borders** feature directly into 
 - [Downloads & Installation](#-downloads--installation)
   - [macOS (.dmg)](#macos-dmg)
   - [Windows (.exe)](#windows-exe)
+  - [Linux (.AppImage / .deb)](#linux-appimage--deb)
 - [How It Works (Code Architecture)](#-how-it-works-code-architecture)
 - [Included Files](#-included-files)
 - [Continuous Cloud Automation (CI/CD)](#-continuous-cloud-automation-cicd)
   - [Auto Rebuild on Upstream Releases](#1-auto-rebuild-on-upstream-releases)
   - [On-Demand Windows Builder](#2-on-demand-windows-builder)
+  - [On-Demand Linux Builder](#3-on-demand-linux-builder)
 - [Local Development & Building](#-local-development--building)
   - [Automated Local Script](#option-a-automated-local-rebuild)
   - [Manual Git Patch Workflow](#option-b-manual-git-patch-workflow)
@@ -78,6 +81,21 @@ Pre-compiled, ready-to-install packages are available on the **[Releases](https:
 1. Download `RapidRAW_<version>_x64-setup.exe` from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases) or the [Actions Artifacts](https://github.com/puneetrane1811/rapidraw-export-borders/actions).
 2. Run the setup installer and follow the on-screen instructions.
 
+### Linux (.AppImage & .deb)
+
+Packages are available from [Releases](https://github.com/puneetrane1811/rapidraw-export-borders/releases):
+
+- **Universal AppImage** (runs on Ubuntu, Fedora, Arch, Debian, openSUSE, etc.):
+  ```bash
+  chmod +x RapidRAW_*.AppImage
+  ./RapidRAW_*.AppImage
+  ```
+- **Debian / Ubuntu Package (`.deb`)**:
+  ```bash
+  sudo dpkg -i RapidRAW_*.deb
+  sudo apt-get install -f   # Resolves any missing system dependencies
+  ```
+
 ---
 
 ## 🧠 How It Works (Code Architecture)
@@ -127,14 +145,15 @@ RapidRAW Source Tree
 | :--- | :--- |
 | [`export-borders.patch`](./export-borders.patch) | Complete, clean unified diff patch against the RapidRAW codebase. |
 | [`update-and-build.sh`](./update-and-build.sh) | Local shell script to download any RapidRAW version, apply the patch, and build a `.dmg`. |
-| [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS and Windows, and publishes releases. |
+| [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS, Windows, & Linux, and publishes releases. |
 | [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml) | Dedicated workflow to compile native Windows `.exe` installers on demand. |
+| [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml) | Dedicated workflow to package Linux `.AppImage` and `.deb` installers on demand. |
 
 ---
 
 ## 🚀 Continuous Cloud Automation (CI/CD)
 
-This repository includes fully automated GitHub Actions workflows that run in the cloud on Microsoft and Apple runners.
+This repository includes fully automated GitHub Actions workflows that run in the cloud on Microsoft, Apple, and Ubuntu runners.
 
 ### 1. Auto Rebuild on Upstream Releases
 
@@ -146,13 +165,15 @@ flowchart LR
     Cond -- Yes --> Matrix["Trigger Multi-Platform Build"]
     Matrix --> Mac["🍎 macOS Runner<br/>Compiles .dmg"]
     Matrix --> Win["🪟 Windows Runner<br/>Compiles .exe"]
-    Mac --> Rel["🎉 Auto-Publish GitHub Release<br/>(Attaches both .dmg & .exe)"]
+    Matrix --> Lin["🐧 Linux Runner<br/>Packages .AppImage & .deb"]
+    Mac --> Rel["🎉 Auto-Publish GitHub Release<br/>(Attaches DMG, EXE, AppImage, DEB)"]
     Win --> Rel
+    Lin --> Rel
 ```
 
 - **Schedule**: Automatically polls [CyberTimon/RapidRAW](https://github.com/CyberTimon/RapidRAW) daily at `22:00 UTC`.
-- **Parallel Compilation**: When a new tag is detected, it spins up parallel `macos-latest` and `windows-latest` runners.
-- **Auto-Publish**: Automatically compiles the `.dmg` and `.exe` and attaches them to a new release tag (e.g., `v1.7.0-borders`).
+- **Parallel Compilation**: When a new tag is detected, it spins up parallel `macos-latest`, `windows-latest`, and `ubuntu-24.04` runners.
+- **Auto-Publish**: Automatically compiles and attaches all packages (`.dmg`, `.exe`, `.AppImage`, `.deb`) to a new release tag (e.g., `v1.7.0-borders`).
 - **Manual Trigger**: Can also be run on demand from **Actions** > **Auto Rebuild on Upstream Release** > **Run workflow**.
 
 #### 📊 Upstream Cadence & Timing Intelligence
@@ -175,6 +196,13 @@ Rather than checking at an arbitrary midnight hour, the `22:00 UTC` schedule is 
 
 - File: [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml)
 - Can be triggered manually at any time to compile a Windows `.exe` against any specified branch or tag.
+
+### 3. On-Demand Linux Builder
+
+- File: [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml)
+- Runs on Ubuntu 24.04 with WebKitGTK and AppIndicator system libraries.
+- Compiles and publishes both **`.AppImage`** (portable binary) and **`.deb`** (Debian/Ubuntu) packages.
+
 
 ---
 

@@ -88,16 +88,34 @@ jobs:
             platform: macOS
             bundle: dmg
             target_flag: ''
-            artifact_glob: '*.dmg'
           - os: windows-latest
             platform: Windows
             bundle: nsis
             target_flag: '--target x86_64-pc-windows-msvc'
-            artifact_glob: '*.exe'
+          - os: ubuntu-24.04
+            platform: Linux
+            bundle: appimage,deb
+            target_flag: ''
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout patch repository
         uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies (WebKit, GTK, AppIndicator)
+        if: matrix.platform == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            pkg-config
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -130,29 +148,25 @@ jobs:
           cd rapidraw-src
           npm ci || npm install
 
-      - name: Build Installer Package
+      - name: Build Installer Packages
         shell: bash
         run: |
           cd rapidraw-src
           npm run tauri -- build --bundles ${{ matrix.bundle }} --no-sign ${{ matrix.target_flag }}
 
-      - name: Stage Artifact
+      - name: Stage Artifacts
         id: stage
         shell: bash
         run: |
           mkdir -p dist_artifacts
-          PKG=$(find rapidraw-src/src-tauri/target -type f \( -name "${{ matrix.artifact_glob }}" \) | head -n 1)
-          if [ -z "$PKG" ]; then
-            echo "::error::Built installer matching ${{ matrix.artifact_glob }} not found!"
-            exit 1
-          fi
-          echo "Found built package: $PKG"
-          cp "$PKG" dist_artifacts/
+          find rapidraw-src/src-tauri/target -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -exec cp {} dist_artifacts/ \;
+          echo "Collected artifacts:"
+          ls -lh dist_artifacts/
 
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-installer
+          name: ${{ matrix.platform }}-installers
           path: dist_artifacts/*
           if-no-files-found: error
 
@@ -192,6 +206,7 @@ jobs:
             ### 📦 Available Downloads
             - **macOS (Apple Silicon)**: `.dmg` installer
             - **Windows**: `.exe` setup installer
+            - **Linux**: `.AppImage` (universal portable) and `.deb` package (Ubuntu/Debian)
 
             Built automatically from source using [puneetrane1811/rapidraw-export-borders](https://github.com/${{ github.repository }}).
           files: all_installers/*
