@@ -2,8 +2,10 @@ name: Auto Rebuild on Upstream Release
 
 on:
   schedule:
-    # Check daily at 00:00 UTC for new RapidRAW releases
-    - cron: '0 0 * * *'
+    # Timed with RapidRAW maintainer (CyberTimon - Central Europe) release cadence:
+    # Releases historically drop between 17:00 and 21:00 UTC (heavily on Sundays and weekends).
+    # Checking at 22:00 UTC catches releases right after they are published in the European evening.
+    - cron: '0 22 * * *'
   workflow_dispatch:
     inputs:
       target_ref:
