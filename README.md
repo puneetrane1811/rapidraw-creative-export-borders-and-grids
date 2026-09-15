@@ -106,11 +106,16 @@ RapidRAW Source Tree
 ### Technical Details
 
 1. **Dimension Math (`export_processing.rs`)**:
-   Calculates border padding as a percentage of the respective image dimensions with checked arithmetic:
-   $$\text{horizontal} = \max\left(1, \operatorname{round}\left(\text{width} \times \frac{\text{size}}{100}\right)\right)$$
-   $$\text{vertical} = \max\left(1, \operatorname{round}\left(\text{height} \times \frac{\text{size}}{100}\right)\right)$$
+   Calculates border padding as a percentage of the image dimensions with integer overflow safety:
+   ```rust
+   let horizontal = ((width as f32 * size / 100.0).round() as u32).max(1);
+   let vertical   = ((height as f32 * size / 100.0).round() as u32).max(1);
+
+   let output_width  = width.checked_add(horizontal.saturating_mul(2))?;
+   let output_height = height.checked_add(vertical.saturating_mul(2))?;
+   ```
 2. **Buffer Allocation & Blending**:
-   Allocates a new RGBA canvas sized $(\text{width} + 2 \times \text{horizontal}, \text{height} + 2 \times \text{vertical})$ initialized to the chosen hex color, and overlays the processed image into the center.
+   Allocates a new RGBA canvas sized `(output_width, output_height)` initialized to the chosen hex color, and overlays the processed image onto the center at `(horizontal, vertical)`.
 3. **Resolution Metadata Preservation**:
    Updates `final_full_w` and `final_full_h` in `determine_export_dimensions` so exported sidecars and EXIF records match the final bordered canvas size.
 
