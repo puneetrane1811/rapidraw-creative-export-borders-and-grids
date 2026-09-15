@@ -1,0 +1,96 @@
+name: Build Windows Release (.exe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      rapidraw_version:
+        description: 'RapidRAW Release Tag or Branch'
+        required: true
+        default: 'v1.6.3'
+      upload_to_release:
+        description: 'Attach to an existing GitHub Release?'
+        type: boolean
+        required: false
+        default: true
+      release_tag:
+        description: 'GitHub Release Tag to attach to (if above is true)'
+        required: false
+        default: 'v1.6.3-borders'
+
+jobs:
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout patch repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+
+      - name: Clone RapidRAW source
+        shell: bash
+        run: |
+          echo "Cloning RapidRAW ${{ github.event.inputs.rapidraw_version }}..."
+          git clone --depth 1 --branch ${{ github.event.inputs.rapidraw_version }} https://github.com/CyberTimon/RapidRAW.git rapidraw-src
+
+      - name: Apply Export Borders Patch
+        shell: bash
+        run: |
+          echo "Applying patch..."
+          cd rapidraw-src
+          git apply ../export-borders.patch
+          echo "Patch applied successfully!"
+          git status
+
+      - name: Install Frontend Dependencies
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm ci || npm install
+
+      - name: Build Windows Installer with Tauri
+        shell: bash
+        run: |
+          cd rapidraw-src
+          npm run tauri -- build --bundles nsis
+
+      - name: Locate Built Installer
+        id: locate-installer
+        shell: bash
+        run: |
+          EXE_PATH=$(find rapidraw-src/src-tauri/target/release/bundle/nsis -name "*.exe" | head -n 1)
+          if [ -z "$EXE_PATH" ]; then
+            echo "::error::Installer .exe not found!"
+            exit 1
+          fi
+          echo "Found installer at $EXE_PATH"
+          echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
+          echo "exe_name=$(basename "$EXE_PATH")" >> $GITHUB_OUTPUT
+
+      - name: Upload Installer as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.locate-installer.outputs.exe_name }}
+          path: ${{ steps.locate-installer.outputs.exe_path }}
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release
+        if: ${{ github.event.inputs.upload_to_release == 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: ${{ steps.locate-installer.outputs.exe_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

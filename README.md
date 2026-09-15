@@ -121,6 +121,23 @@ The script will fetch the release source, apply `export-borders.patch`, run the 
 
 ---
 
+### Option D: Automated Windows (.exe) Cloud Build
+
+This repository includes a GitHub Actions workflow to build native Windows installers (`.exe`) directly in the cloud:
+
+1. Go to your repository on GitHub and click the **Actions** tab.
+2. Under All workflows, select **Build Windows Release (.exe)**.
+3. Click the **Run workflow** dropdown button:
+   - **RapidRAW Release Tag**: Choose the version (e.g., `v1.6.3`).
+   - **Attach to an existing GitHub Release**: Checked by default.
+   - **GitHub Release Tag**: `v1.6.3-borders`
+4. Click **Run workflow**.
+
+GitHub's Windows runner will automatically check out RapidRAW, apply `export-borders.patch`, compile the NSIS installer (`.exe`), and attach it to your release or provide it as a downloadable artifact!
+
+
+---
+
 ## 🍏 Installing on macOS (Gatekeeper Bypass)
 
 Because local or personal builds are unsigned, macOS Gatekeeper may block the app on first launch.
