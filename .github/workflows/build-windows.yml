@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       rapidraw_version:
-        description: 'RapidRAW Release Tag or Branch'
+        description: 'RapidRAW Release Tag or Branch (Use "main" for current codebase)'
         required: true
-        default: 'v1.6.3'
+        default: 'main'
       upload_to_release:
         description: 'Attach to an existing GitHub Release?'
         type: boolean
@@ -42,6 +42,8 @@ jobs:
       - name: Clone RapidRAW source
         shell: bash
         run: |
+          # Keep Unix LF endings on Windows to ensure patch applies cleanly
+          git config --global core.autocrlf false
           echo "Cloning RapidRAW ${{ github.event.inputs.rapidraw_version }}..."
           git clone --depth 1 --branch ${{ github.event.inputs.rapidraw_version }} https://github.com/CyberTimon/RapidRAW.git rapidraw-src
 
@@ -50,7 +52,7 @@ jobs:
         run: |
           echo "Applying patch..."
           cd rapidraw-src
-          git apply ../export-borders.patch
+          git apply --ignore-whitespace --ignore-space-change ../export-borders.patch
           echo "Patch applied successfully!"
           git status
 
