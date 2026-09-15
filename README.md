@@ -1,4 +1,4 @@
-# RapidRAW with Export Image Borders 🖼️
+# RapidRAW: Advanced Borders & Grids 🖼️📐
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![macOS Support](https://img.shields.io/badge/macOS-Apple_Silicon-brightgreen.svg)]()
@@ -8,7 +8,7 @@
 
 A custom feature extension and automated CI/CD distribution pipeline for **[RapidRAW](https://github.com/CyberTimon/RapidRAW)**—the modern, high-performance open-source RAW photo editor built with Tauri, Rust, and React.
 
-This project introduces a native **Export Image Borders** feature directly into RapidRAW's UI and export pipeline, eliminating the need for external scripts or post-processing tools like ImageMagick.
+This project introduces native **Borders, Fine-Art Keylines, Multi-Photo Collages, Tile Splitters, and Real-Time Live Preview** directly into RapidRAW's UI and export pipeline, eliminating the need for external tools or fragmented post-processing scripts.
 
 ---
 
@@ -37,17 +37,37 @@ This project introduces a native **Export Image Borders** feature directly into 
 
 ## 💡 Motivation
 
-Photographers often add borders to photos for social media presentation (e.g., maintaining consistent aspect ratios on Instagram without cropping), white margins for prints, or aesthetic framing.
+Modern photo publishing requires far more than basic raw development. Photographers regularly prepare images for diverse finishing formats:
+- **Social Media & Portfolios**: Maintaining uniform aspect ratios without awkward cropping on platforms like Instagram, Behance, or VSCO.
+- **Swipeable Panoramas & Mosaics**: Slicing wide landscapes or editorial shots into seamless multi-image carousels and $3 \times 3$ grid profile mosaics.
+- **Client Contact Sheets & Collages**: Grouping series of photos into clean, structured $N \times M$ grids with precise gutters for client proofing or moodboards.
+- **Museum & Gallery Prints**: Framing fine-art prints with outer mats and delicate, contrasting inner keylines (fillets) to separate the artwork from the mat.
 
-Previously, achieving this required exporting images from RapidRAW and running terminal scripts with ImageMagick:
+### The Problem: Fragmented Workflows & Blind Processing
+Previously, achieving these results required exporting files from RapidRAW and jumping between multiple external tools—Photoshop, Lightroom's Print module, mobile apps (Unfold, PanoraSplit), or tedious terminal scripts:
+
 ```bash
-# Prior workaround:
-for file in *.jpg; do 
-  magick "$file" -border 1%x1% "border_${file}"
-done
+# Prior fragmented workarounds:
+# 1. Adding borders
+magick input.jpg -bordercolor white -border 2% framed.jpg
+
+# 2. Assembling a 2x2 contact sheet collage
+montage photo1.jpg photo2.jpg photo3.jpg photo4.jpg -tile 2x2 -geometry +20+20 collage.jpg
+
+# 3. Slicing a panoramic swipe carousel
+magick panorama.jpg -crop 3x1@ +repage tile_%d.jpg
 ```
 
-This project integrates that capability natively into RapidRAW so borders can be applied seamlessly during single-image or batch exports.
+This multi-step workflow created major pain points:
+1. **Blind Trial-and-Error**: Shell scripts and external utilities provide no visual feedback until processing is done. Adjusting a margin or gutter required re-exporting and re-running commands repeatedly.
+2. **Re-compression Quality Loss**: Exporting intermediate JPEGs and re-saving them through secondary tools causes unnecessary generation loss and degrades image fidelity.
+3. **Broken Flow**: Photographers had to manage different third-party apps for borders, other apps for collage montages, and yet other tools for Instagram tile slicing.
+
+### The Solution: Native Creative Export in RapidRAW
+This extension integrates borders, fine-art keylines, multi-photo collages, multi-tile splitting, and composition grids directly into RapidRAW's core export engine:
+- **Zero Generation Loss**: Borders, gutters, and slice matrices are rendered in a single high-performance pipeline directly from the developed 16-bit raster data.
+- **Real-Time Visual Proofing**: An embedded, sticky HTML5 canvas renders live visual updates at 60fps as you adjust sliders, colors, and layouts.
+- **One-Click Repeatability**: All configurations are remembered across export presets (`High Quality`, `Fast Web`, and custom presets).
 
 ---
 
