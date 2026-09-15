@@ -1,209 +1,117 @@
---- a/src/components/ui/ExportImportProperties.tsx
-+++ b/src/components/ui/ExportImportProperties.tsx
-@@ -45,6 +45,7 @@
-   } | null;
-   stripGps: boolean;
-   watermark: WatermarkSettings | null;
-+  border?: BorderSettings | null;
-   exportMasks?: boolean;
-   preserveFolders?: boolean;
-   destinationType?: string;
-@@ -69,6 +70,12 @@
-   scale: number;
-   spacing: number;
-   opacity: number;
-+}
-+
-+interface BorderSettings {
-+  /** Border thickness as a percentage of each corresponding image dimension. */
-+  size: number;
-+  color: string;
- }
- 
- export interface ExportState {
-@@ -122,6 +129,9 @@
-   watermarkScale: number;
-   watermarkSpacing: number;
-   watermarkOpacity: number;
-+  enableBorder?: boolean;
-+  borderSize?: number;
-+  borderColor?: string;
-   lastExportPath?: string;
-   destinationType?: string;
-   subfolder?: string;
---- a/src/hooks/useExportSettings.ts
-+++ b/src/hooks/useExportSettings.ts
-@@ -21,6 +21,9 @@
-   const [watermarkScale, setWatermarkScale] = useState(10);
-   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
-   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
-+  const [enableBorder, setEnableBorder] = useState(false);
-+  const [borderSize, setBorderSize] = useState(1);
-+  const [borderColor, setBorderColor] = useState('#ffffff');
-   const [destinationType, setDestinationType] = useState<string>('customFolder');
-   const [subfolder, setSubfolder] = useState<string>('');
- 
-@@ -44,6 +47,9 @@
-     setWatermarkScale(preset.watermarkScale);
-     setWatermarkSpacing(preset.watermarkSpacing);
-     setWatermarkOpacity(preset.watermarkOpacity);
-+    setEnableBorder(preset.enableBorder ?? false);
-+    setBorderSize(preset.borderSize ?? 1);
-+    setBorderColor(preset.borderColor ?? '#ffffff');
-     setDestinationType(preset.destinationType || 'customFolder');
-     setSubfolder(preset.subfolder || '');
-   }, []);
-@@ -69,6 +75,9 @@
-       watermarkScale,
-       watermarkSpacing,
-       watermarkOpacity,
-+      enableBorder,
-+      borderSize,
-+      borderColor,
-       destinationType,
-       subfolder,
-     }),
-@@ -92,6 +101,9 @@
-       watermarkScale,
-       watermarkSpacing,
-       watermarkOpacity,
-+      enableBorder,
-+      borderSize,
-+      borderColor,
-       destinationType,
-       subfolder,
-     ],
-@@ -136,6 +148,12 @@
-     setWatermarkSpacing,
-     watermarkOpacity,
-     setWatermarkOpacity,
-+    enableBorder,
-+    setEnableBorder,
-+    borderSize,
-+    setBorderSize,
-+    borderColor,
-+    setBorderColor,
-     destinationType,
-     setDestinationType,
-     subfolder,
---- a/src/hooks/useExternalEditSession.ts
-+++ b/src/hooks/useExternalEditSession.ts
-@@ -66,6 +66,7 @@
-       stripGps: false,
-       exportMasks: false,
-       watermark: null,
-+      border: null,
-     };
- 
-     setIsFinishing(true);
---- a/src/components/panel/right/ExportPanel.tsx
-+++ b/src/components/panel/right/ExportPanel.tsx
-@@ -242,6 +242,12 @@
-     setWatermarkSpacing,
-     watermarkOpacity,
-     setWatermarkOpacity,
-+    enableBorder,
-+    setEnableBorder,
-+    borderSize,
-+    setBorderSize,
-+    borderColor,
-+    setBorderColor,
-     preserveFolders,
-     setPreserveFolders,
-     handleApplyPreset,
-@@ -412,6 +418,7 @@
-               opacity: watermarkOpacity,
-             }
-           : null,
-+      border: enableBorder ? { size: borderSize, color: borderColor } : null,
-     };
-     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-     const runEstimate = () =>
-@@ -453,6 +460,9 @@
-     watermarkScale,
-     watermarkSpacing,
-     watermarkOpacity,
-+    enableBorder,
-+    borderSize,
-+    borderColor,
-     debouncedEstimateSize,
-     exportMasks,
-     preserveFolders,
-@@ -498,6 +508,7 @@
-               opacity: watermarkOpacity,
-             }
-           : null,
-+      border: enableBorder ? { size: borderSize, color: borderColor } : null,
-     };
- 
-     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
-@@ -754,6 +765,41 @@
-                         onChange={setDontEnlarge}
-                         trackClassName="bg-surface"
-                       />
-+                    </div>
-+                  )}
-+                </Section>
-+
-+                <Section title={t('export.sections.border')}>
-+                  <Switch
-+                    label={t('export.border.addBorder')}
-+                    checked={enableBorder}
-+                    onChange={setEnableBorder}
-+                    disabled={isExporting}
-+                    trackClassName="bg-surface"
-+                  />
-+                  {enableBorder && (
-+                    <div className="space-y-4 pl-2 border-l-2 border-surface">
-+                      <Slider
-+                        label={t('export.border.size')}
-+                        min={0.1}
-+                        max={20}
-+                        step={0.1}
-+                        value={borderSize}
-+                        onChange={(e) => setBorderSize(Number(e.target.value))}
-+                        disabled={isExporting}
-+                        defaultValue={1}
-+                      />
-+                      <div className="flex items-center justify-between gap-3">
-+                        <Text variant={TextVariants.label}>{t('export.border.color')}</Text>
-+                        <input
-+                          aria-label={t('export.border.color')}
-+                          className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
-+                          disabled={isExporting}
-+                          onChange={(e) => setBorderColor(e.target.value)}
-+                          type="color"
-+                          value={borderColor}
-+                        />
-+                      </div>
-                     </div>
-                   )}
-                 </Section>
---- a/src/i18n/locales/en.json
-+++ b/src/i18n/locales/en.json
-@@ -786,6 +786,11 @@
-       "mb": "MB",
-       "tb": "TB"
-     },
-+    "border": {
-+      "addBorder": "Add Border",
-+      "color": "Color",
-+      "size": "Size (%)"
-+    },
-     "destination": {
-       "customFolder": "Custom folder",
-       "originalFolder": "Original image folder",
-@@ -828,6 +833,7 @@
-     },
-     "sections": {
-       "advanced": "Advanced",
-+      "border": "Border",
-       "destination": "Destination",
-       "fileNaming": "File Naming",
-       "fileSettings": "File Settings",
+diff --git a/src-tauri/src/app_settings.rs b/src-tauri/src/app_settings.rs
+index 9eb589f..8935dea 100644
+--- a/src-tauri/src/app_settings.rs
++++ b/src-tauri/src/app_settings.rs
+@@ -240,6 +240,48 @@ pub struct ExportPreset {
+     pub watermark_spacing: u32,
+     pub watermark_opacity: u32,
+     #[serde(default)]
++    pub enable_border: Option<bool>,
++    #[serde(default)]
++    pub border_size: Option<f32>,
++    #[serde(default)]
++    pub border_color: Option<String>,
++    #[serde(default)]
++    pub enable_keyline: Option<bool>,
++    #[serde(default)]
++    pub keyline_size: Option<f32>,
++    #[serde(default)]
++    pub keyline_color: Option<String>,
++    #[serde(default)]
++    pub keyline_inset: Option<f32>,
++    #[serde(default)]
++    pub enable_grid_overlay: Option<bool>,
++    #[serde(default)]
++    pub grid_overlay_rows: Option<u32>,
++    #[serde(default)]
++    pub grid_overlay_cols: Option<u32>,
++    #[serde(default)]
++    pub grid_overlay_color: Option<String>,
++    #[serde(default)]
++    pub grid_overlay_opacity: Option<f32>,
++    #[serde(default)]
++    pub enable_collage_grid: Option<bool>,
++    #[serde(default)]
++    pub collage_columns: Option<u32>,
++    #[serde(default)]
++    pub collage_rows: Option<u32>,
++    #[serde(default)]
++    pub collage_gutter: Option<f32>,
++    #[serde(default)]
++    pub collage_cell_fit: Option<String>,
++    #[serde(default)]
++    pub enable_tile_split: Option<bool>,
++    #[serde(default)]
++    pub tile_split_columns: Option<u32>,
++    #[serde(default)]
++    pub tile_split_rows: Option<u32>,
++    #[serde(default)]
++    pub tile_border_each_tile: Option<bool>,
++    #[serde(default)]
+     pub export_masks: Option<bool>,
+     #[serde(default)]
+     pub preserve_folders: Option<bool>,
+@@ -271,6 +313,27 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
+             watermark_scale: 10,
+             watermark_spacing: 5,
+             watermark_opacity: 75,
++            enable_border: Some(false),
++            border_size: Some(1.0),
++            border_color: Some("#ffffff".to_string()),
++            enable_keyline: Some(false),
++            keyline_size: Some(0.2),
++            keyline_color: Some("#000000".to_string()),
++            keyline_inset: Some(0.5),
++            enable_grid_overlay: Some(false),
++            grid_overlay_rows: Some(3),
++            grid_overlay_cols: Some(3),
++            grid_overlay_color: Some("#ffffff".to_string()),
++            grid_overlay_opacity: Some(50.0),
++            enable_collage_grid: Some(false),
++            collage_columns: Some(2),
++            collage_rows: Some(2),
++            collage_gutter: Some(1.0),
++            collage_cell_fit: Some("fit".to_string()),
++            enable_tile_split: Some(false),
++            tile_split_columns: Some(3),
++            tile_split_rows: Some(1),
++            tile_border_each_tile: Some(false),
+             export_masks: Some(false),
+             preserve_folders: Some(false),
+             last_export_path: None,
+@@ -295,6 +358,27 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
+             watermark_scale: 10,
+             watermark_spacing: 5,
+             watermark_opacity: 75,
++            enable_border: Some(false),
++            border_size: Some(1.0),
++            border_color: Some("#ffffff".to_string()),
++            enable_keyline: Some(false),
++            keyline_size: Some(0.2),
++            keyline_color: Some("#000000".to_string()),
++            keyline_inset: Some(0.5),
++            enable_grid_overlay: Some(false),
++            grid_overlay_rows: Some(3),
++            grid_overlay_cols: Some(3),
++            grid_overlay_color: Some("#ffffff".to_string()),
++            grid_overlay_opacity: Some(50.0),
++            enable_collage_grid: Some(false),
++            collage_columns: Some(2),
++            collage_rows: Some(2),
++            collage_gutter: Some(1.0),
++            collage_cell_fit: Some("fit".to_string()),
++            enable_tile_split: Some(false),
++            tile_split_columns: Some(3),
++            tile_split_rows: Some(1),
++            tile_border_each_tile: Some(false),
+             export_masks: Some(false),
+             preserve_folders: Some(false),
+             last_export_path: None,
+diff --git a/src-tauri/src/export_processing.rs b/src-tauri/src/export_processing.rs
+index b0e31f5..7f7bec6 100644
 --- a/src-tauri/src/export_processing.rs
 +++ b/src-tauri/src/export_processing.rs
-@@ -7,7 +7,7 @@
+@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
  use std::sync::{Arc, Mutex};
  
  use image::codecs::jpeg::JpegEncoder;
@@ -212,19 +120,61 @@
  use jxl_encoder::{
      LosslessConfig, LossyConfig, PixelLayout,
      api::{calibrated_jxl_quality, quality_to_distance},
-@@ -102,6 +102,8 @@
+@@ -102,6 +102,12 @@ pub struct ExportSettings {
      pub filename_template: Option<String>,
      pub watermark: Option<WatermarkSettings>,
      #[serde(default)]
 +    pub border: Option<BorderSettings>,
 +    #[serde(default)]
++    pub collage_grid: Option<CollageGridSettings>,
++    #[serde(default)]
++    pub tile_split: Option<TileSplitSettings>,
++    #[serde(default)]
      pub export_masks: bool,
      #[serde(default)]
      pub preserve_folders: bool,
-@@ -142,6 +144,49 @@
-     pub scale: f32,
-     pub spacing: f32,
+@@ -144,6 +150,310 @@ pub struct WatermarkSettings {
      pub opacity: f32,
+ }
+ 
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct KeylineSettings {
++    pub enabled: bool,
++    pub size: f32,
++    pub color: String,
++    pub inset: f32,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct GridOverlaySettings {
++    pub enabled: bool,
++    pub rows: u32,
++    pub columns: u32,
++    pub color: String,
++    pub opacity: f32,
++    pub size: f32,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct CollageGridSettings {
++    pub enabled: bool,
++    pub columns: u32,
++    pub rows: u32,
++    pub gutter: f32,
++    pub cell_fit: String,
++    pub background_color: Option<String>,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct TileSplitSettings {
++    pub enabled: bool,
++    pub columns: u32,
++    pub rows: u32,
++    pub border_each_tile: bool,
 +}
 +
 +#[derive(Serialize, Deserialize, Debug, Clone)]
@@ -233,6 +183,10 @@
 +    /// Border thickness as a percentage of each corresponding image dimension.
 +    pub size: f32,
 +    pub color: String,
++    #[serde(default)]
++    pub keyline: Option<KeylineSettings>,
++    #[serde(default)]
++    pub grid_overlay: Option<GridOverlaySettings>,
 +}
 +
 +fn parse_border_color(color: &str) -> Result<Rgba<u8>, String> {
@@ -254,6 +208,9 @@
 +    if !size.is_finite() || size < 0.0 {
 +        return Err("Border size must be a non-negative number.".to_string());
 +    }
++    if size == 0.0 {
++        return Ok((0, 0, width, height));
++    }
 +    let horizontal = ((width as f32 * size / 100.0).round() as u32).max(1);
 +    let vertical = ((height as f32 * size / 100.0).round() as u32).max(1);
 +    let output_width = width.checked_add(horizontal.saturating_mul(2)).ok_or("Border makes image too wide.")?;
@@ -261,35 +218,377 @@
 +    Ok((horizontal, vertical, output_width, output_height))
 +}
 +
++fn draw_filled_rect(
++    buffer: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
++    x0: i32,
++    y0: i32,
++    x1: i32,
++    y1: i32,
++    color: Rgba<u8>,
++    opacity: f32,
++) {
++    let (buf_w, buf_h) = buffer.dimensions();
++    let min_x = x0.clamp(0, buf_w as i32) as u32;
++    let max_x = x1.clamp(0, buf_w as i32) as u32;
++    let min_y = y0.clamp(0, buf_h as i32) as u32;
++    let max_y = y1.clamp(0, buf_h as i32) as u32;
++
++    if min_x >= max_x || min_y >= max_y {
++        return;
++    }
++
++    if opacity >= 0.999 {
++        for y in min_y..max_y {
++            for x in min_x..max_x {
++                buffer.put_pixel(x, y, color);
++            }
++        }
++    } else {
++        let alpha = opacity.clamp(0.0, 1.0);
++        let inv_alpha = 1.0 - alpha;
++        for y in min_y..max_y {
++            for x in min_x..max_x {
++                let p = buffer.get_pixel(x, y);
++                let r = (color[0] as f32 * alpha + p[0] as f32 * inv_alpha).round() as u8;
++                let g = (color[1] as f32 * alpha + p[1] as f32 * inv_alpha).round() as u8;
++                let b = (color[2] as f32 * alpha + p[2] as f32 * inv_alpha).round() as u8;
++                buffer.put_pixel(x, y, Rgba([r, g, b, 255]));
++            }
++        }
++    }
++}
++
++fn draw_rect_outline(
++    buffer: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
++    x0: i32,
++    y0: i32,
++    x1: i32,
++    y1: i32,
++    thickness: u32,
++    color: Rgba<u8>,
++    opacity: f32,
++) {
++    let t = thickness as i32;
++    draw_filled_rect(buffer, x0, y0, x1, y0 + t, color, opacity);
++    draw_filled_rect(buffer, x0, y1 - t, x1, y1, color, opacity);
++    draw_filled_rect(buffer, x0, y0, x0 + t, y1, color, opacity);
++    draw_filled_rect(buffer, x1 - t, y0, x1, y1, color, opacity);
++}
++
 +fn apply_border(image: DynamicImage, border_settings: &BorderSettings) -> Result<DynamicImage, String> {
 +    let (width, height) = image.dimensions();
 +    let (horizontal, vertical, output_width, output_height) =
 +        border_dimensions(width, height, border_settings.size)?;
-+    let mut bordered = ImageBuffer::from_pixel(output_width, output_height, parse_border_color(&border_settings.color)?);
-+    imageops::overlay(&mut bordered, &image.to_rgba8(), horizontal as i64, vertical as i64);
++
++    let mut bordered = if border_settings.size > 0.0 {
++        let mut buf = ImageBuffer::from_pixel(output_width, output_height, parse_border_color(&border_settings.color)?);
++        imageops::overlay(&mut buf, &image.to_rgba8(), horizontal as i64, vertical as i64);
++        buf
++    } else {
++        image.to_rgba8()
++    };
++
++    // 1. Inset Keyline
++    if let Some(keyline) = &border_settings.keyline {
++        if keyline.enabled {
++            let keyline_color = parse_border_color(&keyline.color)?;
++            let thickness = ((width.min(height) as f32 * keyline.size / 100.0).round() as u32).max(1);
++            let inset = ((width.min(height) as f32 * keyline.inset / 100.0).round() as i32).max(0);
++
++            let kx0 = (horizontal as i32) - inset;
++            let ky0 = (vertical as i32) - inset;
++            let kx1 = (horizontal + width) as i32 + inset;
++            let ky1 = (vertical + height) as i32 + inset;
++
++            draw_rect_outline(&mut bordered, kx0, ky0, kx1, ky1, thickness, keyline_color, 1.0);
++        }
++    }
++
++    // 2. Composition Grid Overlay
++    if let Some(grid) = &border_settings.grid_overlay {
++        if grid.enabled && grid.columns > 1 && grid.rows > 1 {
++            let grid_color = parse_border_color(&grid.color)?;
++            let opacity = (grid.opacity / 100.0).clamp(0.0, 1.0);
++            let thickness = ((width.min(height) as f32 * grid.size / 100.0).round() as u32).max(1);
++
++            let img_x0 = horizontal as i32;
++            let img_y0 = vertical as i32;
++            let img_x1 = (horizontal + width) as i32;
++            let img_y1 = (vertical + height) as i32;
++
++            for col in 1..grid.columns {
++                let gx = img_x0 + ((width as f32 * col as f32 / grid.columns as f32).round() as i32);
++                let half_t = (thickness / 2) as i32;
++                draw_filled_rect(&mut bordered, gx - half_t, img_y0, gx - half_t + (thickness as i32), img_y1, grid_color, opacity);
++            }
++
++            for row in 1..grid.rows {
++                let gy = img_y0 + ((height as f32 * row as f32 / grid.rows as f32).round() as i32);
++                let half_t = (thickness / 2) as i32;
++                draw_filled_rect(&mut bordered, img_x0, gy - half_t, img_x1, gy - half_t + (thickness as i32), grid_color, opacity);
++            }
++        }
++    }
++
 +    Ok(DynamicImage::ImageRgba8(bordered))
- }
- 
++}
++
++fn composite_photo_collage(
++    images: &[DynamicImage],
++    collage_settings: &CollageGridSettings,
++    border_settings: Option<&BorderSettings>,
++) -> Result<DynamicImage, String> {
++    if images.is_empty() {
++        return Err("No images provided for collage".to_string());
++    }
++
++    let cols = collage_settings.columns.max(1);
++    let rows = collage_settings.rows.max(1);
++
++    let (first_w, first_h) = images[0].dimensions();
++    let cell_w = first_w.max(100);
++    let cell_h = first_h.max(100);
++
++    let gutter_px = if cols > 1 || rows > 1 {
++        (cell_w as f32 * collage_settings.gutter / 100.0).round() as u32
++    } else {
++        0
++    };
++
++    let inner_w = cols * cell_w + (cols.saturating_sub(1)) * gutter_px;
++    let inner_h = rows * cell_h + (rows.saturating_sub(1)) * gutter_px;
++
++    let bg_color_str = collage_settings.background_color.as_deref().unwrap_or("#ffffff");
++    let bg_color = parse_border_color(bg_color_str)?;
++
++    let mut master = ImageBuffer::from_pixel(inner_w, inner_h, bg_color);
++
++    for (idx, img) in images.iter().enumerate() {
++        if idx >= (cols * rows) as usize {
++            break;
++        }
++        let col = (idx as u32) % cols;
++        let row = (idx as u32) / cols;
++
++        let cell_x = col * (cell_w + gutter_px);
++        let cell_y = row * (cell_h + gutter_px);
++
++        let (iw, ih) = img.dimensions();
++        let target_img = if collage_settings.cell_fit == "fill" {
++            let scale_x = cell_w as f32 / iw as f32;
++            let scale_y = cell_h as f32 / ih as f32;
++            let scale = scale_x.max(scale_y);
++            let scaled_w = (iw as f32 * scale).round() as u32;
++            let scaled_h = (ih as f32 * scale).round() as u32;
++
++            let scaled = img.resize_exact(scaled_w, scaled_h, imageops::FilterType::Lanczos3);
++            let crop_x = (scaled_w.saturating_sub(cell_w)) / 2;
++            let crop_y = (scaled_h.saturating_sub(cell_h)) / 2;
++            scaled.crop_imm(crop_x, crop_y, cell_w, cell_h)
++        } else {
++            img.resize(cell_w, cell_h, imageops::FilterType::Lanczos3)
++        };
++
++        let (tw, th) = target_img.dimensions();
++        let paste_x = cell_x + (cell_w.saturating_sub(tw)) / 2;
++        let paste_y = cell_y + (cell_h.saturating_sub(th)) / 2;
++
++        imageops::overlay(&mut master, &target_img.to_rgba8(), paste_x as i64, paste_y as i64);
++    }
++
++    let mut result = DynamicImage::ImageRgba8(master);
++
++    if let Some(border) = border_settings {
++        result = apply_border(result, border)?;
++    }
++
++    Ok(result)
++}
++
++fn slice_into_tiles(
++    image: &DynamicImage,
++    tile_settings: &TileSplitSettings,
++    border_settings: Option<&BorderSettings>,
++) -> Result<Vec<DynamicImage>, String> {
++    let (width, height) = image.dimensions();
++    let cols = tile_settings.columns.max(1);
++    let rows = tile_settings.rows.max(1);
++
++    let tile_w = width / cols;
++    let tile_h = height / rows;
++
++    if tile_w == 0 || tile_h == 0 {
++        return Err("Image too small to split into the requested number of tiles".to_string());
++    }
++
++    let mut tiles = Vec::with_capacity((cols * rows) as usize);
++
++    for r in 0..rows {
++        for c in 0..cols {
++            let tx = c * tile_w;
++            let ty = r * tile_h;
++            let mut tile = image.crop_imm(tx, ty, tile_w, tile_h);
++
++            if tile_settings.border_each_tile {
++                if let Some(border) = border_settings {
++                    tile = apply_border(tile, border)?;
++                }
++            }
++            tiles.push(tile);
++        }
++    }
++
++    Ok(tiles)
++}
++
  fn apply_watermark(
-@@ -340,6 +385,9 @@
- 
+     base_image: &mut DynamicImage,
+     watermark_settings: &WatermarkSettings,
+@@ -341,6 +651,9 @@ fn apply_export_resize_and_watermark(
      if let Some(watermark_settings) = &export_settings.watermark {
          apply_watermark(&mut image, watermark_settings)?;
-+    }
+     }
 +    if let Some(border_settings) = &export_settings.border {
 +        image = apply_border(image, border_settings)?;
-     }
++    }
      Ok(image)
  }
-@@ -1490,6 +1538,7 @@
+ 
+@@ -1008,6 +1321,7 @@ pub(crate) async fn export_images_impl(
+         let total_paths = paths.len();
+         let settings = load_settings(app_handle.clone()).unwrap_or_default();
+ 
++        let first_source_path = paths.first().cloned().unwrap_or_default();
+         let mut base_path_counts: HashMap<String, usize> = HashMap::new();
+         let mut export_items = Vec::with_capacity(total_paths);
+ 
+@@ -1039,6 +1353,13 @@ pub(crate) async fn export_images_impl(
+             export_items.push((i, path_str, *count, explicit_vc));
+         }
+ 
++        let is_collage = export_settings.collage_grid.as_ref().map(|c| c.enabled).unwrap_or(false) && total_paths > 1;
++        let collage_collector: Option<Arc<Mutex<Vec<(usize, DynamicImage, String)>>>> = if is_collage {
++            Some(Arc::new(Mutex::new(Vec::with_capacity(total_paths))))
++        } else {
++            None
++        };
++
+         let used_paths = Arc::new(Mutex::new(std::collections::HashSet::new()));
+         let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
+         let mut join_handles = Vec::new();
+@@ -1060,6 +1381,7 @@ pub(crate) async fn export_images_impl(
+             let base_origin_folders = base_origin_folders.clone();
+             let export_settings = export_settings.clone();
+             let output_format = output_format.clone();
++            let collage_collector_clone = collage_collector.clone();
+             let settings = settings.clone();
+             let cancellation_token_clone = Arc::clone(&cancellation_token);
+             let adjustments_mode = adjustments_mode.clone();
+@@ -1292,12 +1614,41 @@ pub(crate) async fn export_images_impl(
+                         actual_output_format,
+                     )?;
+                     ensure_export_not_cancelled(&cancellation_token_clone)?;
+-                    save_image_with_metadata(
+-                        &final_image,
+-                        &output_path,
+-                        &source_path_str,
+-                        &export_settings,
+-                    )?;
++                    if let Some(collector) = &collage_collector_clone {
++                        collector.lock().unwrap().push((global_index, final_image, source_path_str.clone()));
++                    } else if let Some(tile_settings) = &export_settings.tile_split {
++                        if tile_settings.enabled {
++                            let tiles = slice_into_tiles(&final_image, tile_settings, export_settings.border.as_ref())?;
++                            let parent_dir = output_path.parent().unwrap_or(Path::new(""));
++                            let stem = output_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
++                            let ext = output_path.extension().and_then(|s| s.to_str()).unwrap_or(&output_format);
++
++                            for (t_idx, tile) in tiles.iter().enumerate() {
++                                ensure_export_not_cancelled(&cancellation_token_clone)?;
++                                let tile_path = parent_dir.join(format!("{}_tile_{:02}.{}", stem, t_idx + 1, ext));
++                                save_image_with_metadata(
++                                    tile,
++                                    &tile_path,
++                                    &source_path_str,
++                                    &export_settings,
++                                )?;
++                            }
++                        } else {
++                            save_image_with_metadata(
++                                &final_image,
++                                &output_path,
++                                &source_path_str,
++                                &export_settings,
++                            )?;
++                        }
++                    } else {
++                        save_image_with_metadata(
++                            &final_image,
++                            &output_path,
++                            &source_path_str,
++                            &export_settings,
++                        )?;
++                    }
+                     ensure_export_not_cancelled(&cancellation_token_clone)?;
+ 
+                     if export_settings.preserve_timestamps {
+@@ -1355,6 +1706,45 @@ pub(crate) async fn export_images_impl(
+             }
+         }
+ 
++        if let Some(collector) = collage_collector {
++            if !cancellation_token.load(Ordering::SeqCst) {
++                let mut collected = {
++                    let mut lock = collector.lock().unwrap();
++                    std::mem::take(&mut *lock)
++                };
++                collected.sort_by_key(|(idx, _, _)| *idx);
++                let images: Vec<DynamicImage> = collected.into_iter().map(|(_, img, _)| img).collect();
++
++                if let Some(collage_settings) = &export_settings.collage_grid {
++                    if let Ok(composite) = composite_photo_collage(&images, collage_settings, export_settings.border.as_ref()) {
++                        let collage_output_path = if is_explicit_file_path {
++                            output_folder_path.to_path_buf()
++                        } else {
++                            output_folder_path.join(format!("collage_export.{}", output_format))
++                        };
++
++                        if let Some(tile_settings) = &export_settings.tile_split {
++                            if tile_settings.enabled {
++                                if let Ok(tiles) = slice_into_tiles(&composite, tile_settings, export_settings.border.as_ref()) {
++                                    let parent_dir = collage_output_path.parent().unwrap_or(Path::new(""));
++                                    let stem = collage_output_path.file_stem().and_then(|s| s.to_str()).unwrap_or("collage");
++                                    let ext = collage_output_path.extension().and_then(|s| s.to_str()).unwrap_or(&output_format);
++                                    for (t_idx, tile) in tiles.iter().enumerate() {
++                                        let tile_path = parent_dir.join(format!("{}_tile_{:02}.{}", stem, t_idx + 1, ext));
++                                        let _ = save_image_with_metadata(tile, &tile_path, &first_source_path, &export_settings);
++                                    }
++                                }
++                            } else {
++                                let _ = save_image_with_metadata(&composite, &collage_output_path, &first_source_path, &export_settings);
++                            }
++                        } else {
++                            let _ = save_image_with_metadata(&composite, &collage_output_path, &first_source_path, &export_settings);
++                        }
++                    }
++                }
++            }
++        }
++
+         let errors: Vec<String> = results.into_iter().filter_map(Result::err).collect();
+         let error_count = errors.len();
+         let export_state = app_handle.state::<AppState>();
+@@ -1490,6 +1880,9 @@ pub async fn run_headless_export(
          strip_gps: false,
          filename_template: None,
          watermark: None,
 +        border: None,
++        collage_grid: None,
++        tile_split: None,
          export_masks: false,
          preserve_folders: true,
          destination_type: None,
-@@ -1693,11 +1742,18 @@
+@@ -1693,12 +2086,19 @@ pub async fn estimate_export_sizes(
              apply_all_transformations(&loaded_image.image, &adjustments_clone);
          let (full_w, full_h) = transformed_full_res.dimensions();
  
@@ -299,48 +598,1382 @@
          } else {
              (full_w, full_h)
          };
-+
+ 
 +        if let Some(border_settings) = &export_settings.border {
 +            let (_, _, bordered_w, bordered_h) =
 +                border_dimensions(final_full_w, final_full_h, border_settings.size)?;
 +            final_full_w = bordered_w;
 +            final_full_h = bordered_h;
 +        }
- 
++
          let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
          let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
---- a/src-tauri/src/app_settings.rs
-+++ b/src-tauri/src/app_settings.rs
-@@ -240,6 +240,12 @@
-     pub watermark_spacing: u32,
-     pub watermark_opacity: u32,
-     #[serde(default)]
-+    pub enable_border: Option<bool>,
-+    #[serde(default)]
-+    pub border_size: Option<f32>,
-+    #[serde(default)]
-+    pub border_color: Option<String>,
-+    #[serde(default)]
-     pub export_masks: Option<bool>,
-     #[serde(default)]
-     pub preserve_folders: Option<bool>,
-@@ -271,6 +277,9 @@
-             watermark_scale: 10,
-             watermark_spacing: 5,
-             watermark_opacity: 75,
-+            enable_border: Some(false),
-+            border_size: Some(1.0),
-+            border_color: Some("#ffffff".to_string()),
-             export_masks: Some(false),
-             preserve_folders: Some(false),
-             last_export_path: None,
-@@ -295,6 +304,9 @@
-             watermark_scale: 10,
-             watermark_spacing: 5,
-             watermark_opacity: 75,
-+            enable_border: Some(false),
-+            border_size: Some(1.0),
-+            border_color: Some("#ffffff".to_string()),
-             export_masks: Some(false),
-             preserve_folders: Some(false),
-             last_export_path: None,
+             (final_full_w as f64 * final_full_h as f64)
+diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
+new file mode 100644
+index 0000000..b6f2e07
+--- /dev/null
++++ b/src/components/panel/right/ExportLivePreview.tsx
+@@ -0,0 +1,478 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { useTranslation } from 'react-i18next';
++import { Maximize2, X, Image as ImageIcon, Grid, Layers, SplitSquareVertical } from 'lucide-react';
++import Text from '../../ui/Text';
++import { TextVariants } from '../../../types/typography';
++import { SelectedImage } from '../../ui/AppProperties';
++
++interface ExportLivePreviewProps {
++  selectedImage: SelectedImage | null;
++  finalPreviewUrl?: string | null;
++  multiSelectedPaths: string[];
++  thumbnailMap?: Record<string, string>;
++  enableBorder: boolean;
++  borderSize: number;
++  borderColor: string;
++  enableKeyline: boolean;
++  keylineSize: number;
++  keylineColor: string;
++  keylineInset: number;
++  enableGridOverlay: boolean;
++  gridOverlayRows: number;
++  gridOverlayCols: number;
++  gridOverlayColor: string;
++  gridOverlayOpacity: number;
++  gridOverlaySize?: number;
++  enableCollageGrid: boolean;
++  collageColumns: number;
++  collageRows: number;
++  collageGutter: number;
++  collageCellFit: 'fit' | 'fill';
++  enableTileSplit: boolean;
++  tileSplitColumns: number;
++  tileSplitRows: number;
++  tileBorderEachTile: boolean;
++}
++
++export default function ExportLivePreview({
++  selectedImage,
++  finalPreviewUrl,
++  multiSelectedPaths,
++  thumbnailMap = {},
++  enableBorder,
++  borderSize,
++  borderColor,
++  enableKeyline,
++  keylineSize,
++  keylineColor,
++  keylineInset,
++  enableGridOverlay,
++  gridOverlayRows,
++  gridOverlayCols,
++  gridOverlayColor,
++  gridOverlayOpacity,
++  gridOverlaySize = 1,
++  enableCollageGrid,
++  collageColumns,
++  collageRows,
++  collageGutter,
++  collageCellFit,
++  enableTileSplit,
++  tileSplitColumns,
++  tileSplitRows,
++}: ExportLivePreviewProps) {
++  const { t } = useTranslation();
++  const canvasRef = useRef<HTMLCanvasElement | null>(null);
++  const modalCanvasRef = useRef<HTMLCanvasElement | null>(null);
++  const [isModalOpen, setIsModalOpen] = useState(false);
++  const [loadedImages, setLoadedImages] = useState<HTMLImageElement[]>([]);
++  const [imageRatio, setImageRatio] = useState<number>(1.5);
++
++  // Collect image URLs to display:
++  const activeImageUrls = React.useMemo(() => {
++    if (enableCollageGrid && multiSelectedPaths.length > 1) {
++      return multiSelectedPaths.map(
++        (p) => thumbnailMap[p] || (p === selectedImage?.path ? finalPreviewUrl || selectedImage?.thumbnailUrl : '') || ''
++      ).filter(Boolean);
++    }
++    const single = finalPreviewUrl || selectedImage?.thumbnailUrl;
++    return single ? [single] : [];
++  }, [enableCollageGrid, multiSelectedPaths, thumbnailMap, selectedImage, finalPreviewUrl]);
++
++  // Preload images into HTMLImageElement objects
++  useEffect(() => {
++    let cancelled = false;
++    if (activeImageUrls.length === 0) {
++      setLoadedImages([]);
++      return;
++    }
++
++    Promise.all(
++      activeImageUrls.map((url) => {
++        return new Promise<HTMLImageElement | null>((resolve) => {
++          const img = new Image();
++          img.crossOrigin = 'anonymous';
++          img.onload = () => resolve(img);
++          img.onerror = () => resolve(null);
++          img.src = url;
++        });
++      })
++    ).then((imgs) => {
++      if (cancelled) return;
++      const valid = imgs.filter((i): i is HTMLImageElement => i !== null);
++      setLoadedImages(valid);
++      if (valid.length > 0) {
++        setImageRatio(valid[0].naturalWidth / (valid[0].naturalHeight || 1));
++      }
++    });
++
++    return () => {
++      cancelled = true;
++    };
++  }, [activeImageUrls]);
++
++  // Canvas drawing function
++  const renderToCanvas = React.useCallback(
++    (canvas: HTMLCanvasElement | null, maxDim: number) => {
++      if (!canvas) return;
++      const ctx = canvas.getContext('2d');
++      if (!ctx) return;
++
++      if (loadedImages.length === 0) {
++        canvas.width = maxDim;
++        canvas.height = Math.round(maxDim / 1.5);
++        ctx.fillStyle = '#1e1e1e';
++        ctx.fillRect(0, 0, canvas.width, canvas.height);
++        ctx.fillStyle = '#666';
++        ctx.font = '14px sans-serif';
++        ctx.textAlign = 'center';
++        ctx.textBaseline = 'middle';
++        ctx.fillText(t('export.preview.noImage', 'No image preview available'), canvas.width / 2, canvas.height / 2);
++        return;
++      }
++
++      const isCollage = enableCollageGrid && loadedImages.length > 1;
++      const cols = isCollage ? Math.max(1, collageColumns) : 1;
++      const rows = isCollage ? Math.max(1, collageRows) : 1;
++
++      // Base cell dimensions:
++      const cellW = 400;
++      const cellH = Math.round(cellW / (imageRatio > 0 ? imageRatio : 1.5));
++      const gutterPx = isCollage ? Math.round((cellW * collageGutter) / 100) : 0;
++
++      const innerContentW = cols * cellW + (cols - 1) * gutterPx;
++      const innerContentH = rows * cellH + (rows - 1) * gutterPx;
++
++      // Border math:
++      const borderSizeVal = enableBorder ? Math.max(0, borderSize) : 0;
++      const borderXPx = Math.round((innerContentW * borderSizeVal) / 100);
++      const borderYPx = Math.round((innerContentH * borderSizeVal) / 100);
++
++      const totalCanvasW = innerContentW + borderXPx * 2;
++      const totalCanvasH = innerContentH + borderYPx * 2;
++
++      // Fit into target display size while preserving crispness:
++      const scale = Math.min(maxDim / totalCanvasW, (maxDim * 0.8) / totalCanvasH, 1.0);
++      canvas.width = Math.round(totalCanvasW * scale);
++      canvas.height = Math.round(totalCanvasH * scale);
++
++      ctx.save();
++      ctx.scale(scale, scale);
++
++      // 1. Draw canvas background / outer border
++      ctx.fillStyle = enableBorder ? borderColor : '#111111';
++      ctx.fillRect(0, 0, totalCanvasW, totalCanvasH);
++
++      // 2. Render photos / cells
++      const startX = borderXPx;
++      const startY = borderYPx;
++
++      for (let r = 0; r < rows; r++) {
++        for (let c = 0; c < cols; c++) {
++          const imgIdx = r * cols + c;
++          const img = loadedImages[imgIdx % loadedImages.length];
++          const x = startX + c * (cellW + gutterPx);
++          const y = startY + r * (cellH + gutterPx);
++
++          // Cell background in case of 'fit'
++          ctx.fillStyle = enableBorder ? borderColor : '#1e1e1e';
++          ctx.fillRect(x, y, cellW, cellH);
++
++          if (img) {
++            ctx.save();
++            ctx.beginPath();
++            ctx.rect(x, y, cellW, cellH);
++            ctx.clip();
++
++            const imgAspect = img.naturalWidth / (img.naturalHeight || 1);
++            const cellAspect = cellW / cellH;
++
++            let dw = cellW;
++            let dh = cellH;
++            let dx = x;
++            let dy = y;
++
++            if (collageCellFit === 'fill') {
++              // Center crop
++              if (imgAspect > cellAspect) {
++                dw = cellH * imgAspect;
++                dx = x - (dw - cellW) / 2;
++              } else {
++                dh = cellW / imgAspect;
++                dy = y - (dh - cellH) / 2;
++              }
++            } else {
++              // Fit (letterbox)
++              if (imgAspect > cellAspect) {
++                dh = cellW / imgAspect;
++                dy = y + (cellH - dh) / 2;
++              } else {
++                dw = cellH * imgAspect;
++                dx = x + (cellW - dw) / 2;
++              }
++            }
++
++            ctx.drawImage(img, dx, dy, dw, dh);
++            ctx.restore();
++          }
++
++          // 3. Optional Keyline per cell or overall image
++          if (enableKeyline) {
++            ctx.save();
++            ctx.strokeStyle = keylineColor;
++            const strokeW = Math.max(1, Math.round((cellW * keylineSize) / 100));
++            ctx.lineWidth = strokeW;
++            const insetPx = Math.round((cellW * keylineInset) / 100);
++            ctx.strokeRect(
++              x - insetPx,
++              y - insetPx,
++              cellW + insetPx * 2,
++              cellH + insetPx * 2
++            );
++            ctx.restore();
++          }
++        }
++      }
++
++      // 4. Grid overlay lines (Rule of Thirds or custom grid)
++      if (enableGridOverlay) {
++        ctx.save();
++        ctx.strokeStyle = gridOverlayColor;
++        ctx.globalAlpha = Math.max(0, Math.min(100, gridOverlayOpacity)) / 100;
++        ctx.lineWidth = Math.max(1, gridOverlaySize);
++
++        const gCols = Math.max(1, gridOverlayCols);
++        const gRows = Math.max(1, gridOverlayRows);
++
++        for (let i = 1; i < gCols; i++) {
++          const gx = startX + (innerContentW * i) / gCols;
++          ctx.beginPath();
++          ctx.moveTo(gx, startY);
++          ctx.lineTo(gx, startY + innerContentH);
++          ctx.stroke();
++        }
++
++        for (let j = 1; j < gRows; j++) {
++          const gy = startY + (innerContentH * j) / gRows;
++          ctx.beginPath();
++          ctx.moveTo(startX, gy);
++          ctx.lineTo(startX + innerContentW, gy);
++          ctx.stroke();
++        }
++        ctx.restore();
++      }
++
++      // 5. Multi-Tile Splitter cut-guides
++      if (enableTileSplit) {
++        ctx.save();
++        const tCols = Math.max(1, tileSplitColumns);
++        const tRows = Math.max(1, tileSplitRows);
++
++        ctx.strokeStyle = '#38bdf8'; // Sky blue dashed lines
++        ctx.lineWidth = 2;
++        ctx.setLineDash([6, 6]);
++
++        const tileW = totalCanvasW / tCols;
++        const tileH = totalCanvasH / tRows;
++
++        for (let tc = 1; tc < tCols; tc++) {
++          const tx = tc * tileW;
++          ctx.beginPath();
++          ctx.moveTo(tx, 0);
++          ctx.lineTo(tx, totalCanvasH);
++          ctx.stroke();
++        }
++
++        for (let tr = 1; tr < tRows; tr++) {
++          const ty = tr * tileH;
++          ctx.beginPath();
++          ctx.moveTo(0, ty);
++          ctx.lineTo(totalCanvasW, ty);
++          ctx.stroke();
++        }
++
++        // Draw tile index badges
++        ctx.setLineDash([]);
++        ctx.font = 'bold 12px sans-serif';
++        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
++        ctx.strokeStyle = '#38bdf8';
++        ctx.lineWidth = 1;
++
++        let tileCount = 1;
++        for (let r = 0; r < tRows; r++) {
++          for (let c = 0; c < tCols; c++) {
++            const bx = c * tileW + 8;
++            const by = r * tileH + 8;
++            const text = `Tile ${tileCount++}`;
++            const metrics = ctx.measureText(text);
++            ctx.fillRect(bx, by, metrics.width + 12, 20);
++            ctx.strokeRect(bx, by, metrics.width + 12, 20);
++            ctx.fillStyle = '#ffffff';
++            ctx.fillText(text, bx + 6, by + 14);
++            ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
++          }
++        }
++
++        ctx.restore();
++      }
++
++      ctx.restore();
++    },
++    [
++      loadedImages,
++      enableCollageGrid,
++      collageColumns,
++      collageRows,
++      collageGutter,
++      collageCellFit,
++      imageRatio,
++      enableBorder,
++      borderSize,
++      borderColor,
++      enableKeyline,
++      keylineSize,
++      keylineColor,
++      keylineInset,
++      enableGridOverlay,
++      gridOverlayCols,
++      gridOverlayRows,
++      gridOverlayColor,
++      gridOverlayOpacity,
++      gridOverlaySize,
++      enableTileSplit,
++      tileSplitColumns,
++      tileSplitRows,
++      t,
++    ]
++  );
++
++  // Render on main panel canvas
++  useEffect(() => {
++    renderToCanvas(canvasRef.current, 380);
++  }, [renderToCanvas]);
++
++  // Render on modal canvas if modal open
++  useEffect(() => {
++    if (isModalOpen) {
++      renderToCanvas(modalCanvasRef.current, 900);
++    }
++  }, [isModalOpen, renderToCanvas]);
++
++  const filesCount = React.useMemo(() => {
++    if (enableTileSplit) {
++      return tileSplitColumns * tileSplitRows;
++    }
++    if (enableCollageGrid && multiSelectedPaths.length > 1) {
++      return 1; // All photos consolidated into 1 collage
++    }
++    return Math.max(1, multiSelectedPaths.length);
++  }, [enableTileSplit, tileSplitColumns, tileSplitRows, enableCollageGrid, multiSelectedPaths]);
++
++  return (
++    <div className="w-full bg-surface-lowest rounded-lg border border-surface p-3 mb-4 space-y-2">
++      {/* Header with Title and Expand button */}
++      <div className="flex items-center justify-between">
++        <div className="flex items-center gap-1.5">
++          <ImageIcon className="w-4 h-4 text-accent" />
++          <Text variant={TextVariants.label} className="font-semibold">
++            {t('export.preview.title', 'Live Export Preview')}
++          </Text>
++        </div>
++        <button
++          type="button"
++          aria-label={t('export.preview.expand', 'Expand Preview')}
++          title={t('export.preview.expand', 'Expand Preview')}
++          onClick={() => setIsModalOpen(true)}
++          className="p-1 hover:bg-surface rounded text-subtext hover:text-white transition-colors"
++        >
++          <Maximize2 className="w-3.5 h-3.5" />
++        </button>
++      </div>
++
++      {/* Embedded Live Canvas */}
++      <div className="w-full flex items-center justify-center bg-black/40 rounded border border-surface/50 p-2 overflow-hidden">
++        <canvas
++          ref={canvasRef}
++          className="max-w-full h-auto object-contain rounded shadow-md transition-all duration-75"
++        />
++      </div>
++
++      {/* Status & Badge Info Bar */}
++      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-subtext pt-1">
++        <div className="flex items-center gap-1.5">
++          {enableCollageGrid && multiSelectedPaths.length > 1 && (
++            <span className="inline-flex items-center gap-1 bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
++              <Grid className="w-3 h-3" />
++              {collageColumns}×{collageRows} Collage
++            </span>
++          )}
++          {enableTileSplit && (
++            <span className="inline-flex items-center gap-1 bg-sky-500/20 text-sky-400 px-1.5 py-0.5 rounded font-mono">
++              <SplitSquareVertical className="w-3 h-3" />
++              {tileSplitColumns}×{tileSplitRows} Split
++            </span>
++          )}
++          {enableBorder && (
++            <span className="inline-flex items-center gap-1 bg-surface px-1.5 py-0.5 rounded font-mono">
++              Border: {borderSize}%
++            </span>
++          )}
++        </div>
++        <div className="font-medium text-white/80">
++          {filesCount} {filesCount === 1 ? 'file' : 'files'} to export
++        </div>
++      </div>
++
++      {/* Fullscreen / Enlarged Preview Modal */}
++      {isModalOpen && (
++        <div
++          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6"
++          onClick={() => setIsModalOpen(false)}
++        >
++          <div
++            className="relative max-w-4xl w-full bg-surface-lowest rounded-xl border border-surface shadow-2xl p-4 flex flex-col space-y-3"
++            onClick={(e) => e.stopPropagation()}
++          >
++            <div className="flex items-center justify-between border-b border-surface pb-2">
++              <div className="flex items-center gap-2">
++                <Layers className="w-4 h-4 text-accent" />
++                <Text variant={TextVariants.heading}>
++                  {t('export.preview.highResTitle', 'Export Output Inspector')}
++                </Text>
++              </div>
++              <button
++                type="button"
++                onClick={() => setIsModalOpen(false)}
++                className="p-1 rounded-md hover:bg-surface text-subtext hover:text-white"
++              >
++                <X className="w-5 h-5" />
++              </button>
++            </div>
++
++            <div className="w-full h-[65vh] flex items-center justify-center bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] bg-black/70 rounded-lg overflow-auto p-4 border border-surface/40">
++              <canvas
++                ref={modalCanvasRef}
++                className="max-h-full max-w-full object-contain rounded shadow-2xl"
++              />
++            </div>
++
++            <div className="flex items-center justify-between text-xs text-subtext pt-1">
++              <span>
++                {enableCollageGrid && multiSelectedPaths.length > 1
++                  ? `Multi-Photo Collage: ${multiSelectedPaths.length} photos (${collageColumns} cols × ${collageRows} rows)`
++                  : `Single Image Export`}
++              </span>
++              <button
++                type="button"
++                onClick={() => setIsModalOpen(false)}
++                className="px-3 py-1 bg-surface hover:bg-surface/80 text-white rounded text-xs"
++              >
++                {t('common.close', 'Close')}
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
+index 267e321..b618357 100644
+--- a/src/components/panel/right/ExportPanel.tsx
++++ b/src/components/panel/right/ExportPanel.tsx
+@@ -29,7 +29,9 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
+ import Text from '../../ui/Text';
+ import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
+ import { useEditorStore } from '../../../store/useEditorStore';
++import { useProcessStore } from '../../../store/useProcessStore';
+ import { useUIStore } from '../../../store/useUIStore';
++import ExportLivePreview from './ExportLivePreview';
+ 
+ interface ExportPanelProps {
+   exportState: ExportState;
+@@ -242,6 +244,50 @@ export default function ExportPanel({
+     setWatermarkSpacing,
+     watermarkOpacity,
+     setWatermarkOpacity,
++    enableBorder,
++    setEnableBorder,
++    borderSize,
++    setBorderSize,
++    borderColor,
++    setBorderColor,
++    enableKeyline,
++    setEnableKeyline,
++    keylineSize,
++    setKeylineSize,
++    keylineColor,
++    setKeylineColor,
++    keylineInset,
++    setKeylineInset,
++    enableGridOverlay,
++    setEnableGridOverlay,
++    gridOverlayRows,
++    setGridOverlayRows,
++    gridOverlayCols,
++    setGridOverlayCols,
++    gridOverlayColor,
++    setGridOverlayColor,
++    gridOverlayOpacity,
++    setGridOverlayOpacity,
++    gridOverlaySize,
++    setGridOverlaySize,
++    enableCollageGrid,
++    setEnableCollageGrid,
++    collageColumns,
++    setCollageColumns,
++    collageRows,
++    setCollageRows,
++    collageGutter,
++    setCollageGutter,
++    collageCellFit,
++    setCollageCellFit,
++    enableTileSplit,
++    setEnableTileSplit,
++    tileSplitColumns,
++    setTileSplitColumns,
++    tileSplitRows,
++    setTileSplitRows,
++    tileBorderEachTile,
++    setTileBorderEachTile,
+     preserveFolders,
+     setPreserveFolders,
+     handleApplyPreset,
+@@ -252,6 +298,9 @@ export default function ExportPanel({
+     setSubfolder,
+   } = useExportSettings();
+ 
++  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
++  const thumbnails = useProcessStore((s) => s.thumbnails);
++
+   const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
+ 
+   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
+@@ -412,6 +461,61 @@ export default function ExportPanel({
+               opacity: watermarkOpacity,
+             }
+           : null,
++      border: enableBorder
++        ? {
++            size: borderSize,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : enableKeyline || enableGridOverlay
++        ? {
++            size: 0,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : null,
++      collageGrid: enableCollageGrid
++        ? {
++            enabled: true,
++            columns: collageColumns,
++            rows: collageRows,
++            gutter: collageGutter,
++            cellFit: collageCellFit,
++            backgroundColor: borderColor,
++          }
++        : null,
++      tileSplit: enableTileSplit
++        ? {
++            enabled: true,
++            columns: tileSplitColumns,
++            rows: tileSplitRows,
++            borderEachTile: tileBorderEachTile,
++          }
++        : null,
+     };
+     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
+     const runEstimate = () =>
+@@ -453,6 +557,28 @@ export default function ExportPanel({
+     watermarkScale,
+     watermarkSpacing,
+     watermarkOpacity,
++    enableBorder,
++    borderSize,
++    borderColor,
++    enableKeyline,
++    keylineSize,
++    keylineColor,
++    keylineInset,
++    enableGridOverlay,
++    gridOverlayRows,
++    gridOverlayCols,
++    gridOverlayColor,
++    gridOverlayOpacity,
++    gridOverlaySize,
++    enableCollageGrid,
++    collageColumns,
++    collageRows,
++    collageGutter,
++    collageCellFit,
++    enableTileSplit,
++    tileSplitColumns,
++    tileSplitRows,
++    tileBorderEachTile,
+     debouncedEstimateSize,
+     exportMasks,
+     preserveFolders,
+@@ -498,6 +624,61 @@ export default function ExportPanel({
+               opacity: watermarkOpacity,
+             }
+           : null,
++      border: enableBorder
++        ? {
++            size: borderSize,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : enableKeyline || enableGridOverlay
++        ? {
++            size: 0,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : null,
++      collageGrid: enableCollageGrid
++        ? {
++            enabled: true,
++            columns: collageColumns,
++            rows: collageRows,
++            gutter: collageGutter,
++            cellFit: collageCellFit,
++            backgroundColor: borderColor,
++          }
++        : null,
++      tileSplit: enableTileSplit
++        ? {
++            enabled: true,
++            columns: tileSplitColumns,
++            rows: tileSplitRows,
++            borderEachTile: tileBorderEachTile,
++          }
++        : null,
+     };
+ 
+     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
+@@ -507,13 +688,15 @@ export default function ExportPanel({
+ 
+       let outputFolderOrFile = '';
+       const isOriginalFolder = destinationType === 'originalFolder';
+-      const shouldChooseOutputFile = numImages === 1 && !preserveFolders && !isOriginalFolder;
++      const isSingleOutput = (numImages === 1 || (enableCollageGrid && numImages > 1)) && !enableTileSplit;
++      const shouldChooseOutputFile = isSingleOutput && !preserveFolders && !isOriginalFolder;
+ 
+       if (isOriginalFolder) {
+         outputFolderOrFile = 'originalFolderDummy';
+       } else if (shouldChooseOutputFile) {
+         const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
+-        const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
++        const baseStem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
++        const stem = enableCollageGrid && numImages > 1 ? `${baseStem}_collage` : baseStem;
+         const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
+         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
+ 
+@@ -612,6 +795,35 @@ export default function ExportPanel({
+               />
+             </div>
+ 
++            <ExportLivePreview
++              selectedImage={selectedImage}
++              finalPreviewUrl={finalPreviewUrl}
++              multiSelectedPaths={pathsToExport}
++              thumbnailMap={thumbnails}
++              enableBorder={enableBorder}
++              borderSize={borderSize}
++              borderColor={borderColor}
++              enableKeyline={enableKeyline}
++              keylineSize={keylineSize}
++              keylineColor={keylineColor}
++              keylineInset={keylineInset}
++              enableGridOverlay={enableGridOverlay}
++              gridOverlayRows={gridOverlayRows}
++              gridOverlayCols={gridOverlayCols}
++              gridOverlayColor={gridOverlayColor}
++              gridOverlayOpacity={gridOverlayOpacity}
++              gridOverlaySize={gridOverlaySize}
++              enableCollageGrid={enableCollageGrid}
++              collageColumns={collageColumns}
++              collageRows={collageRows}
++              collageGutter={collageGutter}
++              collageCellFit={collageCellFit}
++              enableTileSplit={enableTileSplit}
++              tileSplitColumns={tileSplitColumns}
++              tileSplitRows={tileSplitRows}
++              tileBorderEachTile={tileBorderEachTile}
++            />
++
+             <Section title={t('export.sections.fileSettings')}>
+               <div className="grid grid-cols-3 gap-2">
+                 {FILE_FORMATS.map((format: FileFormat) => (
+@@ -758,6 +970,290 @@ export default function ExportPanel({
+                   )}
+                 </Section>
+ 
++                <Section title={t('export.sections.border')}>
++                  {/* 1. Outer Border */}
++                  <Switch
++                    label={t('export.border.addBorder')}
++                    checked={enableBorder}
++                    onChange={setEnableBorder}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                  {enableBorder && (
++                    <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++                      <Slider
++                        label={t('export.border.size')}
++                        min={0.1}
++                        max={20}
++                        step={0.1}
++                        value={borderSize}
++                        onChange={(e) => setBorderSize(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={1}
++                      />
++                      <div className="flex items-center justify-between gap-3">
++                        <Text variant={TextVariants.label}>{t('export.border.color')}</Text>
++                        <input
++                          aria-label={t('export.border.color')}
++                          className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                          disabled={isExporting}
++                          onChange={(e) => setBorderColor(e.target.value)}
++                          type="color"
++                          value={borderColor}
++                        />
++                      </div>
++                    </div>
++                  )}
++
++                  {/* 2. Fine-Art Keyline */}
++                  <div className="pt-2">
++                    <Switch
++                      label={t('export.border.addKeyline')}
++                      checked={enableKeyline}
++                      onChange={setEnableKeyline}
++                      disabled={isExporting}
++                      trackClassName="bg-surface"
++                    />
++                    {enableKeyline && (
++                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++                        <Slider
++                          label={t('export.border.keylineInset')}
++                          min={0.1}
++                          max={5}
++                          step={0.1}
++                          value={keylineInset}
++                          onChange={(e) => setKeylineInset(Number(e.target.value))}
++                          disabled={isExporting}
++                          defaultValue={0.5}
++                        />
++                        <Slider
++                          label={t('export.border.keylineSize')}
++                          min={0.1}
++                          max={2}
++                          step={0.05}
++                          value={keylineSize}
++                          onChange={(e) => setKeylineSize(Number(e.target.value))}
++                          disabled={isExporting}
++                          defaultValue={0.2}
++                        />
++                        <div className="flex items-center justify-between gap-3">
++                          <Text variant={TextVariants.label}>{t('export.border.keylineColor')}</Text>
++                          <input
++                            aria-label={t('export.border.keylineColor')}
++                            className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                            disabled={isExporting}
++                            onChange={(e) => setKeylineColor(e.target.value)}
++                            type="color"
++                            value={keylineColor}
++                          />
++                        </div>
++                      </div>
++                    )}
++                  </div>
++
++                  {/* 3. Multi-Photo Collage Grid */}
++                  <div className="pt-2">
++                    <Switch
++                      label={t('export.grid.enableCollage')}
++                      checked={enableCollageGrid}
++                      onChange={setEnableCollageGrid}
++                      disabled={isExporting}
++                      trackClassName="bg-surface"
++                    />
++                    {enableCollageGrid && (
++                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++                        <div className="grid grid-cols-2 gap-3">
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.grid.collageCols')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={1}
++                              max={10}
++                              value={collageColumns}
++                              disabled={isExporting}
++                              onChange={(e) => setCollageColumns(Math.max(1, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.grid.collageRows')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={1}
++                              max={10}
++                              value={collageRows}
++                              disabled={isExporting}
++                              onChange={(e) => setCollageRows(Math.max(1, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                        </div>
++
++                        <Slider
++                          label={t('export.grid.collageGutter')}
++                          min={0}
++                          max={10}
++                          step={0.1}
++                          value={collageGutter}
++                          onChange={(e) => setCollageGutter(Number(e.target.value))}
++                          disabled={isExporting}
++                          defaultValue={1.0}
++                        />
++
++                        <div>
++                          <Text variant={TextVariants.label} className="mb-1.5">
++                            {t('export.grid.cellFit')}
++                          </Text>
++                          <div className="grid grid-cols-2 gap-2">
++                            <button
++                              type="button"
++                              className={`px-2 py-1 text-xs rounded transition-colors ${
++                                collageCellFit === 'fit' ? 'bg-accent text-white font-medium' : 'bg-surface text-subtext hover:bg-surface/80'
++                              }`}
++                              onClick={() => setCollageCellFit('fit')}
++                              disabled={isExporting}
++                            >
++                              {t('export.grid.fit')}
++                            </button>
++                            <button
++                              type="button"
++                              className={`px-2 py-1 text-xs rounded transition-colors ${
++                                collageCellFit === 'fill' ? 'bg-accent text-white font-medium' : 'bg-surface text-subtext hover:bg-surface/80'
++                              }`}
++                              onClick={() => setCollageCellFit('fill')}
++                              disabled={isExporting}
++                            >
++                              {t('export.grid.fill')}
++                            </button>
++                          </div>
++                        </div>
++                      </div>
++                    )}
++                  </div>
++
++                  {/* 4. Multi-Tile Splitter */}
++                  <div className="pt-2">
++                    <Switch
++                      label={t('export.grid.enableTileSplit')}
++                      checked={enableTileSplit}
++                      onChange={setEnableTileSplit}
++                      disabled={isExporting}
++                      trackClassName="bg-surface"
++                    />
++                    {enableTileSplit && (
++                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++                        <div className="grid grid-cols-2 gap-3">
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.grid.tileCols')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={1}
++                              max={10}
++                              value={tileSplitColumns}
++                              disabled={isExporting}
++                              onChange={(e) => setTileSplitColumns(Math.max(1, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.grid.tileRows')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={1}
++                              max={10}
++                              value={tileSplitRows}
++                              disabled={isExporting}
++                              onChange={(e) => setTileSplitRows(Math.max(1, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                        </div>
++                        <Switch
++                          label={t('export.grid.borderEachTile')}
++                          checked={tileBorderEachTile}
++                          onChange={setTileBorderEachTile}
++                          disabled={isExporting}
++                          trackClassName="bg-surface"
++                        />
++                      </div>
++                    )}
++                  </div>
++
++                  {/* 5. Composition Grid Overlay */}
++                  <div className="pt-2">
++                    <Switch
++                      label={t('export.border.addGridOverlay')}
++                      checked={enableGridOverlay}
++                      onChange={setEnableGridOverlay}
++                      disabled={isExporting}
++                      trackClassName="bg-surface"
++                    />
++                    {enableGridOverlay && (
++                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++                        <div className="grid grid-cols-2 gap-3">
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.border.gridOverlayCols')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={2}
++                              max={12}
++                              value={gridOverlayCols}
++                              disabled={isExporting}
++                              onChange={(e) => setGridOverlayCols(Math.max(2, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                          <div>
++                            <Text variant={TextVariants.label} className="mb-1">
++                              {t('export.border.gridOverlayRows')}
++                            </Text>
++                            <input
++                              type="number"
++                              min={2}
++                              max={12}
++                              value={gridOverlayRows}
++                              disabled={isExporting}
++                              onChange={(e) => setGridOverlayRows(Math.max(2, Number(e.target.value)))}
++                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                            />
++                          </div>
++                        </div>
++                        <Slider
++                          label={t('export.border.gridOverlayOpacity')}
++                          min={5}
++                          max={100}
++                          step={1}
++                          value={gridOverlayOpacity}
++                          onChange={(e) => setGridOverlayOpacity(Number(e.target.value))}
++                          disabled={isExporting}
++                          defaultValue={50}
++                        />
++                        <div className="flex items-center justify-between gap-3">
++                          <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor')}</Text>
++                          <input
++                            aria-label={t('export.border.gridOverlayColor')}
++                            className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                            disabled={isExporting}
++                            onChange={(e) => setGridOverlayColor(e.target.value)}
++                            type="color"
++                            value={gridOverlayColor}
++                          />
++                        </div>
++                      </div>
++                    )}
++                  </div>
++                </Section>
++
+                 {fileFormat == FileFormats.Jpeg && (
+                   <Section title={t('export.sections.metadata')}>
+                     <Switch
+diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
+index 86285cd..78a1a15 100644
+--- a/src/components/ui/ExportImportProperties.tsx
++++ b/src/components/ui/ExportImportProperties.tsx
+@@ -45,6 +45,9 @@ export interface ExportSettings {
+   } | null;
+   stripGps: boolean;
+   watermark: WatermarkSettings | null;
++  border?: BorderSettings | null;
++  collageGrid?: CollageGridSettings | null;
++  tileSplit?: TileSplitSettings | null;
+   exportMasks?: boolean;
+   preserveFolders?: boolean;
+   destinationType?: string;
+@@ -71,6 +74,46 @@ interface WatermarkSettings {
+   opacity: number;
+ }
+ 
++export interface KeylineSettings {
++  enabled: boolean;
++  size: number;
++  color: string;
++  inset: number;
++}
++
++export interface GridOverlaySettings {
++  enabled: boolean;
++  rows: number;
++  columns: number;
++  color: string;
++  opacity: number;
++  size: number;
++}
++
++export interface CollageGridSettings {
++  enabled: boolean;
++  columns: number;
++  rows: number;
++  gutter: number;
++  cellFit: 'fit' | 'fill';
++  backgroundColor?: string;
++}
++
++export interface TileSplitSettings {
++  enabled: boolean;
++  columns: number;
++  rows: number;
++  borderEachTile: boolean;
++}
++
++export interface BorderSettings {
++  /** Border thickness as a percentage of each corresponding image dimension. */
++  size: number;
++  color: string;
++  keyline?: KeylineSettings | null;
++  gridOverlay?: GridOverlaySettings | null;
++}
++
+ export interface ExportState {
+   errorMessage: string;
+   progress: Progress;
+@@ -122,6 +165,27 @@ export interface ExportPreset {
+   watermarkScale: number;
+   watermarkSpacing: number;
+   watermarkOpacity: number;
++  enableBorder?: boolean;
++  borderSize?: number;
++  borderColor?: string;
++  enableKeyline?: boolean;
++  keylineSize?: number;
++  keylineColor?: string;
++  keylineInset?: number;
++  enableGridOverlay?: boolean;
++  gridOverlayRows?: number;
++  gridOverlayCols?: number;
++  gridOverlayColor?: string;
++  gridOverlayOpacity?: number;
++  enableCollageGrid?: boolean;
++  collageColumns?: number;
++  collageRows?: number;
++  collageGutter?: number;
++  collageCellFit?: 'fit' | 'fill';
++  enableTileSplit?: boolean;
++  tileSplitColumns?: number;
++  tileSplitRows?: number;
++  tileBorderEachTile?: boolean;
+   lastExportPath?: string;
+   destinationType?: string;
+   subfolder?: string;
+diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
+index 598487c..1e01f42 100644
+--- a/src/hooks/useExportSettings.ts
++++ b/src/hooks/useExportSettings.ts
+@@ -21,6 +21,28 @@ export function useExportSettings() {
+   const [watermarkScale, setWatermarkScale] = useState(10);
+   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
+   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
++  const [enableBorder, setEnableBorder] = useState(false);
++  const [borderSize, setBorderSize] = useState(1);
++  const [borderColor, setBorderColor] = useState('#ffffff');
++  const [enableKeyline, setEnableKeyline] = useState(false);
++  const [keylineSize, setKeylineSize] = useState(0.2);
++  const [keylineColor, setKeylineColor] = useState('#000000');
++  const [keylineInset, setKeylineInset] = useState(0.5);
++  const [enableGridOverlay, setEnableGridOverlay] = useState(false);
++  const [gridOverlayRows, setGridOverlayRows] = useState(3);
++  const [gridOverlayCols, setGridOverlayCols] = useState(3);
++  const [gridOverlayColor, setGridOverlayColor] = useState('#ffffff');
++  const [gridOverlayOpacity, setGridOverlayOpacity] = useState(50);
++  const [gridOverlaySize, setGridOverlaySize] = useState(1);
++  const [enableCollageGrid, setEnableCollageGrid] = useState(false);
++  const [collageColumns, setCollageColumns] = useState(2);
++  const [collageRows, setCollageRows] = useState(2);
++  const [collageGutter, setCollageGutter] = useState(1.0);
++  const [collageCellFit, setCollageCellFit] = useState<'fit' | 'fill'>('fit');
++  const [enableTileSplit, setEnableTileSplit] = useState(false);
++  const [tileSplitColumns, setTileSplitColumns] = useState(3);
++  const [tileSplitRows, setTileSplitRows] = useState(1);
++  const [tileBorderEachTile, setTileBorderEachTile] = useState(false);
+   const [destinationType, setDestinationType] = useState<string>('customFolder');
+   const [subfolder, setSubfolder] = useState<string>('');
+ 
+@@ -44,6 +66,27 @@ export function useExportSettings() {
+     setWatermarkScale(preset.watermarkScale);
+     setWatermarkSpacing(preset.watermarkSpacing);
+     setWatermarkOpacity(preset.watermarkOpacity);
++    setEnableBorder(preset.enableBorder ?? false);
++    setBorderSize(preset.borderSize ?? 1);
++    setBorderColor(preset.borderColor ?? '#ffffff');
++    setEnableKeyline(preset.enableKeyline ?? false);
++    setKeylineSize(preset.keylineSize ?? 0.2);
++    setKeylineColor(preset.keylineColor ?? '#000000');
++    setKeylineInset(preset.keylineInset ?? 0.5);
++    setEnableGridOverlay(preset.enableGridOverlay ?? false);
++    setGridOverlayRows(preset.gridOverlayRows ?? 3);
++    setGridOverlayCols(preset.gridOverlayCols ?? 3);
++    setGridOverlayColor(preset.gridOverlayColor ?? '#ffffff');
++    setGridOverlayOpacity(preset.gridOverlayOpacity ?? 50);
++    setEnableCollageGrid(preset.enableCollageGrid ?? false);
++    setCollageColumns(preset.collageColumns ?? 2);
++    setCollageRows(preset.collageRows ?? 2);
++    setCollageGutter(preset.collageGutter ?? 1.0);
++    setCollageCellFit(preset.collageCellFit ?? 'fit');
++    setEnableTileSplit(preset.enableTileSplit ?? false);
++    setTileSplitColumns(preset.tileSplitColumns ?? 3);
++    setTileSplitRows(preset.tileSplitRows ?? 1);
++    setTileBorderEachTile(preset.tileBorderEachTile ?? false);
+     setDestinationType(preset.destinationType || 'customFolder');
+     setSubfolder(preset.subfolder || '');
+   }, []);
+@@ -69,6 +112,27 @@ export function useExportSettings() {
+       watermarkScale,
+       watermarkSpacing,
+       watermarkOpacity,
++      enableBorder,
++      borderSize,
++      borderColor,
++      enableKeyline,
++      keylineSize,
++      keylineColor,
++      keylineInset,
++      enableGridOverlay,
++      gridOverlayRows,
++      gridOverlayCols,
++      gridOverlayColor,
++      gridOverlayOpacity,
++      enableCollageGrid,
++      collageColumns,
++      collageRows,
++      collageGutter,
++      collageCellFit,
++      enableTileSplit,
++      tileSplitColumns,
++      tileSplitRows,
++      tileBorderEachTile,
+       destinationType,
+       subfolder,
+     }),
+@@ -92,6 +156,27 @@ export function useExportSettings() {
+       watermarkScale,
+       watermarkSpacing,
+       watermarkOpacity,
++      enableBorder,
++      borderSize,
++      borderColor,
++      enableKeyline,
++      keylineSize,
++      keylineColor,
++      keylineInset,
++      enableGridOverlay,
++      gridOverlayRows,
++      gridOverlayCols,
++      gridOverlayColor,
++      gridOverlayOpacity,
++      enableCollageGrid,
++      collageColumns,
++      collageRows,
++      collageGutter,
++      collageCellFit,
++      enableTileSplit,
++      tileSplitColumns,
++      tileSplitRows,
++      tileBorderEachTile,
+       destinationType,
+       subfolder,
+     ],
+@@ -136,6 +221,50 @@ export function useExportSettings() {
+     setWatermarkSpacing,
+     watermarkOpacity,
+     setWatermarkOpacity,
++    enableBorder,
++    setEnableBorder,
++    borderSize,
++    setBorderSize,
++    borderColor,
++    setBorderColor,
++    enableKeyline,
++    setEnableKeyline,
++    keylineSize,
++    setKeylineSize,
++    keylineColor,
++    setKeylineColor,
++    keylineInset,
++    setKeylineInset,
++    enableGridOverlay,
++    setEnableGridOverlay,
++    gridOverlayRows,
++    setGridOverlayRows,
++    gridOverlayCols,
++    setGridOverlayCols,
++    gridOverlayColor,
++    setGridOverlayColor,
++    gridOverlayOpacity,
++    setGridOverlayOpacity,
++    gridOverlaySize,
++    setGridOverlaySize,
++    enableCollageGrid,
++    setEnableCollageGrid,
++    collageColumns,
++    setCollageColumns,
++    collageRows,
++    setCollageRows,
++    collageGutter,
++    setCollageGutter,
++    collageCellFit,
++    setCollageCellFit,
++    enableTileSplit,
++    setEnableTileSplit,
++    tileSplitColumns,
++    setTileSplitColumns,
++    tileSplitRows,
++    setTileSplitRows,
++    tileBorderEachTile,
++    setTileBorderEachTile,
+     destinationType,
+     setDestinationType,
+     subfolder,
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index 5de22d6..1be60db 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -786,6 +786,41 @@
+       "mb": "MB",
+       "tb": "TB"
+     },
++    "border": {
++      "addBorder": "Add Outer Border",
++      "color": "Color",
++      "size": "Thickness (%)",
++      "addKeyline": "Add Fine-Art Keyline",
++      "keylineColor": "Keyline Color",
++      "keylineSize": "Keyline Thickness (%)",
++      "keylineInset": "Keyline Inset (%)",
++      "addGridOverlay": "Composition Grid Overlay",
++      "gridOverlayRows": "Grid Rows",
++      "gridOverlayCols": "Grid Columns",
++      "gridOverlayColor": "Grid Color",
++      "gridOverlayOpacity": "Grid Opacity (%)"
++    },
++    "grid": {
++      "collageTitle": "Grid Collage (Multi-Photo)",
++      "enableCollage": "Export as Grid Collage",
++      "collageCols": "Columns",
++      "collageRows": "Rows",
++      "collageGutter": "Gutter / Spacing (%)",
++      "cellFit": "Cell Sizing Mode",
++      "fit": "Fit (Letterbox)",
++      "fill": "Fill (Center-Crop)",
++      "tileSplitTitle": "Multi-Tile Splitter (Instagram / Panorama)",
++      "enableTileSplit": "Split into Grid Tiles",
++      "tileCols": "Tile Columns",
++      "tileRows": "Tile Rows",
++      "borderEachTile": "Border Each Tile"
++    },
++    "preview": {
++      "title": "Live Export Preview",
++      "expand": "Expand Preview",
++      "highResTitle": "Export Output Inspector",
++      "noImage": "No image preview available"
++    },
+     "destination": {
+       "customFolder": "Custom folder",
+       "originalFolder": "Original image folder",
+@@ -828,6 +863,7 @@
+     },
+     "sections": {
+       "advanced": "Advanced",
++      "border": "Borders & Grids",
+       "destination": "Destination",
+       "fileNaming": "File Naming",
+       "fileSettings": "File Settings",

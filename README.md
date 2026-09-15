@@ -53,12 +53,14 @@ This project integrates that capability natively into RapidRAW so borders can be
 
 ## ✨ Features
 
-- **Toggle Switch**: Enable or disable borders on export with one click (`Add Border`).
-- **Configurable Thickness**: Fine-tune border size using a smooth slider from `0.1%` up to `20.0%` of image dimensions (default: `1.0%`).
-- **Color Picker**: Integrated native RGB color picker to select any hex color (default: `#ffffff` pure white).
-- **Preset Persistence**: Border configurations are automatically remembered in default presets (`High Quality`, `Fast Web`) and custom user presets.
-- **Pipeline Integration**: Fully compatible with resizing, watermarking, GPS stripping, and metadata retention.
-- **Batch Export Support**: Applies borders consistently across bulk photo exports.
+- **🖼️ Real-Time Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant visual feedback for borders, keylines, collage layouts, and tile slice lines as you adjust sliders, plus a pop-out high-resolution inspection modal.
+- **📐 Multi-Photo Contact Sheet / Grid Collage**: Combine multiple selected photos into an $N \times M$ grid collage on a single canvas with customizable cell gutters (spacing) and outer border framing.
+- **🔲 Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely.
+- **📱 Multi-Tile Grid Splitter (Instagram / Panorama)**: Slice any photo or collage into an $N \times M$ matrix of individual exported files with optional borders per tile—ideal for seamless swipeable Instagram carousels and $3 \times 3$ grid mosaics.
+- **🎨 Fine-Art Inset Keyline**: Add museum-grade framing with a contrasting hairline inner border inset at any distance inside the outer mat.
+- **📏 Composition Grid Overlay**: Overlay Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines with adjustable opacity, thickness, and color for proofing and composition review.
+- **⚡ Fully Combinable**: Use any feature individually or combine them all together seamlessly in a single export run.
+- **💾 Preset Persistence**: All border, keyline, collage, and tile split configurations are automatically remembered in default presets and custom user presets.
 
 ---
 
@@ -107,19 +109,20 @@ The feature is cleanly separated across the Rust backend and React frontend:
 RapidRAW Source Tree
 ├── src-tauri/
 │   ├── src/
-│   │   ├── export_processing.rs   <-- Border math, hex parsing & canvas overlay
+│   │   ├── export_processing.rs   <-- Border math, keylines, collages & tile slicing
 │   │   └── app_settings.rs        <-- Preset schema & default preset values
 ├── src/
 │   ├── components/
 │   │   ├── panel/right/
-│   │   │   └── ExportPanel.tsx    <-- Switch, slider & color picker UI
+│   │   │   ├── ExportLivePreview.tsx <-- Real-time HTML5 preview canvas & inspector
+│   │   │   └── ExportPanel.tsx    <-- Borders, keylines, collages & tile split UI
 │   │   └── ui/
 │   │       └── ExportImportProperties.tsx <-- TypeScript interface definitions
 │   ├── hooks/
 │   │   ├── useExportSettings.ts   <-- State management & preset synchronization
 │   │   └── useExternalEditSession.ts <-- External session payload defaults
 │   └── i18n/locales/
-│       └── en.json                <-- English UI localization keys
+│       └── en.json                <-- Localization strings
 ```
 
 ### Technical Details
