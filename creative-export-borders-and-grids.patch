@@ -1099,7 +1099,7 @@ index 0000000..b34830c
 +  );
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..3e3438f 100644
+index 267e321..bb20c9c 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -29,7 +29,9 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
@@ -1112,7 +1112,73 @@ index 267e321..3e3438f 100644
  
  interface ExportPanelProps {
    exportState: ExportState;
-@@ -242,6 +244,50 @@ export default function ExportPanel({
+@@ -59,6 +61,65 @@ function Section({ title, children }: SectionProps) {
+   );
+ }
+ 
++function GridNumberInput({
++  value,
++  min,
++  max,
++  disabled,
++  onChange,
++  className,
++}: {
++  value: number;
++  min: number;
++  max: number;
++  disabled?: boolean;
++  onChange: (val: number) => void;
++  className?: string;
++}) {
++  const [localVal, setLocalVal] = useState<string>(String(value || min));
++
++  useEffect(() => {
++    setLocalVal(String(value || min));
++  }, [value, min]);
++
++  return (
++    <input
++      type="number"
++      min={min}
++      max={max}
++      value={localVal}
++      disabled={disabled}
++      onChange={(e) => {
++        const raw = e.target.value;
++        setLocalVal(raw);
++        if (raw === '') return;
++        const num = parseInt(raw, 10);
++        if (!isNaN(num)) {
++          const clamped = Math.min(max, Math.max(min, num));
++          onChange(clamped);
++        }
++      }}
++      onBlur={() => {
++        const num = parseInt(localVal, 10);
++        if (isNaN(num) || num < min) {
++          setLocalVal(String(min));
++          onChange(min);
++        } else if (num > max) {
++          setLocalVal(String(max));
++          onChange(max);
++        } else {
++          setLocalVal(String(num));
++          onChange(num);
++        }
++      }}
++      className={
++        className ||
++        'w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary focus:border-accent focus:outline-hidden'
++      }
++    />
++  );
++}
++
+ function WatermarkPreview({
+   anchor,
+   scale,
+@@ -242,6 +303,50 @@ export default function ExportPanel({
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -1163,7 +1229,7 @@ index 267e321..3e3438f 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -252,6 +298,9 @@ export default function ExportPanel({
+@@ -252,6 +357,9 @@ export default function ExportPanel({
      setSubfolder,
    } = useExportSettings();
  
@@ -1173,7 +1239,7 @@ index 267e321..3e3438f 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -370,8 +419,10 @@ export default function ExportPanel({
+@@ -370,8 +478,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -1185,7 +1251,7 @@ index 267e321..3e3438f 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -412,6 +463,61 @@ export default function ExportPanel({
+@@ -412,6 +522,61 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1247,7 +1313,7 @@ index 267e321..3e3438f 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -453,6 +559,28 @@ export default function ExportPanel({
+@@ -453,6 +618,28 @@ export default function ExportPanel({
      watermarkScale,
      watermarkSpacing,
      watermarkOpacity,
@@ -1276,7 +1342,7 @@ index 267e321..3e3438f 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -498,6 +626,61 @@ export default function ExportPanel({
+@@ -498,6 +685,61 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1338,7 +1404,7 @@ index 267e321..3e3438f 100644
      };
  
      const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
-@@ -507,13 +690,15 @@ export default function ExportPanel({
+@@ -507,13 +749,15 @@ export default function ExportPanel({
  
        let outputFolderOrFile = '';
        const isOriginalFolder = destinationType === 'originalFolder';
@@ -1356,7 +1422,7 @@ index 267e321..3e3438f 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,8 +777,32 @@ export default function ExportPanel({
+@@ -592,8 +836,32 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
@@ -1391,7 +1457,7 @@ index 267e321..3e3438f 100644
  
    return (
      <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
-@@ -758,6 +967,319 @@ export default function ExportPanel({
+@@ -758,6 +1026,311 @@ export default function ExportPanel({
                    )}
                  </Section>
  
@@ -1521,28 +1587,24 @@ index 267e321..3e3438f 100644
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.grid.collageCols')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={1}
 +                              max={10}
 +                              value={collageColumns}
 +                              disabled={isExporting}
-+                              onChange={(e) => setCollageColumns(Math.max(1, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setCollageColumns}
 +                            />
 +                          </div>
 +                          <div>
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.grid.collageRows')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={1}
 +                              max={10}
 +                              value={collageRows}
 +                              disabled={isExporting}
-+                              onChange={(e) => setCollageRows(Math.max(1, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setCollageRows}
 +                            />
 +                          </div>
 +                        </div>
@@ -1565,8 +1627,10 @@ index 267e321..3e3438f 100644
 +                          <div className="grid grid-cols-2 gap-2">
 +                            <button
 +                              type="button"
-+                              className={`px-2 py-1 text-xs rounded transition-colors ${
-+                                collageCellFit === 'fit' ? 'bg-accent text-white font-medium' : 'bg-surface text-subtext hover:bg-surface/80'
++                              className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
++                                collageCellFit === 'fit'
++                                  ? 'bg-accent text-button-text shadow-sm'
++                                  : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
 +                              }`}
 +                              onClick={() => setCollageCellFit('fit')}
 +                              disabled={isExporting}
@@ -1575,8 +1639,10 @@ index 267e321..3e3438f 100644
 +                            </button>
 +                            <button
 +                              type="button"
-+                              className={`px-2 py-1 text-xs rounded transition-colors ${
-+                                collageCellFit === 'fill' ? 'bg-accent text-white font-medium' : 'bg-surface text-subtext hover:bg-surface/80'
++                              className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
++                                collageCellFit === 'fill'
++                                  ? 'bg-accent text-button-text shadow-sm'
++                                  : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
 +                              }`}
 +                              onClick={() => setCollageCellFit('fill')}
 +                              disabled={isExporting}
@@ -1605,28 +1671,24 @@ index 267e321..3e3438f 100644
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.grid.tileCols')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={1}
 +                              max={10}
 +                              value={tileSplitColumns}
 +                              disabled={isExporting}
-+                              onChange={(e) => setTileSplitColumns(Math.max(1, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setTileSplitColumns}
 +                            />
 +                          </div>
 +                          <div>
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.grid.tileRows')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={1}
 +                              max={10}
 +                              value={tileSplitRows}
 +                              disabled={isExporting}
-+                              onChange={(e) => setTileSplitRows(Math.max(1, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setTileSplitRows}
 +                            />
 +                          </div>
 +                        </div>
@@ -1657,28 +1719,24 @@ index 267e321..3e3438f 100644
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.border.gridOverlayCols')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={2}
 +                              max={12}
 +                              value={gridOverlayCols}
 +                              disabled={isExporting}
-+                              onChange={(e) => setGridOverlayCols(Math.max(2, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setGridOverlayCols}
 +                            />
 +                          </div>
 +                          <div>
 +                            <Text variant={TextVariants.label} className="mb-1">
 +                              {t('export.border.gridOverlayRows')}
 +                            </Text>
-+                            <input
-+                              type="number"
++                            <GridNumberInput
 +                              min={2}
 +                              max={12}
 +                              value={gridOverlayRows}
 +                              disabled={isExporting}
-+                              onChange={(e) => setGridOverlayRows(Math.max(2, Number(e.target.value)))}
-+                              className="w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary"
++                              onChange={setGridOverlayRows}
 +                            />
 +                          </div>
 +                        </div>
@@ -1711,7 +1769,7 @@ index 267e321..3e3438f 100644
                  {fileFormat == FileFormats.Jpeg && (
                    <Section title={t('export.sections.metadata')}>
                      <Switch
-@@ -938,11 +1460,11 @@ export default function ExportPanel({
+@@ -938,11 +1511,11 @@ export default function ExportPanel({
              <span className="italic">{t('export.status.estimatingSize')}</span>
            ) : estimatedSize !== null ? (
              <span>
@@ -1725,7 +1783,7 @@ index 267e321..3e3438f 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +1523,11 @@ export default function ExportPanel({
+@@ -1001,9 +1574,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
