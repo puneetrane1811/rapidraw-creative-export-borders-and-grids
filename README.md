@@ -1,4 +1,4 @@
-# RapidRAW: Advanced Borders & Grids 🖼️📐
+# RapidRAW: Creative Export — Borders & Grids 🖼️📐
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![macOS Support](https://img.shields.io/badge/macOS-Apple_Silicon-brightgreen.svg)]()
@@ -68,12 +68,14 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 
 ## ✨ Features
 
-- **🖼️ Real-Time Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant visual feedback for borders, keylines, collage layouts, and tile slice lines as you adjust sliders, plus a pop-out high-resolution inspection modal.
+- **🖼️ Real-Time Sticky Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant 60fps visual feedback for borders, keylines, collage layouts, and tile slice lines as you adjust sliders, plus a full-screen darkroom inspection modal.
 - **📐 Multi-Photo Contact Sheet / Grid Collage**: Combine multiple selected photos into an $N \times M$ grid collage on a single canvas with customizable cell gutters (spacing) and outer border framing.
-- **🔲 Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely.
+- **🔲 High-Contrast Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely. Designed with high-contrast, accessible controls in both light and dark themes.
 - **📱 Multi-Tile Grid Splitter (Instagram / Panorama)**: Slice any photo or collage into an $N \times M$ matrix of individual exported files with optional borders per tile—ideal for seamless swipeable Instagram carousels and $3 \times 3$ grid mosaics.
 - **🎨 Fine-Art Inset Keyline**: Add museum-grade framing with a contrasting hairline inner border inset at any distance inside the outer mat.
 - **📏 Composition Grid Overlay**: Overlay Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines with adjustable opacity, thickness, and color for proofing and composition review.
+- **🔢 Frictionless Numeric Editing**: Natural backspacing and direct typing in row and column inputs without forced snap-backs to 1, with automatic range clamping on blur.
+- **🏷️ Smart Dynamic File Counts & Size Estimates**: Dynamically calculates and displays the exact output file count (e.g. `Export 1 Grid Photo` or `Export 9 Grid Tiles`) and accurate file size estimates for single-pass collages.
 - **⚡ Fully Combinable**: Use any feature individually or combine them all together seamlessly in a single export run.
 - **💾 Preset Persistence**: All border, keyline, collage, and tile split configurations are automatically remembered in default presets and custom user presets.
 
