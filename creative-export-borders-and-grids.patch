@@ -3853,6 +3853,49 @@ index 5b0bbc4..e4457cf 100644
  mod denoising;
  mod exif_processing;
  mod export_processing;
+diff --git a/src/App.tsx b/src/App.tsx
+index 46456d1..c04e33f 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -20,6 +20,7 @@ import TitleBar from './window/TitleBar';
+ import FolderTree from './components/panel/right/FolderTree';
+ import SettingsPanel from './components/panel/SettingsPanel';
+ import ExportPanel from './components/panel/right/ExportPanel';
++import ErrorBoundary from './components/ui/ErrorBoundary';
+ import GlobalTooltip from './components/ui/GlobalTooltip';
+ import AppModals from './components/modals/AppModals';
+ 
+@@ -720,17 +721,19 @@ function App() {
+           );
+         case Panel.Export:
+           return (
+-            <ExportPanel
+-              exportState={exportState}
+-              multiSelectedPaths={multiSelectedPaths}
+-              selectedImage={selectedImage}
+-              setExportState={setExportState}
+-              appSettings={appSettings}
+-              onSettingsChange={handleSettingsChange}
+-              rootPaths={rootPaths}
+-              isVisible={true}
+-              onClose={() => setUI({ isLibraryExportPanelVisible: false })}
+-            />
++            <ErrorBoundary fallbackTitle="Export Panel Error">
++              <ExportPanel
++                exportState={exportState}
++                multiSelectedPaths={multiSelectedPaths}
++                selectedImage={selectedImage}
++                setExportState={setExportState}
++                appSettings={appSettings}
++                onSettingsChange={handleSettingsChange}
++                rootPaths={rootPaths}
++                isVisible={true}
++                onClose={() => setUI({ isLibraryExportPanelVisible: false })}
++              />
++            </ErrorBoundary>
+           );
+         case Panel.Adjustments:
+           return <Controls />;
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
 new file mode 100644
 index 0000000..4350d9c
@@ -5447,7 +5490,7 @@ index 0000000..3680e6b
 +  );
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..62da90d 100644
+index 267e321..bee1579 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -1,21 +1,16 @@
@@ -5474,7 +5517,7 @@ index 267e321..62da90d 100644
    Status,
    ExportState,
    FileFormats,
-@@ -23,13 +18,16 @@ import {
+@@ -23,13 +18,17 @@ import {
    WatermarkAnchor,
  } from '../../ui/ExportImportProperties';
  import { Invokes, SelectedImage, AppSettings, Panel } from '../../ui/AppProperties';
@@ -5489,10 +5532,11 @@ index 267e321..62da90d 100644
 +import { formatBytes } from './ExportCommons';
 +import StandardExportTab from './StandardExportTab';
 +import CreativeExportTab from './CreativeExportTab';
++import ErrorBoundary from '../../ui/ErrorBoundary';
  
  interface ExportPanelProps {
    exportState: ExportState;
-@@ -43,137 +41,6 @@ interface ExportPanelProps {
+@@ -43,137 +42,6 @@ interface ExportPanelProps {
    onClose?: () => void;
  }
  
@@ -5630,7 +5674,7 @@ index 267e321..62da90d 100644
  export default function ExportPanel({
    exportState,
    multiSelectedPaths,
-@@ -187,6 +54,23 @@ export default function ExportPanel({
+@@ -187,6 +55,23 @@ export default function ExportPanel({
  }: ExportPanelProps) {
    const { t } = useTranslation();
  
@@ -5654,7 +5698,7 @@ index 267e321..62da90d 100644
    const resizeModeOptions = useMemo(
      () => [
        { label: t('export.resize.modes.longEdge'), value: 'longEdge' },
-@@ -232,6 +116,12 @@ export default function ExportPanel({
+@@ -232,6 +117,12 @@ export default function ExportPanel({
      setFilenameTemplate,
      enableWatermark,
      setEnableWatermark,
@@ -5667,7 +5711,7 @@ index 267e321..62da90d 100644
      watermarkPath,
      setWatermarkPath,
      watermarkAnchor,
-@@ -242,6 +132,56 @@ export default function ExportPanel({
+@@ -242,6 +133,56 @@ export default function ExportPanel({
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -5724,12 +5768,8 @@ index 267e321..62da90d 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -250,8 +190,13 @@ export default function ExportPanel({
-     setDestinationType,
-     subfolder,
+@@ -252,6 +193,9 @@ export default function ExportPanel({
      setSubfolder,
-+    stripCameraInfo,
-+    setStripCameraInfo,
    } = useExportSettings();
  
 +  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -5738,7 +5778,7 @@ index 267e321..62da90d 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -370,8 +315,10 @@ export default function ExportPanel({
+@@ -370,8 +314,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -5750,7 +5790,7 @@ index 267e321..62da90d 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -384,7 +331,7 @@ export default function ExportPanel({
+@@ -384,7 +330,7 @@ export default function ExportPanel({
            setIsEstimating(false);
          }
        }, 500),
@@ -5759,7 +5799,7 @@ index 267e321..62da90d 100644
    );
  
    useEffect(() => {
-@@ -403,15 +350,75 @@ export default function ExportPanel({
+@@ -403,15 +349,75 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -5838,7 +5878,7 @@ index 267e321..62da90d 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -448,11 +455,39 @@ export default function ExportPanel({
+@@ -448,11 +454,39 @@ export default function ExportPanel({
      stripGps,
      filenameTemplate,
      enableWatermark,
@@ -5878,7 +5918,7 @@ index 267e321..62da90d 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -489,31 +524,93 @@ export default function ExportPanel({
+@@ -489,31 +523,93 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -5978,7 +6018,7 @@ index 267e321..62da90d 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,332 +689,238 @@ export default function ExportPanel({
+@@ -592,332 +688,240 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
@@ -6405,134 +6445,136 @@ index 267e321..62da90d 100644
 +      <div className="grow overflow-y-auto p-3">
 +        {canExport ? (
 +          activeTab === 'standard' ? (
-+            <StandardExportTab
-+              isExporting={isExporting}
-+              appSettings={appSettings}
-+              onSettingsChange={onSettingsChange}
-+              currentSettingsObject={currentSettingsObject}
-+              handleApplyPreset={handleApplyPreset}
-+              fileFormat={fileFormat}
-+              setFileFormat={setFileFormat}
-+              jpegQuality={jpegQuality}
-+              setJpegQuality={setJpegQuality}
-+              tiffBitDepth={tiffBitDepth}
-+              setTiffBitDepth={setTiffBitDepth}
-+              destinationType={destinationType}
-+              setDestinationType={setDestinationType}
-+              subfolder={subfolder}
-+              setSubfolder={setSubfolder}
-+              numImages={numImages}
-+              filenameTemplate={filenameTemplate}
-+              setFilenameTemplate={setFilenameTemplate}
-+              filenameInputRef={filenameInputRef}
-+              handleVariableClick={handleVariableClick}
-+              enableResize={enableResize}
-+              setEnableResize={setEnableResize}
-+              resizeMode={resizeMode}
-+              setResizeMode={setResizeMode}
-+              resizeValue={resizeValue}
-+              setResizeValue={setResizeValue}
-+              dontEnlarge={dontEnlarge}
-+              setDontEnlarge={setDontEnlarge}
-+              keepMetadata={keepMetadata}
-+              setKeepMetadata={setKeepMetadata}
-+              stripGps={stripGps}
-+              setStripGps={setStripGps}
-+              stripCameraInfo={stripCameraInfo}
-+              setStripCameraInfo={setStripCameraInfo}
-+              preserveFolders={preserveFolders}
-+              setPreserveFolders={setPreserveFolders}
-+              preserveTimestamps={preserveTimestamps}
-+              setPreserveTimestamps={setPreserveTimestamps}
-+              exportMasks={exportMasks}
-+              setExportMasks={setExportMasks}
-+              isAdvancedExpanded={isAdvancedExpanded}
-+              setIsAdvancedExpanded={setIsAdvancedExpanded}
-+              resizeModeOptions={resizeModeOptions}
-+              tiffBitDepthOptions={tiffBitDepthOptions}
-+            />
++            <ErrorBoundary fallbackTitle="Standard Export Error">
++              <StandardExportTab
++                isExporting={isExporting}
++                appSettings={appSettings}
++                onSettingsChange={onSettingsChange}
++                currentSettingsObject={currentSettingsObject}
++                handleApplyPreset={handleApplyPreset}
++                fileFormat={fileFormat}
++                setFileFormat={setFileFormat}
++                jpegQuality={jpegQuality}
++                setJpegQuality={setJpegQuality}
++                tiffBitDepth={tiffBitDepth}
++                setTiffBitDepth={setTiffBitDepth}
++                destinationType={destinationType}
++                setDestinationType={setDestinationType}
++                subfolder={subfolder}
++                setSubfolder={setSubfolder}
++                numImages={numImages}
++                filenameTemplate={filenameTemplate}
++                setFilenameTemplate={setFilenameTemplate}
++                filenameInputRef={filenameInputRef}
++                handleVariableClick={handleVariableClick}
++                enableResize={enableResize}
++                setEnableResize={setEnableResize}
++                resizeMode={resizeMode}
++                setResizeMode={setResizeMode}
++                resizeValue={resizeValue}
++                setResizeValue={setResizeValue}
++                dontEnlarge={dontEnlarge}
++                setDontEnlarge={setDontEnlarge}
++                keepMetadata={keepMetadata}
++                setKeepMetadata={setKeepMetadata}
++                stripGps={stripGps}
++                setStripGps={setStripGps}
++                preserveFolders={preserveFolders}
++                setPreserveFolders={setPreserveFolders}
++                preserveTimestamps={preserveTimestamps}
++                setPreserveTimestamps={setPreserveTimestamps}
++                exportMasks={exportMasks}
++                setExportMasks={setExportMasks}
++                isAdvancedExpanded={isAdvancedExpanded}
++                setIsAdvancedExpanded={setIsAdvancedExpanded}
++                resizeModeOptions={resizeModeOptions}
++                tiffBitDepthOptions={tiffBitDepthOptions}
++              />
++            </ErrorBoundary>
 +          ) : (
-+            <CreativeExportTab
-+              selectedImage={selectedImage}
-+              finalPreviewUrl={finalPreviewUrl}
-+              pathsToExport={pathsToExport}
-+              thumbnails={thumbnails}
-+              isExporting={isExporting}
-+              numImages={numImages}
-+              enableBorder={enableBorder}
-+              setEnableBorder={setEnableBorder}
-+              borderSize={borderSize}
-+              setBorderSize={setBorderSize}
-+              borderColor={borderColor}
-+              setBorderColor={setBorderColor}
-+              enableKeyline={enableKeyline}
-+              setEnableKeyline={setEnableKeyline}
-+              keylineSize={keylineSize}
-+              setKeylineSize={setKeylineSize}
-+              keylineColor={keylineColor}
-+              setKeylineColor={setKeylineColor}
-+              keylineInset={keylineInset}
-+              setKeylineInset={setKeylineInset}
-+              enableWatermark={enableWatermark}
-+              setEnableWatermark={setEnableWatermark}
-+              watermarkType={watermarkType}
-+              setWatermarkType={setWatermarkType}
-+              watermarkText={watermarkText}
-+              setWatermarkText={setWatermarkText}
-+              watermarkColor={watermarkColor}
-+              setWatermarkColor={setWatermarkColor}
-+              watermarkPath={watermarkPath}
-+              setWatermarkPath={setWatermarkPath}
-+              watermarkAnchor={watermarkAnchor}
-+              setWatermarkAnchor={setWatermarkAnchor}
-+              watermarkScale={watermarkScale}
-+              setWatermarkScale={setWatermarkScale}
-+              watermarkSpacing={watermarkSpacing}
-+              setWatermarkSpacing={setWatermarkSpacing}
-+              watermarkOpacity={watermarkOpacity}
-+              setWatermarkOpacity={setWatermarkOpacity}
-+              watermarkCustomPlacement={watermarkCustomPlacement}
-+              setWatermarkCustomPlacement={setWatermarkCustomPlacement}
-+              watermarkCustomX={watermarkCustomX}
-+              setWatermarkCustomX={setWatermarkCustomX}
-+              watermarkCustomY={watermarkCustomY}
-+              setWatermarkCustomY={setWatermarkCustomY}
-+              anchorOptions={anchorOptions}
-+              enableCollageGrid={enableCollageGrid}
-+              setEnableCollageGrid={setEnableCollageGrid}
-+              collageColumns={collageColumns}
-+              setCollageColumns={setCollageColumns}
-+              collageRows={collageRows}
-+              setCollageRows={setCollageRows}
-+              collageGutter={collageGutter}
-+              setCollageGutter={setCollageGutter}
-+              collageCellFit={collageCellFit}
-+              setCollageCellFit={setCollageCellFit}
-+              enableTileSplit={enableTileSplit}
-+              setEnableTileSplit={setEnableTileSplit}
-+              tileSplitColumns={tileSplitColumns}
-+              setTileSplitColumns={setTileSplitColumns}
-+              tileSplitRows={tileSplitRows}
-+              setTileSplitRows={setTileSplitRows}
-+              tileBorderEachTile={tileBorderEachTile}
-+              setTileBorderEachTile={setTileBorderEachTile}
-+              enableGridOverlay={enableGridOverlay}
-+              setEnableGridOverlay={setEnableGridOverlay}
-+              gridOverlayRows={gridOverlayRows}
-+              setGridOverlayRows={setGridOverlayRows}
-+              gridOverlayCols={gridOverlayCols}
-+              setGridOverlayCols={setGridOverlayCols}
-+              gridOverlayColor={gridOverlayColor}
-+              setGridOverlayColor={setGridOverlayColor}
-+              gridOverlayOpacity={gridOverlayOpacity}
-+              setGridOverlayOpacity={setGridOverlayOpacity}
-+              gridOverlaySize={gridOverlaySize}
-+            />
++            <ErrorBoundary fallbackTitle="Creative Export Error">
++              <CreativeExportTab
++                selectedImage={selectedImage}
++                finalPreviewUrl={finalPreviewUrl}
++                pathsToExport={pathsToExport}
++                thumbnails={thumbnails}
++                isExporting={isExporting}
++                numImages={numImages}
++                enableBorder={enableBorder}
++                setEnableBorder={setEnableBorder}
++                borderSize={borderSize}
++                setBorderSize={setBorderSize}
++                borderColor={borderColor}
++                setBorderColor={setBorderColor}
++                enableKeyline={enableKeyline}
++                setEnableKeyline={setEnableKeyline}
++                keylineSize={keylineSize}
++                setKeylineSize={setKeylineSize}
++                keylineColor={keylineColor}
++                setKeylineColor={setKeylineColor}
++                keylineInset={keylineInset}
++                setKeylineInset={setKeylineInset}
++                enableWatermark={enableWatermark}
++                setEnableWatermark={setEnableWatermark}
++                watermarkType={watermarkType}
++                setWatermarkType={setWatermarkType}
++                watermarkText={watermarkText}
++                setWatermarkText={setWatermarkText}
++                watermarkColor={watermarkColor}
++                setWatermarkColor={setWatermarkColor}
++                watermarkPath={watermarkPath}
++                setWatermarkPath={setWatermarkPath}
++                watermarkAnchor={watermarkAnchor}
++                setWatermarkAnchor={setWatermarkAnchor}
++                watermarkScale={watermarkScale}
++                setWatermarkScale={setWatermarkScale}
++                watermarkSpacing={watermarkSpacing}
++                setWatermarkSpacing={setWatermarkSpacing}
++                watermarkOpacity={watermarkOpacity}
++                setWatermarkOpacity={setWatermarkOpacity}
++                watermarkCustomPlacement={watermarkCustomPlacement}
++                setWatermarkCustomPlacement={setWatermarkCustomPlacement}
++                watermarkCustomX={watermarkCustomX}
++                setWatermarkCustomX={setWatermarkCustomX}
++                watermarkCustomY={watermarkCustomY}
++                setWatermarkCustomY={setWatermarkCustomY}
++                anchorOptions={anchorOptions}
++                enableCollageGrid={enableCollageGrid}
++                setEnableCollageGrid={setEnableCollageGrid}
++                collageColumns={collageColumns}
++                setCollageColumns={setCollageColumns}
++                collageRows={collageRows}
++                setCollageRows={setCollageRows}
++                collageGutter={collageGutter}
++                setCollageGutter={setCollageGutter}
++                collageCellFit={collageCellFit}
++                setCollageCellFit={setCollageCellFit}
++                enableTileSplit={enableTileSplit}
++                setEnableTileSplit={setEnableTileSplit}
++                tileSplitColumns={tileSplitColumns}
++                setTileSplitColumns={setTileSplitColumns}
++                tileSplitRows={tileSplitRows}
++                setTileSplitRows={setTileSplitRows}
++                tileBorderEachTile={tileBorderEachTile}
++                setTileBorderEachTile={setTileBorderEachTile}
++                enableGridOverlay={enableGridOverlay}
++                setEnableGridOverlay={setEnableGridOverlay}
++                gridOverlayRows={gridOverlayRows}
++                setGridOverlayRows={setGridOverlayRows}
++                gridOverlayCols={gridOverlayCols}
++                setGridOverlayCols={setGridOverlayCols}
++                gridOverlayColor={gridOverlayColor}
++                setGridOverlayColor={setGridOverlayColor}
++                gridOverlayOpacity={gridOverlayOpacity}
++                setGridOverlayOpacity={setGridOverlayOpacity}
++                gridOverlaySize={gridOverlaySize}
++              />
++            </ErrorBoundary>
 +          )
          ) : (
            <div className="flex items-center justify-center h-full">
              <Text
-@@ -932,17 +935,18 @@ export default function ExportPanel({
+@@ -932,17 +936,18 @@ export default function ExportPanel({
          )}
        </div>
  
@@ -6553,7 +6595,7 @@ index 267e321..62da90d 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +1005,11 @@ export default function ExportPanel({
+@@ -1001,9 +1006,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
@@ -6570,10 +6612,10 @@ index 267e321..62da90d 100644
            </Button>
 diff --git a/src/components/panel/right/StandardExportTab.tsx b/src/components/panel/right/StandardExportTab.tsx
 new file mode 100644
-index 0000000..4cd6b86
+index 0000000..88c2511
 --- /dev/null
 +++ b/src/components/panel/right/StandardExportTab.tsx
-@@ -0,0 +1,377 @@
+@@ -0,0 +1,366 @@
 +import React from 'react';
 +import { motion, AnimatePresence } from 'framer-motion';
 +import { useTranslation } from 'react-i18next';
@@ -6600,10 +6642,10 @@ index 0000000..4cd6b86
 +  isExporting: boolean;
 +  appSettings: AppSettings | null;
 +  onSettingsChange: (settings: AppSettings) => void;
-+  currentSettingsObject: ExportSettings;
++  currentSettingsObject: Omit<ExportPreset, 'id' | 'name'>;
 +  handleApplyPreset: (preset: ExportPreset) => void;
 +  fileFormat: FileFormats | string;
-+  setFileFormat: (f: FileFormats) => void;
++  setFileFormat: (f: any) => void;
 +  jpegQuality: number;
 +  setJpegQuality: (q: number) => void;
 +  tiffBitDepth: TiffBitDepth;
@@ -6629,8 +6671,6 @@ index 0000000..4cd6b86
 +  setKeepMetadata: (k: boolean) => void;
 +  stripGps: boolean;
 +  setStripGps: (s: boolean) => void;
-+  stripCameraInfo: boolean;
-+  setStripCameraInfo: (s: boolean) => void;
 +  preserveFolders: boolean;
 +  setPreserveFolders: (p: boolean) => void;
 +  preserveTimestamps: boolean;
@@ -6676,8 +6716,6 @@ index 0000000..4cd6b86
 +  setKeepMetadata,
 +  stripGps,
 +  setStripGps,
-+  stripCameraInfo,
-+  setStripCameraInfo,
 +  preserveFolders,
 +  setPreserveFolders,
 +  preserveTimestamps,
@@ -6872,13 +6910,6 @@ index 0000000..4cd6b86
 +                    disabled={isExporting}
 +                    trackClassName="bg-surface"
 +                  />
-+                  <Switch
-+                    label={t('export.metadata.removeCameraInfo')}
-+                    checked={stripCameraInfo}
-+                    onChange={setStripCameraInfo}
-+                    disabled={isExporting}
-+                    trackClassName="bg-surface"
-+                  />
 +                </div>
 +              )}
 +            </Section>
@@ -6950,6 +6981,74 @@ index 0000000..4cd6b86
 +      </div>
 +    </div>
 +  );
++}
+diff --git a/src/components/ui/ErrorBoundary.tsx b/src/components/ui/ErrorBoundary.tsx
+new file mode 100644
+index 0000000..bada860
+--- /dev/null
++++ b/src/components/ui/ErrorBoundary.tsx
+@@ -0,0 +1,62 @@
++import React, { Component, ErrorInfo, ReactNode } from 'react';
++
++interface Props {
++  children: ReactNode;
++  fallbackTitle?: string;
++  onReset?: () => void;
++}
++
++interface State {
++  hasError: boolean;
++  error: Error | null;
++}
++
++export default class ErrorBoundary extends Component<Props, State> {
++  constructor(props: Props) {
++    super(props);
++    this.state = { hasError: false, error: null };
++  }
++
++  static getDerivedStateFromError(error: Error): State {
++    return { hasError: true, error };
++  }
++
++  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
++    console.error('ErrorBoundary caught an error:', error, errorInfo);
++  }
++
++  handleReset = () => {
++    this.setState({ hasError: false, error: null });
++    if (this.props.onReset) {
++      this.props.onReset();
++    }
++  };
++
++  render() {
++    if (this.state.hasError) {
++      return (
++        <div className="flex flex-col items-center justify-center p-6 text-center h-full w-full bg-surface/80 rounded-xl space-y-4">
++          <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 font-bold text-xl">
++            !
++          </div>
++          <div className="space-y-1">
++            <h3 className="text-text-primary font-semibold text-lg">
++              {this.props.fallbackTitle || 'Something went wrong'}
++            </h3>
++            <p className="text-text-secondary text-sm max-w-xs break-words">
++              {this.state.error?.message || 'An unexpected error occurred.'}
++            </p>
++          </div>
++          <button
++            onClick={this.handleReset}
++            className="px-4 py-2 bg-accent text-button-text rounded-md font-medium text-sm hover:opacity-90 transition-opacity"
++          >
++            Retry
++          </button>
++        </div>
++      );
++    }
++
++    return this.props.children;
++  }
 +}
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
 index 86285cd..22a1afa 100644
@@ -7082,14 +7181,12 @@ index 6369664..9886bcb 100644
          ],
        });
 diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
-index 598487c..13de284 100644
+index 598487c..8cdafa8 100644
 --- a/src/hooks/useExportSettings.ts
 +++ b/src/hooks/useExportSettings.ts
-@@ -14,13 +14,40 @@ export function useExportSettings() {
-   const [stripGps, setStripGps] = useState(true);
-   const [exportMasks, setExportMasks] = useState(false);
+@@ -16,34 +16,90 @@ export function useExportSettings() {
    const [preserveFolders, setPreserveFolders] = useState(false);
--  const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
+   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
    const [enableWatermark, setEnableWatermark] = useState(false);
 +  const [watermarkType, setWatermarkType] = useState<'text' | 'image'>('text');
 +  const [watermarkText, setWatermarkText] = useState('© RapidRAW');
@@ -7127,18 +7224,49 @@ index 598487c..13de284 100644
    const [destinationType, setDestinationType] = useState<string>('customFolder');
    const [subfolder, setSubfolder] = useState<string>('');
  
-@@ -39,11 +66,38 @@ export function useExportSettings() {
-     setPreserveFolders(preset.preserveFolders ?? false);
-     setFilenameTemplate(preset.filenameTemplate);
-     setEnableWatermark(preset.enableWatermark);
-+    setWatermarkType(preset.watermarkType ?? 'text');
-+    setWatermarkText(preset.watermarkText ?? '© RapidRAW');
-+    setWatermarkColor(preset.watermarkColor ?? '#ffffff');
-     setWatermarkPath(preset.watermarkPath);
-     setWatermarkAnchor(preset.watermarkAnchor as WatermarkAnchor);
-     setWatermarkScale(preset.watermarkScale);
-     setWatermarkSpacing(preset.watermarkSpacing);
-     setWatermarkOpacity(preset.watermarkOpacity);
+   const handleApplyPreset = useCallback((preset: ExportPreset) => {
+-    setFileFormat(preset.fileFormat);
+-    setJpegQuality(preset.jpegQuality);
+-    setTiffBitDepth(preset.tiffBitDepth ?? 16);
+-    setEnableResize(preset.enableResize);
+-    setResizeMode(preset.resizeMode);
+-    setResizeValue(preset.resizeValue);
+-    setDontEnlarge(preset.dontEnlarge);
+-    setKeepMetadata(preset.keepMetadata);
+-    setPreserveTimestamps(preset.preserveTimestamps ?? false);
+-    setStripGps(preset.stripGps);
+-    setExportMasks(preset.exportMasks ?? false);
+-    setPreserveFolders(preset.preserveFolders ?? false);
+-    setFilenameTemplate(preset.filenameTemplate);
+-    setEnableWatermark(preset.enableWatermark);
+-    setWatermarkPath(preset.watermarkPath);
+-    setWatermarkAnchor(preset.watermarkAnchor as WatermarkAnchor);
+-    setWatermarkScale(preset.watermarkScale);
+-    setWatermarkSpacing(preset.watermarkSpacing);
+-    setWatermarkOpacity(preset.watermarkOpacity);
++    if (!preset) return;
++    if (preset.fileFormat) setFileFormat(preset.fileFormat);
++    if (preset.jpegQuality !== undefined) setJpegQuality(preset.jpegQuality);
++    if (preset.tiffBitDepth !== undefined) setTiffBitDepth(preset.tiffBitDepth ?? 16);
++    if (preset.enableResize !== undefined) setEnableResize(preset.enableResize);
++    if (preset.resizeMode) setResizeMode(preset.resizeMode);
++    if (preset.resizeValue !== undefined) setResizeValue(preset.resizeValue);
++    if (preset.dontEnlarge !== undefined) setDontEnlarge(preset.dontEnlarge);
++    if (preset.keepMetadata !== undefined) setKeepMetadata(preset.keepMetadata);
++    if (preset.preserveTimestamps !== undefined) setPreserveTimestamps(preset.preserveTimestamps ?? false);
++    if (preset.stripGps !== undefined) setStripGps(preset.stripGps);
++    if (preset.exportMasks !== undefined) setExportMasks(preset.exportMasks ?? false);
++    if (preset.preserveFolders !== undefined) setPreserveFolders(preset.preserveFolders ?? false);
++    if (preset.filenameTemplate !== undefined) setFilenameTemplate(preset.filenameTemplate || '{original_filename}_edited');
++    if (preset.enableWatermark !== undefined) setEnableWatermark(preset.enableWatermark);
++    if (preset.watermarkType) setWatermarkType(preset.watermarkType);
++    if (preset.watermarkText !== undefined) setWatermarkText(preset.watermarkText ?? '© RapidRAW');
++    if (preset.watermarkColor !== undefined) setWatermarkColor(preset.watermarkColor ?? '#ffffff');
++    if (preset.watermarkPath !== undefined) setWatermarkPath(preset.watermarkPath);
++    if (preset.watermarkAnchor) setWatermarkAnchor(preset.watermarkAnchor as WatermarkAnchor);
++    if (preset.watermarkScale !== undefined) setWatermarkScale(preset.watermarkScale);
++    if (preset.watermarkSpacing !== undefined) setWatermarkSpacing(preset.watermarkSpacing);
++    setWatermarkOpacity(preset.watermarkOpacity ?? 75);
 +    setWatermarkCustomPlacement(preset.watermarkCustomPlacement ?? false);
 +    setWatermarkCustomX(preset.watermarkCustomX ?? 85);
 +    setWatermarkCustomY(preset.watermarkCustomY ?? 90);
@@ -7166,7 +7294,7 @@ index 598487c..13de284 100644
      setDestinationType(preset.destinationType || 'customFolder');
      setSubfolder(preset.subfolder || '');
    }, []);
-@@ -64,11 +118,38 @@ export function useExportSettings() {
+@@ -64,11 +120,38 @@ export function useExportSettings() {
        preserveFolders,
        filenameTemplate,
        enableWatermark,
@@ -7205,7 +7333,7 @@ index 598487c..13de284 100644
        destinationType,
        subfolder,
      }),
-@@ -87,11 +168,38 @@ export function useExportSettings() {
+@@ -87,11 +170,38 @@ export function useExportSettings() {
        preserveFolders,
        filenameTemplate,
        enableWatermark,
@@ -7244,7 +7372,7 @@ index 598487c..13de284 100644
        destinationType,
        subfolder,
      ],
-@@ -126,6 +234,12 @@ export function useExportSettings() {
+@@ -126,6 +236,12 @@ export function useExportSettings() {
      setFilenameTemplate,
      enableWatermark,
      setEnableWatermark,
@@ -7257,7 +7385,7 @@ index 598487c..13de284 100644
      watermarkPath,
      setWatermarkPath,
      watermarkAnchor,
-@@ -136,6 +250,56 @@ export function useExportSettings() {
+@@ -136,6 +252,56 @@ export function useExportSettings() {
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
