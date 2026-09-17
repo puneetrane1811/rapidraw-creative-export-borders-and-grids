@@ -609,6 +609,553 @@ index b0e31f5..7f7bec6 100644
          let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
          let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
              (final_full_w as f64 * final_full_h as f64)
+diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
+new file mode 100644
+index 0000000..375a904
+--- /dev/null
++++ b/src/components/panel/right/CreativeExportTab.tsx
+@@ -0,0 +1,441 @@
++import React from 'react';
++import { useTranslation } from 'react-i18next';
++import Switch from '../../ui/Switch';
++import Slider from '../../ui/Slider';
++import Text from '../../ui/Text';
++import { TextVariants, TextColors } from '../../../types/typography';
++import { SelectedImage } from '../../ui/AppProperties';
++import ExportLivePreview from './ExportLivePreview';
++import { Section, GridNumberInput } from './ExportCommons';
++
++export interface CreativeExportTabProps {
++  selectedImage: SelectedImage | null;
++  finalPreviewUrl: string | null;
++  pathsToExport: string[];
++  thumbnails: Record<string, string>;
++  isExporting: boolean;
++  numImages: number;
++
++  // Outer Border
++  enableBorder: boolean;
++  setEnableBorder: (enabled: boolean) => void;
++  borderSize: number;
++  setBorderSize: (size: number) => void;
++  borderColor: string;
++  setBorderColor: (color: string) => void;
++
++  // Fine-Art Keyline
++  enableKeyline: boolean;
++  setEnableKeyline: (enabled: boolean) => void;
++  keylineSize: number;
++  setKeylineSize: (size: number) => void;
++  keylineColor: string;
++  setKeylineColor: (color: string) => void;
++  keylineInset: number;
++  setKeylineInset: (inset: number) => void;
++
++  // Collage Grid
++  enableCollageGrid: boolean;
++  setEnableCollageGrid: (enabled: boolean) => void;
++  collageColumns: number;
++  setCollageColumns: (cols: number) => void;
++  collageRows: number;
++  setCollageRows: (rows: number) => void;
++  collageGutter: number;
++  setCollageGutter: (gutter: number) => void;
++  collageCellFit: 'fit' | 'fill';
++  setCollageCellFit: (fit: 'fit' | 'fill') => void;
++
++  // Tile Splitter
++  enableTileSplit: boolean;
++  setEnableTileSplit: (enabled: boolean) => void;
++  tileSplitColumns: number;
++  setTileSplitColumns: (cols: number) => void;
++  tileSplitRows: number;
++  setTileSplitRows: (rows: number) => void;
++  tileBorderEachTile: boolean;
++  setTileBorderEachTile: (border: boolean) => void;
++
++  // Composition Grid Overlay
++  enableGridOverlay: boolean;
++  setEnableGridOverlay: (enabled: boolean) => void;
++  gridOverlayRows: number;
++  setGridOverlayRows: (rows: number) => void;
++  gridOverlayCols: number;
++  setGridOverlayCols: (cols: number) => void;
++  gridOverlayColor: string;
++  setGridOverlayColor: (color: string) => void;
++  gridOverlayOpacity: number;
++  setGridOverlayOpacity: (opacity: number) => void;
++  gridOverlaySize: number;
++}
++
++export default function CreativeExportTab({
++  selectedImage,
++  finalPreviewUrl,
++  pathsToExport,
++  thumbnails,
++  isExporting,
++  numImages,
++  enableBorder,
++  setEnableBorder,
++  borderSize,
++  setBorderSize,
++  borderColor,
++  setBorderColor,
++  enableKeyline,
++  setEnableKeyline,
++  keylineSize,
++  setKeylineSize,
++  keylineColor,
++  setKeylineColor,
++  keylineInset,
++  setKeylineInset,
++  enableCollageGrid,
++  setEnableCollageGrid,
++  collageColumns,
++  setCollageColumns,
++  collageRows,
++  setCollageRows,
++  collageGutter,
++  setCollageGutter,
++  collageCellFit,
++  setCollageCellFit,
++  enableTileSplit,
++  setEnableTileSplit,
++  tileSplitColumns,
++  setTileSplitColumns,
++  tileSplitRows,
++  setTileSplitRows,
++  tileBorderEachTile,
++  setTileBorderEachTile,
++  enableGridOverlay,
++  setEnableGridOverlay,
++  gridOverlayRows,
++  setGridOverlayRows,
++  gridOverlayCols,
++  setGridOverlayCols,
++  gridOverlayColor,
++  setGridOverlayColor,
++  gridOverlayOpacity,
++  setGridOverlayOpacity,
++  gridOverlaySize,
++}: CreativeExportTabProps) {
++  const { t } = useTranslation();
++
++  return (
++    <div className="space-y-6">
++      {/* 🖼️ Hero Live Interactive Preview */}
++      <ExportLivePreview
++        selectedImage={selectedImage}
++        finalPreviewUrl={finalPreviewUrl}
++        multiSelectedPaths={pathsToExport}
++        thumbnailMap={thumbnails}
++        enableBorder={enableBorder}
++        borderSize={borderSize}
++        borderColor={borderColor}
++        enableKeyline={enableKeyline}
++        keylineSize={keylineSize}
++        keylineColor={keylineColor}
++        keylineInset={keylineInset}
++        enableGridOverlay={enableGridOverlay}
++        gridOverlayRows={gridOverlayRows}
++        gridOverlayCols={gridOverlayCols}
++        gridOverlayColor={gridOverlayColor}
++        gridOverlayOpacity={gridOverlayOpacity}
++        gridOverlaySize={gridOverlaySize}
++        enableCollageGrid={enableCollageGrid}
++        collageColumns={collageColumns}
++        collageRows={collageRows}
++        collageGutter={collageGutter}
++        collageCellFit={collageCellFit}
++        enableTileSplit={enableTileSplit}
++        tileSplitColumns={tileSplitColumns}
++        tileSplitRows={tileSplitRows}
++        tileBorderEachTile={tileBorderEachTile}
++      />
++
++      {/* 📐 Card 1: Outer Border & Fine-Art Keyline */}
++      <Section title={t('export.sections.border', 'Framing & Keylines')}>
++        {/* 1. Outer Border */}
++        <Switch
++          label={t('export.border.addBorder')}
++          checked={enableBorder}
++          onChange={setEnableBorder}
++          disabled={isExporting}
++          trackClassName="bg-surface"
++        />
++        {enableBorder && (
++          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++            <Slider
++              label={t('export.border.size')}
++              min={0.1}
++              max={20}
++              step={0.1}
++              value={borderSize}
++              onChange={(e) => setBorderSize(Number(e.target.value))}
++              disabled={isExporting}
++              defaultValue={1}
++            />
++            <div className="flex items-center justify-between gap-3">
++              <Text variant={TextVariants.label}>{t('export.border.color')}</Text>
++              <input
++                aria-label={t('export.border.color')}
++                className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                disabled={isExporting}
++                onChange={(e) => setBorderColor(e.target.value)}
++                type="color"
++                value={borderColor}
++              />
++            </div>
++          </div>
++        )}
++
++        {/* 2. Fine-Art Keyline */}
++        <div className="pt-2">
++          <Switch
++            label={t('export.border.addKeyline')}
++            checked={enableKeyline}
++            onChange={setEnableKeyline}
++            disabled={isExporting}
++            trackClassName="bg-surface"
++          />
++          {enableKeyline && (
++            <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++              <Slider
++                label={t('export.border.keylineInset')}
++                min={0.1}
++                max={5}
++                step={0.1}
++                value={keylineInset}
++                onChange={(e) => setKeylineInset(Number(e.target.value))}
++                disabled={isExporting}
++                defaultValue={0.5}
++              />
++              <Slider
++                label={t('export.border.keylineSize')}
++                min={0.1}
++                max={2}
++                step={0.05}
++                value={keylineSize}
++                onChange={(e) => setKeylineSize(Number(e.target.value))}
++                disabled={isExporting}
++                defaultValue={0.2}
++              />
++              <div className="flex items-center justify-between gap-3">
++                <Text variant={TextVariants.label}>{t('export.border.keylineColor')}</Text>
++                <input
++                  aria-label={t('export.border.keylineColor')}
++                  className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                  disabled={isExporting}
++                  onChange={(e) => setKeylineColor(e.target.value)}
++                  type="color"
++                  value={keylineColor}
++                />
++              </div>
++            </div>
++          )}
++        </div>
++      </Section>
++
++      {/* 🔲 Card 2: Multi-Photo Contact Sheet / Collage */}
++      <Section title={t('export.grid.collageTitle', 'Grid Collage (Multi-Photo)')}>
++        {numImages <= 1 && (
++          <Text variant={TextVariants.small} color={TextColors.secondary} className="italic mb-1">
++            {t('export.grid.singleImageCollageHint', 'Select 2 or more photos in the filmstrip to composite a collage.')}
++          </Text>
++        )}
++        <Switch
++          label={t('export.grid.enableCollage')}
++          checked={enableCollageGrid}
++          onChange={setEnableCollageGrid}
++          disabled={isExporting}
++          trackClassName="bg-surface"
++        />
++        {enableCollageGrid && (
++          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++            <div className="grid grid-cols-2 gap-3">
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.grid.collageCols')}
++                </Text>
++                <GridNumberInput
++                  min={1}
++                  max={10}
++                  value={collageColumns}
++                  disabled={isExporting}
++                  onChange={setCollageColumns}
++                />
++              </div>
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.grid.collageRows')}
++                </Text>
++                <GridNumberInput
++                  min={1}
++                  max={10}
++                  value={collageRows}
++                  disabled={isExporting}
++                  onChange={setCollageRows}
++                />
++              </div>
++            </div>
++
++            <Slider
++              label={t('export.grid.collageGutter')}
++              min={0}
++              max={10}
++              step={0.1}
++              value={collageGutter}
++              onChange={(e) => setCollageGutter(Number(e.target.value))}
++              disabled={isExporting}
++              defaultValue={1.0}
++            />
++
++            <div>
++              <Text variant={TextVariants.label} className="mb-1.5">
++                {t('export.grid.cellFit')}
++              </Text>
++              <div className="grid grid-cols-2 gap-2">
++                <button
++                  type="button"
++                  className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
++                    collageCellFit === 'fit'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
++                  }`}
++                  onClick={() => setCollageCellFit('fit')}
++                  disabled={isExporting}
++                >
++                  {t('export.grid.fit')}
++                </button>
++                <button
++                  type="button"
++                  className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
++                    collageCellFit === 'fill'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
++                  }`}
++                  onClick={() => setCollageCellFit('fill')}
++                  disabled={isExporting}
++                >
++                  {t('export.grid.fill')}
++                </button>
++              </div>
++            </div>
++          </div>
++        )}
++      </Section>
++
++      {/* 📱 Card 3: Multi-Tile Splitter (Instagram / Panorama) */}
++      <Section title={t('export.grid.tileSplitTitle', 'Multi-Tile Splitter (Instagram / Panorama)')}>
++        <Switch
++          label={t('export.grid.enableTileSplit')}
++          checked={enableTileSplit}
++          onChange={setEnableTileSplit}
++          disabled={isExporting}
++          trackClassName="bg-surface"
++        />
++        {enableTileSplit && (
++          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++            <div className="grid grid-cols-2 gap-3">
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.grid.tileCols')}
++                </Text>
++                <GridNumberInput
++                  min={1}
++                  max={10}
++                  value={tileSplitColumns}
++                  disabled={isExporting}
++                  onChange={setTileSplitColumns}
++                />
++              </div>
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.grid.tileRows')}
++                </Text>
++                <GridNumberInput
++                  min={1}
++                  max={10}
++                  value={tileSplitRows}
++                  disabled={isExporting}
++                  onChange={setTileSplitRows}
++                />
++              </div>
++            </div>
++            <Switch
++              label={t('export.grid.borderEachTile')}
++              checked={tileBorderEachTile}
++              onChange={setTileBorderEachTile}
++              disabled={isExporting}
++              trackClassName="bg-surface"
++            />
++          </div>
++        )}
++      </Section>
++
++      {/* 📏 Card 4: Composition Grid Overlay */}
++      <Section title={t('export.border.addGridOverlay', 'Composition Grid Overlay')}>
++        <Switch
++          label={t('export.border.addGridOverlay')}
++          checked={enableGridOverlay}
++          onChange={setEnableGridOverlay}
++          disabled={isExporting}
++          trackClassName="bg-surface"
++        />
++        {enableGridOverlay && (
++          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++            <div className="grid grid-cols-2 gap-3">
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.border.gridOverlayCols')}
++                </Text>
++                <GridNumberInput
++                  min={2}
++                  max={12}
++                  value={gridOverlayCols}
++                  disabled={isExporting}
++                  onChange={setGridOverlayCols}
++                />
++              </div>
++              <div>
++                <Text variant={TextVariants.label} className="mb-1">
++                  {t('export.border.gridOverlayRows')}
++                </Text>
++                <GridNumberInput
++                  min={2}
++                  max={12}
++                  value={gridOverlayRows}
++                  disabled={isExporting}
++                  onChange={setGridOverlayRows}
++                />
++              </div>
++            </div>
++            <Slider
++              label={t('export.border.gridOverlayOpacity')}
++              min={5}
++              max={100}
++              step={1}
++              value={gridOverlayOpacity}
++              onChange={(e) => setGridOverlayOpacity(Number(e.target.value))}
++              disabled={isExporting}
++              defaultValue={50}
++            />
++            <div className="flex items-center justify-between gap-3">
++              <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor')}</Text>
++              <input
++                aria-label={t('export.border.gridOverlayColor')}
++                className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                disabled={isExporting}
++                onChange={(e) => setGridOverlayColor(e.target.value)}
++                type="color"
++                value={gridOverlayColor}
++              />
++            </div>
++          </div>
++        )}
++      </Section>
++    </div>
++  );
++}
+diff --git a/src/components/panel/right/ExportCommons.tsx b/src/components/panel/right/ExportCommons.tsx
+new file mode 100644
+index 0000000..403f301
+--- /dev/null
++++ b/src/components/panel/right/ExportCommons.tsx
+@@ -0,0 +1,94 @@
++import React, { useState, useEffect } from 'react';
++import Text from '../../ui/Text';
++import { TextVariants } from '../../../types/typography';
++
++export interface SectionProps {
++  children: any;
++  title: string;
++  className?: string;
++}
++
++export function Section({ title, children, className }: SectionProps) {
++  return (
++    <div className={className}>
++      <Text variant={TextVariants.heading} className="mb-2">
++        {title}
++      </Text>
++      <div className="space-y-2">{children}</div>
++    </div>
++  );
++}
++
++export function GridNumberInput({
++  value,
++  min,
++  max,
++  disabled,
++  onChange,
++  className,
++}: {
++  value: number;
++  min: number;
++  max: number;
++  disabled?: boolean;
++  onChange: (val: number) => void;
++  className?: string;
++}) {
++  const [localVal, setLocalVal] = useState<string>(String(value || min));
++
++  useEffect(() => {
++    setLocalVal(String(value || min));
++  }, [value, min]);
++
++  return (
++    <input
++      type="number"
++      min={min}
++      max={max}
++      value={localVal}
++      disabled={disabled}
++      onChange={(e) => {
++        const raw = e.target.value;
++        setLocalVal(raw);
++        if (raw === '') return;
++        const num = parseInt(raw, 10);
++        if (!isNaN(num)) {
++          const clamped = Math.min(max, Math.max(min, num));
++          onChange(clamped);
++        }
++      }}
++      onBlur={() => {
++        const num = parseInt(localVal, 10);
++        if (isNaN(num) || num < min) {
++          setLocalVal(String(min));
++          onChange(min);
++        } else if (num > max) {
++          setLocalVal(String(max));
++          onChange(max);
++        } else {
++          setLocalVal(String(num));
++          onChange(num);
++        }
++      }}
++      className={
++        className ||
++        'w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent disabled:opacity-50 text-center font-medium'
++      }
++    />
++  );
++}
++
++export const formatBytes = (bytes: number, t: any, decimals = 2) => {
++  if (bytes === 0) return `0 ${t('export.bytes.bytes')}`;
++  const k = 1024;
++  const dm = decimals < 0 ? 0 : decimals;
++  const sizes = [
++    t('export.bytes.bytes'),
++    t('export.bytes.kb'),
++    t('export.bytes.mb'),
++    t('export.bytes.gb'),
++    t('export.bytes.tb'),
++  ];
++  const i = Math.floor(Math.log(bytes) / Math.log(k));
++  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
++};
 diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
 new file mode 100644
 index 0000000..b34830c
@@ -1099,86 +1646,214 @@ index 0000000..b34830c
 +  );
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..bb20c9c 100644
+index 267e321..13bddd2 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
-@@ -29,7 +29,9 @@ import { useOsPlatform } from '../../../hooks/useOsPlatform';
+@@ -1,21 +1,16 @@
+ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+ import { save, open } from '@tauri-apps/plugin-dialog';
+ import { invoke } from '@tauri-apps/api/core';
+-import { FileInput, CheckCircle, XCircle, Loader, Ban, ChevronDown, ChevronRight, Settings, X } from 'lucide-react';
+-import { motion, AnimatePresence } from 'framer-motion';
++import { FileInput, CheckCircle, XCircle, Loader, Ban, X } from 'lucide-react';
++import { motion } from 'framer-motion';
+ import { useTranslation } from 'react-i18next';
+ import debounce from 'lodash.debounce';
+-import Switch from '../../ui/Switch';
+ import Button from '../../ui/Button';
+-import Dropdown from '../../ui/Dropdown';
+-import Slider from '../../ui/Slider';
+-import ImagePicker from '../../ui/ImagePicker';
+ import {
+   ExportPreset,
+   ExportSettings,
+   FileFormat,
+   FILE_FORMATS,
+-  FILENAME_VARIABLES,
+   Status,
+   ExportState,
+   FileFormats,
+@@ -23,13 +18,16 @@ import {
+   WatermarkAnchor,
+ } from '../../ui/ExportImportProperties';
+ import { Invokes, SelectedImage, AppSettings, Panel } from '../../ui/AppProperties';
+-import ExportPresetsList from '../../ui/ExportPresetsList';
+ import { useExportSettings } from '../../../hooks/useExportSettings';
+ import { useOsPlatform } from '../../../hooks/useOsPlatform';
  import Text from '../../ui/Text';
  import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
  import { useEditorStore } from '../../../store/useEditorStore';
 +import { useProcessStore } from '../../../store/useProcessStore';
  import { useUIStore } from '../../../store/useUIStore';
-+import ExportLivePreview from './ExportLivePreview';
++import { formatBytes } from './ExportCommons';
++import StandardExportTab from './StandardExportTab';
++import CreativeExportTab from './CreativeExportTab';
  
  interface ExportPanelProps {
    exportState: ExportState;
-@@ -59,6 +61,65 @@ function Section({ title, children }: SectionProps) {
-   );
+@@ -43,137 +41,6 @@ interface ExportPanelProps {
+   onClose?: () => void;
  }
  
-+function GridNumberInput({
-+  value,
-+  min,
-+  max,
-+  disabled,
-+  onChange,
-+  className,
-+}: {
-+  value: number;
-+  min: number;
-+  max: number;
-+  disabled?: boolean;
-+  onChange: (val: number) => void;
-+  className?: string;
-+}) {
-+  const [localVal, setLocalVal] = useState<string>(String(value || min));
-+
-+  useEffect(() => {
-+    setLocalVal(String(value || min));
-+  }, [value, min]);
-+
-+  return (
-+    <input
-+      type="number"
-+      min={min}
-+      max={max}
-+      value={localVal}
-+      disabled={disabled}
-+      onChange={(e) => {
-+        const raw = e.target.value;
-+        setLocalVal(raw);
-+        if (raw === '') return;
-+        const num = parseInt(raw, 10);
-+        if (!isNaN(num)) {
-+          const clamped = Math.min(max, Math.max(min, num));
-+          onChange(clamped);
-+        }
-+      }}
-+      onBlur={() => {
-+        const num = parseInt(localVal, 10);
-+        if (isNaN(num) || num < min) {
-+          setLocalVal(String(min));
-+          onChange(min);
-+        } else if (num > max) {
-+          setLocalVal(String(max));
-+          onChange(max);
-+        } else {
-+          setLocalVal(String(num));
-+          onChange(num);
-+        }
-+      }}
-+      className={
-+        className ||
-+        'w-full bg-surface border border-surface rounded p-1.5 text-sm text-text-primary focus:border-accent focus:outline-hidden'
+-interface SectionProps {
+-  children: any;
+-  title: string;
+-}
+-
+-function Section({ title, children }: SectionProps) {
+-  return (
+-    <div>
+-      <Text variant={TextVariants.heading} className="mb-2">
+-        {title}
+-      </Text>
+-      <div className="space-y-2">{children}</div>
+-    </div>
+-  );
+-}
+-
+-function WatermarkPreview({
+-  anchor,
+-  scale,
+-  spacing,
+-  opacity,
+-  watermarkPath,
+-  imageAspectRatio,
+-  watermarkImageAspectRatio,
+-}: {
+-  anchor: WatermarkAnchor;
+-  scale: number;
+-  spacing: number;
+-  opacity: number;
+-  watermarkPath: string | null;
+-  imageAspectRatio: number;
+-  watermarkImageAspectRatio: number;
+-}) {
+-  const { t } = useTranslation();
+-
+-  const getPositionStyles = () => {
+-    const minDimPercent = imageAspectRatio > 1 ? 100 / imageAspectRatio : 100;
+-    const watermarkSizePercent = minDimPercent * (scale / 100);
+-    const spacingPercent = minDimPercent * (spacing / 100);
+-
+-    const styles: React.CSSProperties = {
+-      width: `${watermarkSizePercent}%`,
+-      opacity: opacity / 100,
+-      position: 'absolute',
+-    };
+-
+-    const spacingString = `${spacingPercent}%`;
+-
+-    switch (anchor) {
+-      case WatermarkAnchor.TopLeft:
+-        styles.top = spacingString;
+-        styles.left = spacingString;
+-        break;
+-      case WatermarkAnchor.TopCenter:
+-        styles.top = spacingString;
+-        styles.left = '50%';
+-        styles.transform = 'translateX(-50%)';
+-        break;
+-      case WatermarkAnchor.TopRight:
+-        styles.top = spacingString;
+-        styles.right = spacingString;
+-        break;
+-      case WatermarkAnchor.CenterLeft:
+-        styles.top = '50%';
+-        styles.left = spacingString;
+-        styles.transform = 'translateY(-50%)';
+-        break;
+-      case WatermarkAnchor.Center:
+-        styles.top = '50%';
+-        styles.left = '50%';
+-        styles.transform = 'translate(-50%, -50%)';
+-        break;
+-      case WatermarkAnchor.CenterRight:
+-        styles.top = '50%';
+-        styles.right = spacingString;
+-        styles.transform = 'translateY(-50%)';
+-        break;
+-      case WatermarkAnchor.BottomLeft:
+-        styles.bottom = spacingString;
+-        styles.left = spacingString;
+-        break;
+-      case WatermarkAnchor.BottomCenter:
+-        styles.bottom = spacingString;
+-        styles.left = '50%';
+-        styles.transform = 'translateX(-50%)';
+-        break;
+-      case WatermarkAnchor.BottomRight:
+-        styles.bottom = spacingString;
+-        styles.right = spacingString;
+-        break;
+-    }
+-    return styles;
+-  };
+-
+-  return (
+-    <div
+-      className="w-full bg-surface rounded-md relative overflow-hidden border border-surface"
+-      style={{ aspectRatio: imageAspectRatio }}
+-    >
+-      <div className="absolute inset-0 flex items-center justify-center">
+-        <Text variant={TextVariants.label}>{t('export.watermark.previewText')}</Text>
+-      </div>
+-      {watermarkPath && (
+-        <div style={getPositionStyles()}>
+-          <div
+-            className="w-full bg-accent/50 border-2 border-dashed border-accent rounded-xs flex items-center justify-center"
+-            style={{ aspectRatio: watermarkImageAspectRatio }}
+-          >
+-            <span className="text-white text-[8px] font-bold">{t('export.watermark.logoText')}</span>
+-          </div>
+-        </div>
+-      )}
+-    </div>
+-  );
+-}
+-
+-const formatBytes = (bytes: number, t: any, decimals = 2) => {
+-  if (!+bytes) return `0 ${t('export.bytes.bytes')}`;
+-  const k = 1024;
+-  const dm = decimals < 0 ? 0 : decimals;
+-  const sizes = [
+-    t('export.bytes.bytes'),
+-    t('export.bytes.kb'),
+-    t('export.bytes.mb'),
+-    t('export.bytes.gb'),
+-    t('export.bytes.tb'),
+-  ];
+-  const i = Math.floor(Math.log(bytes) / Math.log(k));
+-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+-};
+-
+ export default function ExportPanel({
+   exportState,
+   multiSelectedPaths,
+@@ -187,6 +54,23 @@ export default function ExportPanel({
+ }: ExportPanelProps) {
+   const { t } = useTranslation();
+ 
++  const [activeTab, setActiveTab] = useState<'standard' | 'creative'>(() => {
++    try {
++      const saved = localStorage.getItem('rapidraw_export_active_tab');
++      if (saved === 'creative' || saved === 'standard') {
++        return saved;
 +      }
-+    />
-+  );
-+}
++    } catch {}
++    return 'standard';
++  });
 +
- function WatermarkPreview({
-   anchor,
-   scale,
-@@ -242,6 +303,50 @@ export default function ExportPanel({
++  const handleTabChange = (tab: 'standard' | 'creative') => {
++    setActiveTab(tab);
++    try {
++      localStorage.setItem('rapidraw_export_active_tab', tab);
++    } catch {}
++  };
++
+   const resizeModeOptions = useMemo(
+     () => [
+       { label: t('export.resize.modes.longEdge'), value: 'longEdge' },
+@@ -242,6 +126,50 @@ export default function ExportPanel({
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -1229,8 +1904,12 @@ index 267e321..bb20c9c 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -252,6 +357,9 @@ export default function ExportPanel({
+@@ -250,8 +178,13 @@ export default function ExportPanel({
+     setDestinationType,
+     subfolder,
      setSubfolder,
++    stripCameraInfo,
++    setStripCameraInfo,
    } = useExportSettings();
  
 +  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -1239,7 +1918,7 @@ index 267e321..bb20c9c 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -370,8 +478,10 @@ export default function ExportPanel({
+@@ -370,8 +303,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -1251,7 +1930,16 @@ index 267e321..bb20c9c 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -412,6 +522,61 @@ export default function ExportPanel({
+@@ -384,7 +319,7 @@ export default function ExportPanel({
+           setIsEstimating(false);
+         }
+       }, 500),
+-    [isVisible],
++    [isVisible, enableCollageGrid],
+   );
+ 
+   useEffect(() => {
+@@ -412,6 +347,61 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1313,7 +2001,7 @@ index 267e321..bb20c9c 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -453,6 +618,28 @@ export default function ExportPanel({
+@@ -453,6 +443,28 @@ export default function ExportPanel({
      watermarkScale,
      watermarkSpacing,
      watermarkOpacity,
@@ -1342,7 +2030,7 @@ index 267e321..bb20c9c 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -498,6 +685,61 @@ export default function ExportPanel({
+@@ -498,22 +510,79 @@ export default function ExportPanel({
                opacity: watermarkOpacity,
              }
            : null,
@@ -1404,7 +2092,10 @@ index 267e321..bb20c9c 100644
      };
  
      const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
-@@ -507,13 +749,15 @@ export default function ExportPanel({
+ 
+     try {
+-      const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
++      const selectedFormat: any = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat);
  
        let outputFolderOrFile = '';
        const isOriginalFolder = destinationType === 'originalFolder';
@@ -1422,7 +2113,7 @@ index 267e321..bb20c9c 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,8 +836,32 @@ export default function ExportPanel({
+@@ -592,332 +661,228 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
@@ -1438,6 +2129,13 @@ index 267e321..bb20c9c 100644
 +    }
 +    return base;
 +  }, [isCollageActive, numImages, isTileSplitActive, tileSplitColumns, tileSplitRows]);
++
++  const hasActiveCreativeSettings =
++    enableBorder ||
++    enableKeyline ||
++    isCollageActive ||
++    enableTileSplit ||
++    enableGridOverlay;
 +
 +  const itemLabel = isLut
 +    ? t('export.labels.lut')
@@ -1457,319 +2155,516 @@ index 267e321..bb20c9c 100644
  
    return (
      <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
-@@ -758,6 +1026,311 @@ export default function ExportPanel({
-                   )}
-                 </Section>
++      {/* Header */}
+       <div className="p-3 flex justify-between items-center shrink-0 border-b border-surface">
+         <Text variant={TextVariants.title}>{t('export.title')}</Text>
++        {onClose && (
++          <button
++            onClick={onClose}
++            className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
++          >
++            <X size={18} />
++          </button>
++        )}
+       </div>
+-      <div className="grow overflow-y-auto p-3 space-y-8">
+-        {canExport ? (
+-          <>
+-            <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+-              <ExportPresetsList
+-                appSettings={appSettings}
+-                onSettingsChange={onSettingsChange}
+-                currentSettings={currentSettingsObject}
+-                onApplyPreset={handleApplyPreset}
+-              />
+-            </div>
+-
+-            <Section title={t('export.sections.fileSettings')}>
+-              <div className="grid grid-cols-3 gap-2">
+-                {FILE_FORMATS.map((format: FileFormat) => (
+-                  <button
+-                    className={`px-2 py-1.5 rounded-md transition-colors ${fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'} disabled:opacity-50`}
+-                    disabled={isExporting}
+-                    key={format.id}
+-                    onClick={() => setFileFormat(format.id)}
+-                  >
+-                    <Text color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
+-                      {format.name}
+-                    </Text>
+-                  </button>
+-                ))}
+-              </div>
+-              {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat as FileFormats) && (
+-                <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+-                  <Slider
+-                    defaultValue={90}
+-                    label={
+-                      fileFormat === FileFormats.Jxl && jpegQuality === 100
+-                        ? t('export.file.qualityLossless')
+-                        : t('export.file.quality')
+-                    }
+-                    max={100}
+-                    min={1}
+-                    onChange={(e) => setJpegQuality(Number(e.target.value))}
+-                    step={1}
+-                    value={jpegQuality}
+-                    fillOrigin="min"
+-                  />
+-                </div>
+-              )}
+-              {fileFormat === FileFormats.Tiff && (
+-                <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+-                  <Text variant={TextVariants.label} className="mb-1">
+-                    {t('export.file.tiffBitDepth')}
+-                  </Text>
+-                  <Dropdown
+-                    options={tiffBitDepthOptions}
+-                    value={String(tiffBitDepth)}
+-                    onChange={(value) => setTiffBitDepth(Number(value) as TiffBitDepth)}
+-                    disabled={isExporting}
+-                    className="w-full"
+-                  />
+-                </div>
+-              )}
+-            </Section>
+-
+-            <Section title={t('export.sections.destination')}>
+-              <div className="space-y-3">
+-                <Dropdown
+-                  options={[
+-                    { label: t('export.destination.customFolder'), value: 'customFolder' },
+-                    { label: t('export.destination.originalFolder'), value: 'originalFolder' },
+-                  ]}
+-                  value={destinationType || 'customFolder'}
+-                  onChange={(val) => setDestinationType(val as string)}
+-                  disabled={isExporting}
+-                  className="w-full"
+-                />
  
-+                <Section title={t('export.sections.border')}>
-+                  <ExportLivePreview
-+                    selectedImage={selectedImage}
-+                    finalPreviewUrl={finalPreviewUrl}
-+                    multiSelectedPaths={pathsToExport}
-+                    thumbnailMap={thumbnails}
-+                    enableBorder={enableBorder}
-+                    borderSize={borderSize}
-+                    borderColor={borderColor}
-+                    enableKeyline={enableKeyline}
-+                    keylineSize={keylineSize}
-+                    keylineColor={keylineColor}
-+                    keylineInset={keylineInset}
-+                    enableGridOverlay={enableGridOverlay}
-+                    gridOverlayRows={gridOverlayRows}
-+                    gridOverlayCols={gridOverlayCols}
-+                    gridOverlayColor={gridOverlayColor}
-+                    gridOverlayOpacity={gridOverlayOpacity}
-+                    gridOverlaySize={gridOverlaySize}
-+                    enableCollageGrid={enableCollageGrid}
-+                    collageColumns={collageColumns}
-+                    collageRows={collageRows}
-+                    collageGutter={collageGutter}
-+                    collageCellFit={collageCellFit}
-+                    enableTileSplit={enableTileSplit}
-+                    tileSplitColumns={tileSplitColumns}
-+                    tileSplitRows={tileSplitRows}
-+                    tileBorderEachTile={tileBorderEachTile}
-+                  />
+-                {destinationType === 'originalFolder' && (
+-                  <div className="flex items-center gap-3 pl-2 border-l-2 border-surface">
+-                    <Text variant={TextVariants.label} className="whitespace-nowrap min-w-[70px]">
+-                      {t('export.destination.subfolder')}
+-                    </Text>
+-                    <input
+-                      className="w-full bg-surface border border-transparent rounded-md px-3 py-2 text-sm text-text-primary focus:outline-hidden truncate"
+-                      disabled={isExporting}
+-                      onChange={(e) => setSubfolder(e.target.value)}
+-                      type="text"
+-                      value={subfolder || ''}
+-                      placeholder={t('export.destination.subfolderPlaceholder')}
+-                    />
+-                  </div>
+-                )}
+-              </div>
+-            </Section>
+-
+-            {numImages > 1 && (
+-              <Section title={t('export.sections.fileNaming')}>
+-                <input
+-                  className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
+-                  disabled={isExporting}
+-                  onChange={(e) => setFilenameTemplate(e.target.value)}
+-                  ref={filenameInputRef}
+-                  type="text"
+-                  value={filenameTemplate}
++      {/* Segmented Tab Switcher */}
++      {canExport && (
++        <div className="px-3 pt-2 pb-1 shrink-0">
++          <div className="flex bg-surface-lowest p-1 rounded-lg border border-surface relative">
++            <button
++              type="button"
++              onClick={() => handleTabChange('standard')}
++              disabled={isExporting}
++              className={`relative z-10 flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
++                activeTab === 'standard'
++                  ? 'text-text-primary'
++                  : 'text-text-secondary hover:text-text-primary'
++              }`}
++            >
++              {activeTab === 'standard' && (
++                <motion.div
++                  layoutId="export-active-tab-indicator"
++                  className="absolute inset-0 bg-surface rounded-md shadow-xs"
++                  transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+                 />
+-                <div className="flex flex-wrap gap-2 mt-2">
+-                  {FILENAME_VARIABLES.map((variable: string) => (
+-                    <button
+-                      className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
+-                      disabled={isExporting}
+-                      key={variable}
+-                      onClick={() => handleVariableClick(variable)}
+-                    >
+-                      {variable}
+-                    </button>
+-                  ))}
+-                </div>
+-              </Section>
+-            )}
+-
+-            {fileFormat !== FileFormats.Cube && (
+-              <>
+-                <Section title={t('export.sections.imageSizing')}>
+-                  <Switch
+-                    label={t('export.resize.resizeToFit')}
+-                    checked={enableResize}
+-                    onChange={setEnableResize}
+-                    disabled={isExporting}
+-                    trackClassName="bg-surface"
++              )}
++              <span className="relative z-10">{t('export.tabs.standard', 'Standard Export')}</span>
++            </button>
 +
-+                  {/* 1. Outer Border */}
-+                  <Switch
-+                    label={t('export.border.addBorder')}
-+                    checked={enableBorder}
-+                    onChange={setEnableBorder}
-+                    disabled={isExporting}
-+                    trackClassName="bg-surface"
-+                  />
-+                  {enableBorder && (
-+                    <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
-+                      <Slider
-+                        label={t('export.border.size')}
-+                        min={0.1}
-+                        max={20}
-+                        step={0.1}
-+                        value={borderSize}
-+                        onChange={(e) => setBorderSize(Number(e.target.value))}
-+                        disabled={isExporting}
-+                        defaultValue={1}
-+                      />
-+                      <div className="flex items-center justify-between gap-3">
-+                        <Text variant={TextVariants.label}>{t('export.border.color')}</Text>
-+                        <input
-+                          aria-label={t('export.border.color')}
-+                          className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
-+                          disabled={isExporting}
-+                          onChange={(e) => setBorderColor(e.target.value)}
-+                          type="color"
-+                          value={borderColor}
-+                        />
-+                      </div>
-+                    </div>
-+                  )}
-+
-+                  {/* 2. Fine-Art Keyline */}
-+                  <div className="pt-2">
-+                    <Switch
-+                      label={t('export.border.addKeyline')}
-+                      checked={enableKeyline}
-+                      onChange={setEnableKeyline}
-+                      disabled={isExporting}
-+                      trackClassName="bg-surface"
-+                    />
-+                    {enableKeyline && (
-+                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
-+                        <Slider
-+                          label={t('export.border.keylineInset')}
-+                          min={0.1}
-+                          max={5}
-+                          step={0.1}
-+                          value={keylineInset}
-+                          onChange={(e) => setKeylineInset(Number(e.target.value))}
-+                          disabled={isExporting}
-+                          defaultValue={0.5}
-+                        />
-+                        <Slider
-+                          label={t('export.border.keylineSize')}
-+                          min={0.1}
-+                          max={2}
-+                          step={0.05}
-+                          value={keylineSize}
-+                          onChange={(e) => setKeylineSize(Number(e.target.value))}
-+                          disabled={isExporting}
-+                          defaultValue={0.2}
-+                        />
-+                        <div className="flex items-center justify-between gap-3">
-+                          <Text variant={TextVariants.label}>{t('export.border.keylineColor')}</Text>
-+                          <input
-+                            aria-label={t('export.border.keylineColor')}
-+                            className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
-+                            disabled={isExporting}
-+                            onChange={(e) => setKeylineColor(e.target.value)}
-+                            type="color"
-+                            value={keylineColor}
-+                          />
-+                        </div>
-+                      </div>
-+                    )}
-+                  </div>
-+
-+                  {/* 3. Multi-Photo Collage Grid */}
-+                  <div className="pt-2">
-+                    <Switch
-+                      label={t('export.grid.enableCollage')}
-+                      checked={enableCollageGrid}
-+                      onChange={setEnableCollageGrid}
-+                      disabled={isExporting}
-+                      trackClassName="bg-surface"
-+                    />
-+                    {enableCollageGrid && (
-+                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
-+                        <div className="grid grid-cols-2 gap-3">
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.grid.collageCols')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={1}
-+                              max={10}
-+                              value={collageColumns}
-+                              disabled={isExporting}
-+                              onChange={setCollageColumns}
-+                            />
-+                          </div>
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.grid.collageRows')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={1}
-+                              max={10}
-+                              value={collageRows}
-+                              disabled={isExporting}
-+                              onChange={setCollageRows}
-+                            />
-+                          </div>
-+                        </div>
-+
-+                        <Slider
-+                          label={t('export.grid.collageGutter')}
-+                          min={0}
-+                          max={10}
-+                          step={0.1}
-+                          value={collageGutter}
-+                          onChange={(e) => setCollageGutter(Number(e.target.value))}
-+                          disabled={isExporting}
-+                          defaultValue={1.0}
-+                        />
-+
-+                        <div>
-+                          <Text variant={TextVariants.label} className="mb-1.5">
-+                            {t('export.grid.cellFit')}
-+                          </Text>
-+                          <div className="grid grid-cols-2 gap-2">
-+                            <button
-+                              type="button"
-+                              className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
-+                                collageCellFit === 'fit'
-+                                  ? 'bg-accent text-button-text shadow-sm'
-+                                  : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
-+                              }`}
-+                              onClick={() => setCollageCellFit('fit')}
-+                              disabled={isExporting}
-+                            >
-+                              {t('export.grid.fit')}
-+                            </button>
-+                            <button
-+                              type="button"
-+                              className={`px-3 py-2 text-xs font-semibold rounded-md transition-colors ${
-+                                collageCellFit === 'fill'
-+                                  ? 'bg-accent text-button-text shadow-sm'
-+                                  : 'bg-surface text-text-secondary hover:bg-card-active hover:text-text-primary'
-+                              }`}
-+                              onClick={() => setCollageCellFit('fill')}
-+                              disabled={isExporting}
-+                            >
-+                              {t('export.grid.fill')}
-+                            </button>
-+                          </div>
-+                        </div>
-+                      </div>
-+                    )}
-+                  </div>
-+
-+                  {/* 4. Multi-Tile Splitter */}
-+                  <div className="pt-2">
-+                    <Switch
-+                      label={t('export.grid.enableTileSplit')}
-+                      checked={enableTileSplit}
-+                      onChange={setEnableTileSplit}
-+                      disabled={isExporting}
-+                      trackClassName="bg-surface"
-+                    />
-+                    {enableTileSplit && (
-+                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
-+                        <div className="grid grid-cols-2 gap-3">
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.grid.tileCols')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={1}
-+                              max={10}
-+                              value={tileSplitColumns}
-+                              disabled={isExporting}
-+                              onChange={setTileSplitColumns}
-+                            />
-+                          </div>
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.grid.tileRows')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={1}
-+                              max={10}
-+                              value={tileSplitRows}
-+                              disabled={isExporting}
-+                              onChange={setTileSplitRows}
-+                            />
-+                          </div>
-+                        </div>
-+                        <Switch
-+                          label={t('export.grid.borderEachTile')}
-+                          checked={tileBorderEachTile}
-+                          onChange={setTileBorderEachTile}
-+                          disabled={isExporting}
-+                          trackClassName="bg-surface"
-+                        />
-+                      </div>
-+                    )}
-+                  </div>
-+
-+                  {/* 5. Composition Grid Overlay */}
-+                  <div className="pt-2">
-+                    <Switch
-+                      label={t('export.border.addGridOverlay')}
-+                      checked={enableGridOverlay}
-+                      onChange={setEnableGridOverlay}
-+                      disabled={isExporting}
-+                      trackClassName="bg-surface"
-+                    />
-+                    {enableGridOverlay && (
-+                      <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
-+                        <div className="grid grid-cols-2 gap-3">
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.border.gridOverlayCols')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={2}
-+                              max={12}
-+                              value={gridOverlayCols}
-+                              disabled={isExporting}
-+                              onChange={setGridOverlayCols}
-+                            />
-+                          </div>
-+                          <div>
-+                            <Text variant={TextVariants.label} className="mb-1">
-+                              {t('export.border.gridOverlayRows')}
-+                            </Text>
-+                            <GridNumberInput
-+                              min={2}
-+                              max={12}
-+                              value={gridOverlayRows}
-+                              disabled={isExporting}
-+                              onChange={setGridOverlayRows}
-+                            />
-+                          </div>
-+                        </div>
-+                        <Slider
-+                          label={t('export.border.gridOverlayOpacity')}
-+                          min={5}
-+                          max={100}
-+                          step={1}
-+                          value={gridOverlayOpacity}
-+                          onChange={(e) => setGridOverlayOpacity(Number(e.target.value))}
-+                          disabled={isExporting}
-+                          defaultValue={50}
-+                        />
-+                        <div className="flex items-center justify-between gap-3">
-+                          <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor')}</Text>
-+                          <input
-+                            aria-label={t('export.border.gridOverlayColor')}
-+                            className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
-+                            disabled={isExporting}
-+                            onChange={(e) => setGridOverlayColor(e.target.value)}
-+                            type="color"
-+                            value={gridOverlayColor}
-+                          />
-+                        </div>
-+                      </div>
-+                    )}
-+                  </div>
-+                </Section>
-+
-                 {fileFormat == FileFormats.Jpeg && (
-                   <Section title={t('export.sections.metadata')}>
-                     <Switch
-@@ -938,11 +1511,11 @@ export default function ExportPanel({
++            <button
++              type="button"
++              onClick={() => handleTabChange('creative')}
++              disabled={isExporting}
++              className={`relative z-10 flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
++                activeTab === 'creative'
++                  ? 'text-text-primary'
++                  : 'text-text-secondary hover:text-text-primary'
++              }`}
++            >
++              {activeTab === 'creative' && (
++                <motion.div
++                  layoutId="export-active-tab-indicator"
++                  className="absolute inset-0 bg-surface rounded-md shadow-xs"
++                  transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
++                />
++              )}
++              <span className="relative z-10 flex items-center gap-1.5">
++                {t('export.tabs.creative', 'Creative Export')}
++                {hasActiveCreativeSettings && (
++                  <span
++                    className="w-2 h-2 rounded-full bg-accent inline-block shadow-xs"
++                    title="Creative export features active"
+                   />
+-                  {enableResize && (
+-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+-                      <div className="flex items-center gap-2">
+-                        <Dropdown
+-                          options={resizeModeOptions}
+-                          value={resizeMode}
+-                          onChange={setResizeMode}
+-                          disabled={isExporting}
+-                          className="w-full"
+-                        />
+-                        <input
+-                          className="w-24 bg-surface text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
+-                          disabled={isExporting}
+-                          min="1"
+-                          onChange={(e) => setResizeValue(parseInt(e?.target?.value))}
+-                          type="number"
+-                          value={resizeValue}
+-                        />
+-                        <Text variant={TextVariants.label}>{t('export.resize.pixels')}</Text>
+-                      </div>
+-                      <Switch
+-                        checked={dontEnlarge}
+-                        disabled={isExporting}
+-                        label={t('export.resize.dontEnlarge')}
+-                        onChange={setDontEnlarge}
+-                        trackClassName="bg-surface"
+-                      />
+-                    </div>
+-                  )}
+-                </Section>
+-
+-                {fileFormat == FileFormats.Jpeg && (
+-                  <Section title={t('export.sections.metadata')}>
+-                    <Switch
+-                      checked={keepMetadata}
+-                      disabled={isExporting}
+-                      label={t('export.metadata.saveWithMetadata')}
+-                      onChange={setKeepMetadata}
+-                      trackClassName="bg-surface"
+-                    />
+-                    {keepMetadata && (
+-                      <div className="pl-2 border-l-2 border-surface">
+-                        <Switch
+-                          label={t('export.metadata.removeGps')}
+-                          checked={stripGps}
+-                          onChange={setStripGps}
+-                          disabled={isExporting}
+-                          trackClassName="bg-surface"
+-                        />
+-                      </div>
+-                    )}
+-                  </Section>
+                 )}
++              </span>
++            </button>
++          </div>
++        </div>
++      )}
+ 
+-                <Section title={t('export.sections.watermark')}>
+-                  <Switch
+-                    label={t('export.watermark.addWatermark')}
+-                    checked={enableWatermark}
+-                    onChange={setEnableWatermark}
+-                    disabled={isExporting}
+-                    trackClassName="bg-surface"
+-                  />
+-                  {enableWatermark && (
+-                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+-                      <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+-                        <ImagePicker
+-                          label={t('export.watermark.watermarkImage')}
+-                          imageName={watermarkPath ? watermarkPath.split(/[\\/]/).pop() || null : null}
+-                          onImageSelect={setWatermarkPath}
+-                          onClear={() => setWatermarkPath(null)}
+-                        />
+-                      </div>
+-                      {watermarkPath && (
+-                        <>
+-                          <Dropdown
+-                            options={anchorOptions}
+-                            value={watermarkAnchor}
+-                            onChange={(val) => setWatermarkAnchor(val as WatermarkAnchor)}
+-                            disabled={isExporting}
+-                            className="w-full"
+-                          />
+-                          <div>
+-                            <Slider
+-                              label={t('export.watermark.scale')}
+-                              min={1}
+-                              max={100}
+-                              step={1}
+-                              value={watermarkScale}
+-                              onChange={(e) => setWatermarkScale(Number(e.target.value))}
+-                              disabled={isExporting}
+-                              defaultValue={10}
+-                            />
+-                            <Slider
+-                              label={t('export.watermark.spacing')}
+-                              min={0}
+-                              max={25}
+-                              step={1}
+-                              value={watermarkSpacing}
+-                              onChange={(e) => setWatermarkSpacing(Number(e.target.value))}
+-                              disabled={isExporting}
+-                              defaultValue={5}
+-                            />
+-                            <Slider
+-                              label={t('export.watermark.opacity')}
+-                              min={0}
+-                              max={100}
+-                              step={1}
+-                              value={watermarkOpacity}
+-                              onChange={(e) => setWatermarkOpacity(Number(e.target.value))}
+-                              disabled={isExporting}
+-                              defaultValue={75}
+-                            />
+-                          </div>
+-                          <WatermarkPreview
+-                            imageAspectRatio={imageAspectRatio}
+-                            watermarkImageAspectRatio={watermarkImageAspectRatio}
+-                            watermarkPath={watermarkPath}
+-                            anchor={watermarkAnchor as WatermarkAnchor}
+-                            scale={watermarkScale}
+-                            spacing={watermarkSpacing}
+-                            opacity={watermarkOpacity}
+-                          />
+-                        </>
+-                      )}
+-                    </div>
+-                  )}
+-                </Section>
+-              </>
+-            )}
+-
+-            <div>
+-              <Text variant={TextVariants.heading} className="mb-2">
+-                {t('export.sections.advanced')}
+-              </Text>
+-              <div className="bg-surface rounded-xl overflow-hidden">
+-                <button
+-                  onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+-                  disabled={isExporting}
+-                  className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
+-                >
+-                  <Text
+-                    as="span"
+-                    variant={TextVariants.label}
+-                    color={TextColors.primary}
+-                    className="flex items-center gap-2"
+-                  >
+-                    <Settings size={16} /> {t('export.advanced.title')}
+-                  </Text>
+-                  <Text color={TextColors.secondary}>
+-                    {isAdvancedExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+-                  </Text>
+-                </button>
+-                <AnimatePresence initial={false}>
+-                  {isAdvancedExpanded && (
+-                    <motion.div
+-                      initial={{ height: 0, opacity: 0 }}
+-                      animate={{ height: 'auto', opacity: 1 }}
+-                      exit={{ height: 0, opacity: 0 }}
+-                      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+-                      className="overflow-hidden"
+-                    >
+-                      <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
+-                        <Switch
+-                          label={t('export.advanced.preserveFolders')}
+-                          checked={preserveFolders}
+-                          onChange={setPreserveFolders}
+-                          disabled={isExporting}
+-                        />
+-                        {fileFormat !== FileFormats.Cube && (
+-                          <>
+-                            <Switch
+-                              checked={preserveTimestamps}
+-                              disabled={isExporting}
+-                              label={t('export.advanced.preserveTimestamps')}
+-                              onChange={setPreserveTimestamps}
+-                            />
+-                            <Switch
+-                              label={t('export.advanced.exportMasks')}
+-                              checked={exportMasks}
+-                              onChange={setExportMasks}
+-                              disabled={isExporting}
+-                            />
+-                          </>
+-                        )}
+-                      </div>
+-                    </motion.div>
+-                  )}
+-                </AnimatePresence>
+-              </div>
+-            </div>
+-          </>
++      {/* Tab Content Area */}
++      <div className="grow overflow-y-auto p-3">
++        {canExport ? (
++          activeTab === 'standard' ? (
++            <StandardExportTab
++              isExporting={isExporting}
++              appSettings={appSettings}
++              onSettingsChange={onSettingsChange}
++              currentSettingsObject={currentSettingsObject}
++              handleApplyPreset={handleApplyPreset}
++              fileFormat={fileFormat}
++              setFileFormat={setFileFormat}
++              jpegQuality={jpegQuality}
++              setJpegQuality={setJpegQuality}
++              tiffBitDepth={tiffBitDepth}
++              setTiffBitDepth={setTiffBitDepth}
++              destinationType={destinationType}
++              setDestinationType={setDestinationType}
++              subfolder={subfolder}
++              setSubfolder={setSubfolder}
++              numImages={numImages}
++              filenameTemplate={filenameTemplate}
++              setFilenameTemplate={setFilenameTemplate}
++              filenameInputRef={filenameInputRef}
++              handleVariableClick={handleVariableClick}
++              enableResize={enableResize}
++              setEnableResize={setEnableResize}
++              resizeMode={resizeMode}
++              setResizeMode={setResizeMode}
++              resizeValue={resizeValue}
++              setResizeValue={setResizeValue}
++              dontEnlarge={dontEnlarge}
++              setDontEnlarge={setDontEnlarge}
++              keepMetadata={keepMetadata}
++              setKeepMetadata={setKeepMetadata}
++              stripGps={stripGps}
++              setStripGps={setStripGps}
++              stripCameraInfo={stripCameraInfo}
++              setStripCameraInfo={setStripCameraInfo}
++              enableWatermark={enableWatermark}
++              setEnableWatermark={setEnableWatermark}
++              watermarkPath={watermarkPath}
++              setWatermarkPath={setWatermarkPath}
++              watermarkAnchor={watermarkAnchor}
++              setWatermarkAnchor={setWatermarkAnchor}
++              watermarkScale={watermarkScale}
++              setWatermarkScale={setWatermarkScale}
++              watermarkSpacing={watermarkSpacing}
++              setWatermarkSpacing={setWatermarkSpacing}
++              watermarkOpacity={watermarkOpacity}
++              setWatermarkOpacity={setWatermarkOpacity}
++              imageAspectRatio={imageAspectRatio}
++              watermarkImageAspectRatio={watermarkImageAspectRatio}
++              preserveFolders={preserveFolders}
++              setPreserveFolders={setPreserveFolders}
++              preserveTimestamps={preserveTimestamps}
++              setPreserveTimestamps={setPreserveTimestamps}
++              exportMasks={exportMasks}
++              setExportMasks={setExportMasks}
++              isAdvancedExpanded={isAdvancedExpanded}
++              setIsAdvancedExpanded={setIsAdvancedExpanded}
++              resizeModeOptions={resizeModeOptions}
++              anchorOptions={anchorOptions}
++              tiffBitDepthOptions={tiffBitDepthOptions}
++            />
++          ) : (
++            <CreativeExportTab
++              selectedImage={selectedImage}
++              finalPreviewUrl={finalPreviewUrl}
++              pathsToExport={pathsToExport}
++              thumbnails={thumbnails}
++              isExporting={isExporting}
++              numImages={numImages}
++              enableBorder={enableBorder}
++              setEnableBorder={setEnableBorder}
++              borderSize={borderSize}
++              setBorderSize={setBorderSize}
++              borderColor={borderColor}
++              setBorderColor={setBorderColor}
++              enableKeyline={enableKeyline}
++              setEnableKeyline={setEnableKeyline}
++              keylineSize={keylineSize}
++              setKeylineSize={setKeylineSize}
++              keylineColor={keylineColor}
++              setKeylineColor={setKeylineColor}
++              keylineInset={keylineInset}
++              setKeylineInset={setKeylineInset}
++              enableCollageGrid={enableCollageGrid}
++              setEnableCollageGrid={setEnableCollageGrid}
++              collageColumns={collageColumns}
++              setCollageColumns={setCollageColumns}
++              collageRows={collageRows}
++              setCollageRows={setCollageRows}
++              collageGutter={collageGutter}
++              setCollageGutter={setCollageGutter}
++              collageCellFit={collageCellFit}
++              setCollageCellFit={setCollageCellFit}
++              enableTileSplit={enableTileSplit}
++              setEnableTileSplit={setEnableTileSplit}
++              tileSplitColumns={tileSplitColumns}
++              setTileSplitColumns={setTileSplitColumns}
++              tileSplitRows={tileSplitRows}
++              setTileSplitRows={setTileSplitRows}
++              tileBorderEachTile={tileBorderEachTile}
++              setTileBorderEachTile={setTileBorderEachTile}
++              enableGridOverlay={enableGridOverlay}
++              setEnableGridOverlay={setEnableGridOverlay}
++              gridOverlayRows={gridOverlayRows}
++              setGridOverlayRows={setGridOverlayRows}
++              gridOverlayCols={gridOverlayCols}
++              setGridOverlayCols={setGridOverlayCols}
++              gridOverlayColor={gridOverlayColor}
++              setGridOverlayColor={setGridOverlayColor}
++              gridOverlayOpacity={gridOverlayOpacity}
++              setGridOverlayOpacity={setGridOverlayOpacity}
++              gridOverlaySize={gridOverlaySize}
++            />
++          )
+         ) : (
+           <div className="flex items-center justify-center h-full">
+             <Text
+@@ -932,17 +897,18 @@ export default function ExportPanel({
+         )}
+       </div>
+ 
++      {/* Sticky Universal Footer */}
+       <div className="p-3 border-t border-surface shrink-0 space-y-2">
+         <Text as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
+           {isEstimating ? (
              <span className="italic">{t('export.status.estimatingSize')}</span>
            ) : estimatedSize !== null ? (
              <span>
@@ -1783,7 +2678,7 @@ index 267e321..bb20c9c 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +1574,11 @@ export default function ExportPanel({
+@@ -1001,9 +967,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
@@ -1798,6 +2693,595 @@ index 267e321..bb20c9c 100644
                </>
              )}
            </Button>
+diff --git a/src/components/panel/right/StandardExportTab.tsx b/src/components/panel/right/StandardExportTab.tsx
+new file mode 100644
+index 0000000..3625428
+--- /dev/null
++++ b/src/components/panel/right/StandardExportTab.tsx
+@@ -0,0 +1,583 @@
++import React from 'react';
++import { motion, AnimatePresence } from 'framer-motion';
++import { useTranslation } from 'react-i18next';
++import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
++import Switch from '../../ui/Switch';
++import Dropdown from '../../ui/Dropdown';
++import Slider from '../../ui/Slider';
++import ImagePicker from '../../ui/ImagePicker';
++import Text from '../../ui/Text';
++import { TextColors, TextVariants } from '../../../types/typography';
++import {
++  ExportPreset,
++  ExportSettings,
++  FileFormat,
++  FILE_FORMATS,
++  FILENAME_VARIABLES,
++  FileFormats,
++  TiffBitDepth,
++  WatermarkAnchor,
++} from '../../ui/ExportImportProperties';
++import { AppSettings } from '../../ui/AppProperties';
++import ExportPresetsList from '../../ui/ExportPresetsList';
++import { Section } from './ExportCommons';
++
++function WatermarkPreview({
++  anchor,
++  scale,
++  spacing,
++  opacity,
++  watermarkPath,
++  imageAspectRatio,
++  watermarkImageAspectRatio,
++}: {
++  anchor: WatermarkAnchor;
++  scale: number;
++  spacing: number;
++  opacity: number;
++  watermarkPath: string | null;
++  imageAspectRatio: number;
++  watermarkImageAspectRatio: number;
++}) {
++  const { t } = useTranslation();
++
++  const getPositionStyles = () => {
++    const minDimPercent = imageAspectRatio > 1 ? 100 / imageAspectRatio : 100;
++    const watermarkSizePercent = minDimPercent * (scale / 100);
++    const spacingPercent = minDimPercent * (spacing / 100);
++
++    const styles: React.CSSProperties = {
++      width: `${watermarkSizePercent}%`,
++      opacity: opacity / 100,
++      position: 'absolute',
++    };
++
++    const spacingString = `${spacingPercent}%`;
++
++    switch (anchor) {
++      case WatermarkAnchor.TopLeft:
++        styles.top = spacingString;
++        styles.left = spacingString;
++        break;
++      case WatermarkAnchor.TopCenter:
++        styles.top = spacingString;
++        styles.left = '50%';
++        styles.transform = 'translateX(-50%)';
++        break;
++      case WatermarkAnchor.TopRight:
++        styles.top = spacingString;
++        styles.right = spacingString;
++        break;
++      case WatermarkAnchor.CenterLeft:
++        styles.top = '50%';
++        styles.left = spacingString;
++        styles.transform = 'translateY(-50%)';
++        break;
++      case WatermarkAnchor.Center:
++        styles.top = '50%';
++        styles.left = '50%';
++        styles.transform = 'translate(-50%, -50%)';
++        break;
++      case WatermarkAnchor.CenterRight:
++        styles.top = '50%';
++        styles.right = spacingString;
++        styles.transform = 'translateY(-50%)';
++        break;
++      case WatermarkAnchor.BottomLeft:
++        styles.bottom = spacingString;
++        styles.left = spacingString;
++        break;
++      case WatermarkAnchor.BottomCenter:
++        styles.bottom = spacingString;
++        styles.left = '50%';
++        styles.transform = 'translateX(-50%)';
++        break;
++      case WatermarkAnchor.BottomRight:
++        styles.bottom = spacingString;
++        styles.right = spacingString;
++        break;
++    }
++    return styles;
++  };
++
++  return (
++    <div
++      className="w-full bg-surface rounded-md relative overflow-hidden border border-surface"
++      style={{ aspectRatio: imageAspectRatio }}
++    >
++      <div className="absolute inset-0 flex items-center justify-center">
++        <Text variant={TextVariants.label}>{t('export.watermark.previewText')}</Text>
++      </div>
++      {watermarkPath && (
++        <div style={getPositionStyles()}>
++          <div
++            className="w-full bg-accent/50 border-2 border-dashed border-accent rounded-xs flex items-center justify-center"
++            style={{ aspectRatio: watermarkImageAspectRatio }}
++          >
++            <span className="text-white text-[8px] font-bold">{t('export.watermark.logoText')}</span>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
++
++export interface StandardExportTabProps {
++  isExporting: boolean;
++  appSettings: AppSettings | null;
++  onSettingsChange: (settings: AppSettings) => void;
++  currentSettingsObject: ExportSettings;
++  handleApplyPreset: (preset: ExportPreset) => void;
++  fileFormat: FileFormats | string;
++  setFileFormat: (f: FileFormats) => void;
++  jpegQuality: number;
++  setJpegQuality: (q: number) => void;
++  tiffBitDepth: TiffBitDepth;
++  setTiffBitDepth: (b: TiffBitDepth) => void;
++  destinationType: string;
++  setDestinationType: (d: string) => void;
++  subfolder: string;
++  setSubfolder: (s: string) => void;
++  numImages: number;
++  filenameTemplate: string;
++  setFilenameTemplate: (f: string) => void;
++  filenameInputRef: React.RefObject<HTMLInputElement | null>;
++  handleVariableClick: (v: string) => void;
++  enableResize: boolean;
++  setEnableResize: (r: boolean) => void;
++  resizeMode: string;
++  setResizeMode: (m: string) => void;
++  resizeValue: number;
++  setResizeValue: (v: number) => void;
++  dontEnlarge: boolean;
++  setDontEnlarge: (d: boolean) => void;
++  keepMetadata: boolean;
++  setKeepMetadata: (k: boolean) => void;
++  stripGps: boolean;
++  setStripGps: (s: boolean) => void;
++  stripCameraInfo: boolean;
++  setStripCameraInfo: (s: boolean) => void;
++  enableWatermark: boolean;
++  setEnableWatermark: (w: boolean) => void;
++  watermarkPath: string | null;
++  setWatermarkPath: (p: string | null) => void;
++  watermarkAnchor: WatermarkAnchor;
++  setWatermarkAnchor: (a: WatermarkAnchor) => void;
++  watermarkScale: number;
++  setWatermarkScale: (s: number) => void;
++  watermarkSpacing: number;
++  setWatermarkSpacing: (s: number) => void;
++  watermarkOpacity: number;
++  setWatermarkOpacity: (o: number) => void;
++  imageAspectRatio: number;
++  watermarkImageAspectRatio: number;
++  preserveFolders: boolean;
++  setPreserveFolders: (p: boolean) => void;
++  preserveTimestamps: boolean;
++  setPreserveTimestamps: (p: boolean) => void;
++  exportMasks: boolean;
++  setExportMasks: (m: boolean) => void;
++  isAdvancedExpanded: boolean;
++  setIsAdvancedExpanded: (e: boolean) => void;
++  resizeModeOptions: { label: string; value: string }[];
++  anchorOptions: { label: string; value: WatermarkAnchor }[];
++  tiffBitDepthOptions: { label: string; value: string }[];
++}
++
++export default function StandardExportTab({
++  isExporting,
++  appSettings,
++  onSettingsChange,
++  currentSettingsObject,
++  handleApplyPreset,
++  fileFormat,
++  setFileFormat,
++  jpegQuality,
++  setJpegQuality,
++  tiffBitDepth,
++  setTiffBitDepth,
++  destinationType,
++  setDestinationType,
++  subfolder,
++  setSubfolder,
++  numImages,
++  filenameTemplate,
++  setFilenameTemplate,
++  filenameInputRef,
++  handleVariableClick,
++  enableResize,
++  setEnableResize,
++  resizeMode,
++  setResizeMode,
++  resizeValue,
++  setResizeValue,
++  dontEnlarge,
++  setDontEnlarge,
++  keepMetadata,
++  setKeepMetadata,
++  stripGps,
++  setStripGps,
++  stripCameraInfo,
++  setStripCameraInfo,
++  enableWatermark,
++  setEnableWatermark,
++  watermarkPath,
++  setWatermarkPath,
++  watermarkAnchor,
++  setWatermarkAnchor,
++  watermarkScale,
++  setWatermarkScale,
++  watermarkSpacing,
++  setWatermarkSpacing,
++  watermarkOpacity,
++  setWatermarkOpacity,
++  imageAspectRatio,
++  watermarkImageAspectRatio,
++  preserveFolders,
++  setPreserveFolders,
++  preserveTimestamps,
++  setPreserveTimestamps,
++  exportMasks,
++  setExportMasks,
++  isAdvancedExpanded,
++  setIsAdvancedExpanded,
++  resizeModeOptions,
++  anchorOptions,
++  tiffBitDepthOptions,
++}: StandardExportTabProps) {
++  const { t } = useTranslation();
++
++  return (
++    <div className="space-y-8">
++      {/* Presets List */}
++      <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
++        <ExportPresetsList
++          appSettings={appSettings}
++          onSettingsChange={onSettingsChange}
++          currentSettings={currentSettingsObject}
++          onApplyPreset={handleApplyPreset}
++        />
++      </div>
++
++      {/* File Format Settings */}
++      <Section title={t('export.sections.fileSettings')}>
++        <div className="grid grid-cols-3 gap-2">
++          {FILE_FORMATS.map((format: FileFormat) => (
++            <button
++              className={`px-2 py-1.5 rounded-md transition-colors ${fileFormat === format.id ? 'bg-accent' : 'bg-surface hover:bg-card-active'} disabled:opacity-50`}
++              disabled={isExporting}
++              key={format.id}
++              onClick={() => setFileFormat(format.id)}
++            >
++              <Text color={fileFormat === format.id ? TextColors.button : TextColors.secondary}>
++                {format.name}
++              </Text>
++            </button>
++          ))}
++        </div>
++        {[FileFormats.Jpeg, FileFormats.Webp, FileFormats.Jxl].includes(fileFormat as FileFormats) && (
++          <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
++            <Slider
++              defaultValue={90}
++              label={
++                fileFormat === FileFormats.Jxl && jpegQuality === 100
++                  ? t('export.file.qualityLossless')
++                  : t('export.file.quality')
++              }
++              max={100}
++              min={1}
++              onChange={(e) => setJpegQuality(Number(e.target.value))}
++              step={1}
++              value={jpegQuality}
++              fillOrigin="min"
++            />
++          </div>
++        )}
++        {fileFormat === FileFormats.Tiff && (
++          <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
++            <Text variant={TextVariants.label} className="mb-1">
++              {t('export.file.tiffBitDepth')}
++            </Text>
++            <Dropdown
++              options={tiffBitDepthOptions}
++              value={String(tiffBitDepth)}
++              onChange={(value) => setTiffBitDepth(Number(value) as TiffBitDepth)}
++              disabled={isExporting}
++              className="w-full"
++            />
++          </div>
++        )}
++      </Section>
++
++      {/* Destination */}
++      <Section title={t('export.sections.destination')}>
++        <div className="space-y-3">
++          <Dropdown
++            options={[
++              { label: t('export.destination.customFolder'), value: 'customFolder' },
++              { label: t('export.destination.originalFolder'), value: 'originalFolder' },
++            ]}
++            value={destinationType || 'customFolder'}
++            onChange={(val) => setDestinationType(val as string)}
++            disabled={isExporting}
++            className="w-full"
++          />
++
++          {destinationType === 'originalFolder' && (
++            <div className="flex items-center gap-3 pl-2 border-l-2 border-surface">
++              <Text variant={TextVariants.label} className="whitespace-nowrap min-w-[70px]">
++                {t('export.destination.subfolder')}
++              </Text>
++              <input
++                className="w-full bg-surface border border-transparent rounded-md px-3 py-2 text-sm text-text-primary focus:outline-hidden truncate"
++                disabled={isExporting}
++                onChange={(e) => setSubfolder(e.target.value)}
++                type="text"
++                value={subfolder || ''}
++                placeholder={t('export.destination.subfolderPlaceholder')}
++              />
++            </div>
++          )}
++        </div>
++      </Section>
++
++      {/* File Naming */}
++      {numImages > 1 && (
++        <Section title={t('export.sections.fileNaming')}>
++          <input
++            className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
++            disabled={isExporting}
++            onChange={(e) => setFilenameTemplate(e.target.value)}
++            ref={filenameInputRef}
++            type="text"
++            value={filenameTemplate}
++          />
++          <div className="flex flex-wrap gap-2 mt-2">
++            {FILENAME_VARIABLES.map((variable: string) => (
++              <button
++                className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
++                disabled={isExporting}
++                key={variable}
++                onClick={() => handleVariableClick(variable)}
++              >
++                {variable}
++              </button>
++            ))}
++          </div>
++        </Section>
++      )}
++
++      {/* Image Sizing */}
++      {fileFormat !== FileFormats.Cube && (
++        <>
++          <Section title={t('export.sections.imageSizing')}>
++            <Switch
++              label={t('export.resize.resizeToFit')}
++              checked={enableResize}
++              onChange={setEnableResize}
++              disabled={isExporting}
++              trackClassName="bg-surface"
++            />
++            {enableResize && (
++              <div className="space-y-4 pl-2 border-l-2 border-surface">
++                <div className="flex items-center gap-2">
++                  <Dropdown
++                    options={resizeModeOptions}
++                    value={resizeMode}
++                    onChange={setResizeMode}
++                    disabled={isExporting}
++                    className="w-full"
++                  />
++                  <input
++                    className="w-24 bg-surface text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
++                    disabled={isExporting}
++                    min="1"
++                    onChange={(e) => setResizeValue(parseInt(e?.target?.value))}
++                    type="number"
++                    value={resizeValue}
++                  />
++                  <Text variant={TextVariants.label}>{t('export.resize.pixels')}</Text>
++                </div>
++                <Switch
++                  checked={dontEnlarge}
++                  disabled={isExporting}
++                  label={t('export.resize.dontEnlarge')}
++                  onChange={setDontEnlarge}
++                  trackClassName="bg-surface"
++                />
++              </div>
++            )}
++          </Section>
++
++          {/* Metadata */}
++          {fileFormat == FileFormats.Jpeg && (
++            <Section title={t('export.sections.metadata')}>
++              <Switch
++                checked={keepMetadata}
++                disabled={isExporting}
++                label={t('export.metadata.saveWithMetadata')}
++                onChange={setKeepMetadata}
++                trackClassName="bg-surface"
++              />
++              {keepMetadata && (
++                <div className="pl-2 border-l-2 border-surface">
++                  <Switch
++                    label={t('export.metadata.removeGps')}
++                    checked={stripGps}
++                    onChange={setStripGps}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                  <Switch
++                    label={t('export.metadata.removeCameraInfo')}
++                    checked={stripCameraInfo}
++                    onChange={setStripCameraInfo}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                </div>
++              )}
++            </Section>
++          )}
++
++          {/* Watermark */}
++          <Section title={t('export.sections.watermark')}>
++            <Switch
++              label={t('export.watermark.addWatermark')}
++              checked={enableWatermark}
++              onChange={setEnableWatermark}
++              disabled={isExporting}
++              trackClassName="bg-surface"
++            />
++            {enableWatermark && (
++              <div className="space-y-4 pl-2 border-l-2 border-surface">
++                <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
++                  <ImagePicker
++                    label={t('export.watermark.watermarkImage')}
++                    imageName={watermarkPath ? watermarkPath.split(/[\\/]/).pop() || null : null}
++                    onImageSelect={setWatermarkPath}
++                    onClear={() => setWatermarkPath(null)}
++                  />
++                </div>
++                {watermarkPath && (
++                  <>
++                    <Dropdown
++                      options={anchorOptions}
++                      value={watermarkAnchor}
++                      onChange={(val) => setWatermarkAnchor(val as WatermarkAnchor)}
++                      disabled={isExporting}
++                      className="w-full"
++                    />
++                    <div>
++                      <Slider
++                        label={t('export.watermark.scale')}
++                        min={1}
++                        max={100}
++                        step={1}
++                        value={watermarkScale}
++                        onChange={(e) => setWatermarkScale(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={10}
++                      />
++                      <Slider
++                        label={t('export.watermark.spacing')}
++                        min={0}
++                        max={25}
++                        step={1}
++                        value={watermarkSpacing}
++                        onChange={(e) => setWatermarkSpacing(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={5}
++                      />
++                      <Slider
++                        label={t('export.watermark.opacity')}
++                        min={0}
++                        max={100}
++                        step={1}
++                        value={watermarkOpacity}
++                        onChange={(e) => setWatermarkOpacity(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={75}
++                      />
++                    </div>
++                    <WatermarkPreview
++                      imageAspectRatio={imageAspectRatio}
++                      watermarkImageAspectRatio={watermarkImageAspectRatio}
++                      watermarkPath={watermarkPath}
++                      anchor={watermarkAnchor as WatermarkAnchor}
++                      scale={watermarkScale}
++                      spacing={watermarkSpacing}
++                      opacity={watermarkOpacity}
++                    />
++                  </>
++                )}
++              </div>
++            )}
++          </Section>
++        </>
++      )}
++
++      {/* Advanced Settings */}
++      <div>
++        <Text variant={TextVariants.heading} className="mb-2">
++          {t('export.sections.advanced')}
++        </Text>
++        <div className="bg-surface rounded-xl overflow-hidden">
++          <button
++            onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
++            disabled={isExporting}
++            className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
++          >
++            <Text
++              as="span"
++              variant={TextVariants.label}
++              color={TextColors.primary}
++              className="flex items-center gap-2"
++            >
++              <Settings size={16} /> {t('export.advanced.title')}
++            </Text>
++            <Text color={TextColors.secondary}>
++              {isAdvancedExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
++            </Text>
++          </button>
++          <AnimatePresence initial={false}>
++            {isAdvancedExpanded && (
++              <motion.div
++                initial={{ height: 0, opacity: 0 }}
++                animate={{ height: 'auto', opacity: 1 }}
++                exit={{ height: 0, opacity: 0 }}
++                transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
++                className="overflow-hidden"
++              >
++                <div className="px-4 pb-4 pt-2 border-t border-surface/50 flex flex-col gap-4">
++                  <Switch
++                    label={t('export.advanced.preserveFolders')}
++                    checked={preserveFolders}
++                    onChange={setPreserveFolders}
++                    disabled={isExporting}
++                  />
++                  {fileFormat !== FileFormats.Cube && (
++                    <>
++                      <Switch
++                        checked={preserveTimestamps}
++                        disabled={isExporting}
++                        label={t('export.advanced.preserveTimestamps')}
++                        onChange={setPreserveTimestamps}
++                      />
++                      <Switch
++                        label={t('export.advanced.exportMasks')}
++                        checked={exportMasks}
++                        onChange={setExportMasks}
++                        disabled={isExporting}
++                      />
++                    </>
++                  )}
++                </div>
++              </motion.div>
++            )}
++          </AnimatePresence>
++        </div>
++      </div>
++    </div>
++  );
++}
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
 index 86285cd..78a1a15 100644
 --- a/src/components/ui/ExportImportProperties.tsx
@@ -2056,10 +3540,31 @@ index 598487c..1e01f42 100644
      setDestinationType,
      subfolder,
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 5de22d6..9727c54 100644
+index 60dc8eb..a9c0280 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
-@@ -786,6 +786,41 @@
+@@ -2,8 +2,8 @@
+   "adjustments": {
+     "basic": {
+       "blacks": "Blacks",
+-      "brightness": "Brightness",
+       "contrast": "Contrast",
++      "evShift": "EV Shift",
+       "exposure": "Exposure",
+       "highlights": "Highlights",
+       "mappers": {
+@@ -773,6 +773,10 @@
+     }
+   },
+   "export": {
++    "tabs": {
++      "standard": "Standard Export",
++      "creative": "Creative Export"
++    },
+     "advanced": {
+       "exportMasks": "Export masks as separate files",
+       "preserveFolders": "Preserve Folder Structure",
+@@ -786,6 +790,41 @@
        "mb": "MB",
        "tb": "TB"
      },
@@ -2101,7 +3606,7 @@ index 5de22d6..9727c54 100644
      "destination": {
        "customFolder": "Custom folder",
        "originalFolder": "Original image folder",
-@@ -806,6 +841,10 @@
+@@ -806,6 +845,10 @@
        "tiffBitDepth8": "8-bit"
      },
      "labels": {
@@ -2112,7 +3617,7 @@ index 5de22d6..9727c54 100644
        "image": "Image",
        "image_plural": "Images",
        "lut": "LUT",
-@@ -828,6 +867,7 @@
+@@ -828,6 +871,7 @@
      },
      "sections": {
        "advanced": "Advanced",
@@ -2120,7 +3625,7 @@ index 5de22d6..9727c54 100644
        "destination": "Destination",
        "fileNaming": "File Naming",
        "fileSettings": "File Settings",
-@@ -843,6 +883,7 @@
+@@ -843,6 +887,7 @@
        "estimatedSize": "Estimated file size: ~{{size}}",
        "estimatedTotalSize": "Estimated total size: ~{{size}}",
        "estimatingSize": "Estimating size...",

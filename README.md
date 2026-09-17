@@ -68,6 +68,9 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 
 ## ✨ Features
 
+- **🗂️ Dedicated Dual-Tab Workflow**: Clean separation between **Standard Export** (file formats, compression, sizing, destination, watermark, metadata) and **Creative Export** (hero live preview, framing mats, inset keylines, multi-photo contact sheet collages, tile splitters, and proofing grids).
+- **💾 Persistent Tab Memory**: Automatically remembers whether you were on Standard Export or Creative Export across launches and panel closures.
+- **🚨 Active Feature Status Indicator**: Displays a clear accent status dot on the `Creative Export` tab whenever borders, keylines, collages, or tile splitters are enabled, preventing accidental bordered exports.
 - **🖼️ Real-Time Sticky Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant 60fps visual feedback for borders, keylines, collage layouts, and tile slice lines as you adjust sliders, plus a full-screen darkroom inspection modal.
 - **📐 Multi-Photo Contact Sheet / Grid Collage**: Combine multiple selected photos into an $N \times M$ grid collage on a single canvas with customizable cell gutters (spacing) and outer border framing.
 - **🔲 High-Contrast Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely. Designed with high-contrast, accessible controls in both light and dark themes.
@@ -131,8 +134,11 @@ RapidRAW Source Tree
 ├── src/
 │   ├── components/
 │   │   ├── panel/right/
-│   │   │   ├── ExportLivePreview.tsx <-- Real-time HTML5 preview canvas & inspector
-│   │   │   └── ExportPanel.tsx    <-- Borders, keylines, collages & tile split UI
+│   │   │   ├── ExportPanel.tsx         <-- Tab orchestrator, session memory & export footer
+│   │   │   ├── StandardExportTab.tsx   <-- Standard file formats, sizing, destination, watermark
+│   │   │   ├── CreativeExportTab.tsx   <-- Framing, keylines, collages & tile splitters
+│   │   │   ├── ExportCommons.tsx       <-- Shared Section, GridNumberInput & helpers
+│   │   │   └── ExportLivePreview.tsx   <-- Real-time HTML5 preview canvas & inspector
 │   │   └── ui/
 │   │       └── ExportImportProperties.tsx <-- TypeScript interface definitions
 │   ├── hooks/
