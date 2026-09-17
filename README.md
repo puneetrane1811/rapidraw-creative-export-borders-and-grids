@@ -77,6 +77,9 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
   - **Image / Logo Watermark**: File picker supporting PNG, JPG, JPEG, and WebP logos with full transparency preservation.
   - **Interactive Drag & Custom Placement**: Position watermarks via 9 preset grid anchors, fine-tune normalized $X\% / Y\%$ coordinate sliders, or click and drag directly on the Live Preview canvas to position the watermark interactively.
   - **Precise Opacity Slider**: Smooth 1% to 100% alpha blending for subtle, professional proofing or prominent copyright marks.
+  - **Zero-Dependency Font Engine**: Features an embedded compressed TrueType font (`DejaVuSans.ttf`) decompressed on the fly via `miniz_oxide` and rendered via `ab_glyph`, guaranteeing pixel-perfect text rendering across macOS, Windows, and Linux without relying on system fonts.
+- **👁️ High-Contrast Accessible Controls**: All segmented buttons and toggles (Watermark Type, Placement Mode, Cell Sizing) strictly enforce high-contrast styling (`text-button-text` on `bg-accent`), ensuring clear, crisp readability across dark and light themes without washed-out text.
+- **🛡️ Crash-Resilient Error Boundary**: Embedded React `<ErrorBoundary>` surrounds export panels to gracefully catch unexpected runtime anomalies and render an inline recovery card with a single-click "Retry" option, preventing transparent window unmounts.
 - **📐 Multi-Photo Contact Sheet / Grid Collage**: Combine multiple selected photos into an $N \times M$ grid collage on a single canvas with customizable cell gutters (spacing) and outer border framing.
 - **🔲 High-Contrast Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely. Designed with high-contrast, accessible controls in both light and dark themes.
 - **📱 Multi-Tile Grid Splitter (Instagram / Panorama)**: Slice any photo or collage into an $N \times M$ matrix of individual exported files with optional borders per tile—ideal for seamless swipeable Instagram carousels and $3 \times 3$ grid mosaics.
@@ -134,18 +137,21 @@ The feature is cleanly separated across the Rust backend and React frontend:
 RapidRAW Source Tree
 ├── src-tauri/
 │   ├── src/
-│   │   ├── export_processing.rs   <-- Border math, keylines, collages & tile slicing
-│   │   └── app_settings.rs        <-- Preset schema & default preset values
+│   │   ├── export_processing.rs   <-- Border math, keylines, collages, tile slicing & watermark rasterization
+│   │   ├── default_font.rs        <-- Embedded compressed DejaVuSans font for OS-independent text watermarking
+│   │   ├── app_settings.rs        <-- Preset schema & default preset values
+│   │   └── lib.rs                 <-- Tauri command bindings & font module registration
 ├── src/
 │   ├── components/
 │   │   ├── panel/right/
 │   │   │   ├── ExportPanel.tsx         <-- Tab orchestrator, session memory & export footer
-│   │   │   ├── StandardExportTab.tsx   <-- Standard file formats, sizing, destination, watermark
-│   │   │   ├── CreativeExportTab.tsx   <-- Framing, keylines, collages & tile splitters
+│   │   │   ├── StandardExportTab.tsx   <-- Standard file formats, sizing, destination, metadata
+│   │   │   ├── CreativeExportTab.tsx   <-- Framing, keylines, watermarks, collages & tile splitters
 │   │   │   ├── ExportCommons.tsx       <-- Shared Section, GridNumberInput & helpers
-│   │   │   └── ExportLivePreview.tsx   <-- Real-time HTML5 preview canvas & inspector
+│   │   │   └── ExportLivePreview.tsx   <-- Real-time HTML5 preview canvas, interactive dragging & inspector
 │   │   └── ui/
-│   │       └── ExportImportProperties.tsx <-- TypeScript interface definitions
+│   │       ├── ExportImportProperties.tsx <-- TypeScript interface definitions
+│   │       └── ErrorBoundary.tsx          <-- Defensive React error boundary for export panels
 │   ├── hooks/
 │   │   ├── useExportSettings.ts   <-- State management & preset synchronization
 │   │   └── useExternalEditSession.ts <-- External session payload defaults
@@ -168,6 +174,14 @@ RapidRAW Source Tree
    Allocates a new RGBA canvas sized `(output_width, output_height)` initialized to the chosen hex color, and overlays the processed image onto the center at `(horizontal, vertical)`.
 3. **Resolution Metadata Preservation**:
    Updates `final_full_w` and `final_full_h` in `determine_export_dimensions` so exported sidecars and EXIF records match the final bordered canvas size.
+4. **Watermark Engine & Font Pipeline (`default_font.rs` & `export_processing.rs`)**:
+   - **Embedded TrueType Font**: Stores a compressed `DejaVuSans.ttf` byte array in `default_font.rs`. At runtime, `miniz_oxide::inflate::decompress_to_vec` decompresses it into memory for `ab_glyph::FontRef`.
+   - **Text Rasterization**: Computes dynamic font scaling relative to image dimensions. Draws a subtle semi-transparent black drop-shadow offset by $(+2\text{px}, +2\text{px})$ before rendering the primary colored glyphs, ensuring crisp readability over any background.
+   - **Image Watermarking**: Decodes user logos (PNG/JPG/WebP), resizes via bilinear interpolation to match target scale percentages, and composites onto 8-bit, 16-bit, and 32-bit float raster buffers with alpha and opacity weighting.
+5. **High-Contrast Theming Contract**:
+   To prevent washed-out text when options are toggled in dark mode (where `--app-accent` is pure white `#ffffff`), all active toggle states strictly pair `bg-accent` with `text-button-text font-semibold shadow-sm`. Inactive toggles cleanly use `text-text-secondary hover:text-text-primary`.
+6. **Defensive UI Hardening (`ErrorBoundary.tsx`)**:
+   RapidRAW uses a frameless, transparent webview configuration (`"transparent": true`, `"decorations": false`). Any unhandled React exception causes the root DOM to unmount, rendering the window invisible. Wrapping export tabs in `<ErrorBoundary>` intercepts exceptions and renders a recovery card with error diagnostic details and a "Try Again" reload button.
 
 ---
 
