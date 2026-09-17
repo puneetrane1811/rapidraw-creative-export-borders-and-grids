@@ -68,10 +68,15 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 
 ## ✨ Features
 
-- **🗂️ Dedicated Dual-Tab Workflow**: Clean separation between **Standard Export** (file formats, compression, sizing, destination, watermark, metadata) and **Creative Export** (hero live preview, framing mats, inset keylines, multi-photo contact sheet collages, tile splitters, and proofing grids).
+- **🗂️ Dedicated Dual-Tab Workflow**: Clean separation between **Standard Export** (file formats, compression, sizing, destination, metadata) and **Creative Export** (hero live preview, framing mats, inset keylines, watermarks, multi-photo contact sheet collages, tile splitters, and proofing grids).
 - **💾 Persistent Tab Memory**: Automatically remembers whether you were on Standard Export or Creative Export across launches and panel closures.
-- **🚨 Active Feature Status Indicator**: Displays a clear accent status dot on the `Creative Export` tab whenever borders, keylines, collages, or tile splitters are enabled, preventing accidental bordered exports.
-- **🖼️ Real-Time Sticky Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant 60fps visual feedback for borders, keylines, collage layouts, and tile slice lines as you adjust sliders, plus a full-screen darkroom inspection modal.
+- **🚨 Active Feature Status Indicator**: Displays a clear accent status dot on the `Creative Export` tab whenever borders, keylines, watermarks, collages, or tile splitters are enabled, preventing accidental bordered or branded exports.
+- **🖼️ Real-Time Sticky Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant 60fps visual feedback for borders, keylines, watermarks, collage layouts, and tile slice lines as you adjust sliders, plus a full-screen darkroom inspection modal.
+- **🔤 Real-Time Text & Image Watermarks**: High-resolution branding rendered in real time on the live preview canvas and baked seamlessly into final exports.
+  - **Text Watermark (Default)**: Custom text input with adjustable scaling, text color picker, and subtle drop-shadow rendering for maximum legibility across any photograph.
+  - **Image / Logo Watermark**: File picker supporting PNG, JPG, JPEG, and WebP logos with full transparency preservation.
+  - **Interactive Drag & Custom Placement**: Position watermarks via 9 preset grid anchors, fine-tune normalized $X\% / Y\%$ coordinate sliders, or click and drag directly on the Live Preview canvas to position the watermark interactively.
+  - **Precise Opacity Slider**: Smooth 1% to 100% alpha blending for subtle, professional proofing or prominent copyright marks.
 - **📐 Multi-Photo Contact Sheet / Grid Collage**: Combine multiple selected photos into an $N \times M$ grid collage on a single canvas with customizable cell gutters (spacing) and outer border framing.
 - **🔲 High-Contrast Fit vs. Fill Sizing Modes**: Choose between **Fit (Letterbox)** to preserve exact original photo aspect ratios without cropping, or **Fill (Center-Crop)** to fill each cell completely. Designed with high-contrast, accessible controls in both light and dark themes.
 - **📱 Multi-Tile Grid Splitter (Instagram / Panorama)**: Slice any photo or collage into an $N \times M$ matrix of individual exported files with optional borders per tile—ideal for seamless swipeable Instagram carousels and $3 \times 3$ grid mosaics.
@@ -80,7 +85,7 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 - **🔢 Frictionless Numeric Editing**: Natural backspacing and direct typing in row and column inputs without forced snap-backs to 1, with automatic range clamping on blur.
 - **🏷️ Smart Dynamic File Counts & Size Estimates**: Dynamically calculates and displays the exact output file count (e.g. `Export 1 Grid Photo` or `Export 9 Grid Tiles`) and accurate file size estimates for single-pass collages.
 - **⚡ Fully Combinable**: Use any feature individually or combine them all together seamlessly in a single export run.
-- **💾 Preset Persistence**: All border, keyline, collage, and tile split configurations are automatically remembered in default presets and custom user presets.
+- **💾 Preset Persistence**: All border, keyline, watermark, collage, and tile split configurations are automatically remembered in default presets and custom user presets.
 
 ---
 
