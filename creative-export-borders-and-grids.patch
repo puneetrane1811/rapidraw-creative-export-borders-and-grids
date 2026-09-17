@@ -3898,7 +3898,7 @@ index 46456d1..c04e33f 100644
            return <Controls />;
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
 new file mode 100644
-index 0000000..4350d9c
+index 0000000..4507e01
 --- /dev/null
 +++ b/src/components/panel/right/CreativeExportTab.tsx
 @@ -0,0 +1,716 @@
@@ -4229,7 +4229,7 @@ index 0000000..4350d9c
 +          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
 +            {/* Watermark Type Selector: Text vs Image */}
 +            <div className="space-y-1">
-+              <Text variant={TextVariants.label} className="text-xs text-subtext">
++              <Text variant={TextVariants.label} className="text-xs text-text-secondary">
 +                {t('export.watermark.typeLabel', 'Watermark Type')}
 +              </Text>
 +              <div className="grid grid-cols-2 gap-1 bg-surface p-1 rounded-md">
@@ -4237,10 +4237,10 @@ index 0000000..4350d9c
 +                  type="button"
 +                  disabled={isExporting}
 +                  onClick={() => setWatermarkType('text')}
-+                  className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition-colors ${
++                  className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded transition-colors ${
 +                    watermarkType === 'text'
-+                      ? 'bg-accent text-white shadow-sm'
-+                      : 'text-subtext hover:text-white'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'text-text-secondary hover:text-text-primary'
 +                  }`}
 +                >
 +                  <Type className="w-3.5 h-3.5" />
@@ -4250,10 +4250,10 @@ index 0000000..4350d9c
 +                  type="button"
 +                  disabled={isExporting}
 +                  onClick={() => setWatermarkType('image')}
-+                  className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium rounded transition-colors ${
++                  className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded transition-colors ${
 +                    watermarkType === 'image'
-+                      ? 'bg-accent text-white shadow-sm'
-+                      : 'text-subtext hover:text-white'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'text-text-secondary hover:text-text-primary'
 +                  }`}
 +                >
 +                  <ImageIconLucide className="w-3.5 h-3.5" />
@@ -4308,7 +4308,7 @@ index 0000000..4350d9c
 +            {/* Placement Mode Toggle: Preset 9-Grid vs Custom Drag/Sliders */}
 +            <div className="space-y-2 pt-1 border-t border-surface/50">
 +              <div className="flex items-center justify-between">
-+                <Text variant={TextVariants.label} className="text-xs text-subtext">
++                <Text variant={TextVariants.label} className="text-xs text-text-secondary">
 +                  {t('export.watermark.placementMode', 'Placement Mode')}
 +                </Text>
 +                <div className="flex items-center gap-1 bg-surface p-0.5 rounded text-[11px]">
@@ -4316,10 +4316,10 @@ index 0000000..4350d9c
 +                    type="button"
 +                    disabled={isExporting}
 +                    onClick={() => setWatermarkCustomPlacement(false)}
-+                    className={`px-2 py-0.5 rounded transition-colors ${
++                    className={`px-2.5 py-1 rounded transition-colors font-semibold ${
 +                      !watermarkCustomPlacement
-+                        ? 'bg-accent text-white font-medium shadow-xs'
-+                        : 'text-subtext hover:text-white'
++                        ? 'bg-accent text-button-text shadow-xs'
++                        : 'text-text-secondary hover:text-text-primary'
 +                    }`}
 +                  >
 +                    {t('export.watermark.presetAnchor', 'Preset Anchor')}
@@ -4328,10 +4328,10 @@ index 0000000..4350d9c
 +                    type="button"
 +                    disabled={isExporting}
 +                    onClick={() => setWatermarkCustomPlacement(true)}
-+                    className={`px-2 py-0.5 rounded transition-colors ${
++                    className={`px-2.5 py-1 rounded transition-colors font-semibold ${
 +                      watermarkCustomPlacement
-+                        ? 'bg-accent text-white font-medium shadow-xs'
-+                        : 'text-subtext hover:text-white'
++                        ? 'bg-accent text-button-text shadow-xs'
++                        : 'text-text-secondary hover:text-text-primary'
 +                    }`}
 +                  >
 +                    {t('export.watermark.customPlacement', 'Custom (Drag/Coords)')}
@@ -4720,7 +4720,7 @@ index 0000000..403f301
 +};
 diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
 new file mode 100644
-index 0000000..3680e6b
+index 0000000..16effb4
 --- /dev/null
 +++ b/src/components/panel/right/ExportLivePreview.tsx
 @@ -0,0 +1,765 @@
@@ -5365,7 +5365,7 @@ index 0000000..3680e6b
 +          aria-label={t('export.preview.expand', 'Expand Preview')}
 +          title={t('export.preview.expand', 'Expand Preview')}
 +          onClick={() => setIsModalOpen(true)}
-+          className="p-1 hover:bg-surface rounded text-subtext hover:text-white transition-colors"
++          className="p-1 hover:bg-surface rounded text-text-secondary hover:text-text-primary transition-colors"
 +        >
 +          <Maximize2 className="w-3.5 h-3.5" />
 +        </button>
@@ -5391,7 +5391,7 @@ index 0000000..3680e6b
 +      </div>
 +
 +      {/* Status & Badge Info Bar */}
-+      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-subtext pt-1">
++      <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-text-secondary pt-1">
 +        <div className="flex items-center gap-1.5 flex-wrap">
 +          {enableCollageGrid && multiSelectedPaths.length > 1 && (
 +            <span className="inline-flex items-center gap-1 bg-accent/20 text-accent px-1.5 py-0.5 rounded font-mono">
@@ -5443,7 +5443,7 @@ index 0000000..3680e6b
 +                    <button
 +                      type="button"
 +                      onClick={() => setIsModalOpen(false)}
-+                      className="p-1 rounded-md hover:bg-surface text-subtext hover:text-white"
++                      className="p-1 rounded-md hover:bg-surface text-text-secondary hover:text-text-primary"
 +                    >
 +                      <X className="w-5 h-5" />
 +                    </button>
@@ -5467,7 +5467,7 @@ index 0000000..3680e6b
 +                    )}
 +                  </div>
 +
-+                  <div className="flex items-center justify-between text-xs text-subtext pt-1">
++                  <div className="flex items-center justify-between text-xs text-text-secondary pt-1">
 +                    <span>
 +                      {enableCollageGrid && multiSelectedPaths.length > 1
 +                        ? `Multi-Photo Collage: ${multiSelectedPaths.length} photos (${collageColumns} cols × ${collageRows} rows)`
