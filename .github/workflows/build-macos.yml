@@ -50,6 +50,10 @@ jobs:
           echo "Applying patch..."
           cd rapidraw-src
           git apply --ignore-whitespace --ignore-space-change ../creative-export-borders-and-grids.patch
+          if [ -f ../center-stage-creative-export-studio.patch ]; then
+            echo "Applying center-stage-creative-export-studio.patch..."
+            git apply --ignore-whitespace --ignore-space-change ../center-stage-creative-export-studio.patch
+          fi
           echo "Patch applied successfully!"
           git status
 

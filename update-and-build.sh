@@ -25,10 +25,16 @@ curl -fL --silent --show-error "https://github.com/CyberTimon/RapidRAW/archive/r
 unzip -q "$BUILD_DIR/source.zip" -d "$BUILD_DIR"
 SRC_DIR=$(find "$BUILD_DIR" -maxdepth 1 -type d -name "RapidRAW-*" | head -n 1)
 
-# 2. Apply patch
+# 2. Apply patches
 echo "--> Applying creative-export-borders-and-grids.patch..."
 cd "$SRC_DIR"
 patch -p1 < "$PATCH_FILE"
+
+STUDIO_PATCH="$SCRIPT_DIR/center-stage-creative-export-studio.patch"
+if [ -f "$STUDIO_PATCH" ]; then
+  echo "--> Applying center-stage-creative-export-studio.patch..."
+  patch -p1 < "$STUDIO_PATCH"
+fi
 
 # 3. Reuse isolated toolchains and ONNX libraries
 export PATH="$WORK_DIR/toolchains/node/bin:$WORK_DIR/toolchains/cargo/bin:$PATH"
