@@ -239,7 +239,7 @@ index c04e33f..fd9c1c3 100644
                    side="right"
                    width={effectiveRightWidth}
 diff --git a/src/components/panel/BottomBar.tsx b/src/components/panel/BottomBar.tsx
-index 0645d3c..ceea99d 100644
+index 0645d3c..8dab7c3 100644
 --- a/src/components/panel/BottomBar.tsx
 +++ b/src/components/panel/BottomBar.tsx
 @@ -1,5 +1,5 @@
@@ -249,7 +249,16 @@ index 0645d3c..ceea99d 100644
  import clsx from 'clsx';
  import { motion, AnimatePresence } from 'framer-motion';
  import { useShallow } from 'zustand/react/shallow';
-@@ -554,6 +554,25 @@ export default function BottomBar({
+@@ -122,6 +122,8 @@ export default function BottomBar({
+   imageRatings,
+   isCopied,
+   isCopyDisabled,
++  isExportDisabled = false,
++  onExportClick,
+   isFilmstripVisible,
+   isLibraryView = false,
+   isLoading = false,
+@@ -554,6 +556,25 @@ export default function BottomBar({
                {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
              </Text>
            </div>
@@ -649,7 +658,7 @@ index 9310f14..95051f3 100644
        rating={imageRatings[selectedImage?.path || ''] || 0}
 diff --git a/src/components/views/ExportView.tsx b/src/components/views/ExportView.tsx
 new file mode 100644
-index 0000000..4a7cd09
+index 0000000..171fdb7
 --- /dev/null
 +++ b/src/components/views/ExportView.tsx
 @@ -0,0 +1,1440 @@
@@ -731,7 +740,8 @@ index 0000000..4a7cd09
 +  const setUI = useUIStore((s) => s.setUI);
 +
 +  const thumbnails = useProcessStore((s) => s.thumbnails);
-+  const currentAdjustments = useEditorStore((s) => s.currentAdjustments);
++  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
++  const adjustments = useEditorStore((s) => s.adjustments);
 +
 +  const [activeTab, setActiveTab] = useState<'standard' | 'creative'>(() => {
 +    try {
@@ -867,7 +877,7 @@ index 0000000..4a7cd09
 +    setExifBadgeBgColor,
 +    exifBadgeTextColor,
 +    setExifBadgeTextColor,
-+    applyPreset,
++    handleApplyPreset,
 +  } = useExportSettings();
 +
 +  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState<boolean>(false);
@@ -1191,14 +1201,14 @@ index 0000000..4a7cd09
 +
 +    debouncedEstimateSize(
 +      pathsToExport,
-+      currentAdjustments,
++      adjustments,
 +      selectedImage?.path,
 +      exportSettings,
 +      selectedFormat?.extensions[0] || 'jpg',
 +    );
 +  }, [
 +    pathsToExport,
-+    currentAdjustments,
++    adjustments,
 +    selectedImage?.path,
 +    filenameTemplate,
 +    fileFormat,
@@ -1443,7 +1453,7 @@ index 0000000..4a7cd09
 +          exportSettings,
 +          outputFormat: selectedFormat.extensions[0],
 +          currentEditPath: selectedImage?.path || null,
-+          currentEditAdjustments: currentAdjustments || null,
++          currentEditAdjustments: adjustments || null,
 +        });
 +      }
 +    } catch (error) {
@@ -1570,7 +1580,7 @@ index 0000000..4a7cd09
 +              <strong className="text-text-primary font-semibold">{numImages}</strong> photo{numImages === 1 ? '' : 's'} queued
 +            </span>
 +            {estimatedSize !== null && (
-+              <span className="text-text-secondary/70">({formatBytes(estimatedSize)})</span>
++              <span className="text-text-secondary/70">({formatBytes(estimatedSize, t)})</span>
 +            )}
 +          </div>
 +
@@ -1613,7 +1623,7 @@ index 0000000..4a7cd09
 +              mode="studio"
 +              canvasMaxDimension={950}
 +              selectedImage={selectedImage}
-+              finalPreviewUrl={null}
++              finalPreviewUrl={finalPreviewUrl}
 +              multiSelectedPaths={pathsToExport}
 +              thumbnailMap={thumbnails}
 +              enableBorder={enableBorder}
@@ -1727,7 +1737,7 @@ index 0000000..4a7cd09
 +                appSettings={appSettings}
 +                onSettingsChange={onSettingsChange}
 +                currentSettingsObject={currentSettingsObject}
-+                handleApplyPreset={applyPreset}
++                handleApplyPreset={handleApplyPreset}
 +                fileFormat={fileFormat}
 +                setFileFormat={setFileFormat}
 +                jpegQuality={jpegQuality}
@@ -1770,7 +1780,7 @@ index 0000000..4a7cd09
 +              <CreativeExportTab
 +                hideEmbeddedPreview={true}
 +                selectedImage={selectedImage}
-+                finalPreviewUrl={null}
++                finalPreviewUrl={finalPreviewUrl}
 +                pathsToExport={pathsToExport}
 +                thumbnails={thumbnails}
 +                isExporting={isExporting}
@@ -1843,7 +1853,6 @@ index 0000000..4a7cd09
 +                gridOverlayOpacity={gridOverlayOpacity}
 +                setGridOverlayOpacity={setGridOverlayOpacity}
 +                gridOverlaySize={gridOverlaySize}
-+                setGridOverlaySize={setGridOverlaySize}
 +                enableExifBadge={enableExifBadge}
 +                setEnableExifBadge={setEnableExifBadge}
 +                exifBadgeStyle={exifBadgeStyle}
@@ -1879,7 +1888,7 @@ index 0000000..4a7cd09
 +                {isEstimating ? (
 +                  <span className="text-text-secondary animate-pulse">Calculating size...</span>
 +                ) : estimatedSize !== null ? (
-+                  `~${formatBytes(estimatedSize)}`
++                  `~${formatBytes(estimatedSize, t)}`
 +                ) : (
 +                  '--'
 +                )}
@@ -1892,14 +1901,14 @@ index 0000000..4a7cd09
 +                <div className="flex justify-between text-xs text-text-secondary">
 +                  <span>Exporting...</span>
 +                  <span className="font-mono">
-+                    {progress.current} / {progress.total}
++                    {progress.current ?? 0} / {progress.total}
 +                  </span>
 +                </div>
 +                <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
 +                  <div
 +                    className="h-full bg-accent transition-all duration-200"
 +                    style={{
-+                      width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
++                      width: `${progress.total > 0 ? ((progress.current ?? 0) / progress.total) * 100 : 0}%`,
 +                    }}
 +                  />
 +                </div>
