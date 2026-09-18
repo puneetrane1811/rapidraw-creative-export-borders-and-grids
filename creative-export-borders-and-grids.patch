@@ -12,7 +12,7 @@ index fa4bbc5..568e61e 100644
  ndarray = "0.16"
  tauri-plugin-process = "2.3.1"
 diff --git a/src-tauri/src/app_settings.rs b/src-tauri/src/app_settings.rs
-index 9eb589f..8935dea 100644
+index 9eb589f..dc12d82 100644
 --- a/src-tauri/src/app_settings.rs
 +++ b/src-tauri/src/app_settings.rs
 @@ -240,6 +240,48 @@ pub struct ExportPreset {
@@ -64,7 +64,32 @@ index 9eb589f..8935dea 100644
      pub export_masks: Option<bool>,
      #[serde(default)]
      pub preserve_folders: Option<bool>,
-@@ -271,6 +313,27 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
+@@ -249,6 +291,24 @@ pub struct ExportPreset {
+     pub destination_type: Option<String>,
+     #[serde(default)]
+     pub subfolder: Option<String>,
++    #[serde(default)]
++    pub enable_exif_badge: Option<bool>,
++    #[serde(default)]
++    pub exif_badge_style: Option<String>,
++    #[serde(default)]
++    pub exif_show_camera: Option<bool>,
++    #[serde(default)]
++    pub exif_show_lens: Option<bool>,
++    #[serde(default)]
++    pub exif_show_settings: Option<bool>,
++    #[serde(default)]
++    pub exif_show_date: Option<bool>,
++    #[serde(default)]
++    pub exif_custom_text: Option<String>,
++    #[serde(default)]
++    pub exif_badge_bg_color: Option<String>,
++    #[serde(default)]
++    pub exif_badge_text_color: Option<String>,
+ }
+ 
+ pub fn default_export_presets() -> Vec<ExportPreset> {
+@@ -271,11 +331,41 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
              watermark_scale: 10,
              watermark_spacing: 5,
              watermark_opacity: 75,
@@ -92,7 +117,21 @@ index 9eb589f..8935dea 100644
              export_masks: Some(false),
              preserve_folders: Some(false),
              last_export_path: None,
-@@ -295,6 +358,27 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
+             destination_type: Some("customFolder".to_string()),
+             subfolder: Some("".to_string()),
++            enable_exif_badge: Some(false),
++            exif_badge_style: Some("bottom_strip".to_string()),
++            exif_show_camera: Some(true),
++            exif_show_lens: Some(true),
++            exif_show_settings: Some(true),
++            exif_show_date: Some(false),
++            exif_custom_text: None,
++            exif_badge_bg_color: Some("#ffffff".to_string()),
++            exif_badge_text_color: Some("#111827".to_string()),
+         },
+         ExportPreset {
+             id: "default-fast".to_string(),
+@@ -295,11 +385,41 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
              watermark_scale: 10,
              watermark_spacing: 5,
              watermark_opacity: 75,
@@ -120,6 +159,20 @@ index 9eb589f..8935dea 100644
              export_masks: Some(false),
              preserve_folders: Some(false),
              last_export_path: None,
+             destination_type: Some("customFolder".to_string()),
+             subfolder: Some("".to_string()),
++            enable_exif_badge: Some(false),
++            exif_badge_style: Some("bottom_strip".to_string()),
++            exif_show_camera: Some(true),
++            exif_show_lens: Some(true),
++            exif_show_settings: Some(true),
++            exif_show_date: Some(false),
++            exif_custom_text: None,
++            exif_badge_bg_color: Some("#ffffff".to_string()),
++            exif_badge_text_color: Some("#111827".to_string()),
+         },
+     ]
+ }
 diff --git a/src-tauri/src/default_font.rs b/src-tauri/src/default_font.rs
 new file mode 100644
 index 0000000..2b5cc3a
@@ -3149,7 +3202,7 @@ index 0000000..2b5cc3a
 +    }).clone()
 +}
 diff --git a/src-tauri/src/export_processing.rs b/src-tauri/src/export_processing.rs
-index b0e31f5..972e96c 100644
+index b0e31f5..4f6fe26 100644
 --- a/src-tauri/src/export_processing.rs
 +++ b/src-tauri/src/export_processing.rs
 @@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -3161,7 +3214,36 @@ index b0e31f5..972e96c 100644
  use jxl_encoder::{
      LosslessConfig, LossyConfig, PixelLayout,
      api::{calibrated_jxl_quality, quality_to_distance},
-@@ -102,6 +102,12 @@ pub struct ExportSettings {
+@@ -88,6 +88,28 @@ pub struct ResizeOptions {
+     pub dont_enlarge: bool,
+ }
+ 
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct ExifBadgeSettings {
++    pub enabled: bool,
++    #[serde(default)]
++    pub style: Option<String>,
++    #[serde(default)]
++    pub show_camera: bool,
++    #[serde(default)]
++    pub show_lens: bool,
++    #[serde(default)]
++    pub show_settings: bool,
++    #[serde(default)]
++    pub show_date: bool,
++    #[serde(default)]
++    pub custom_text: Option<String>,
++    #[serde(default)]
++    pub badge_bg_color: Option<String>,
++    #[serde(default)]
++    pub badge_text_color: Option<String>,
++}
++
+ #[derive(Serialize, Deserialize, Debug, Clone)]
+ #[serde(rename_all = "camelCase")]
+ pub struct ExportSettings {
+@@ -102,6 +124,14 @@ pub struct ExportSettings {
      pub filename_template: Option<String>,
      pub watermark: Option<WatermarkSettings>,
      #[serde(default)]
@@ -3171,10 +3253,12 @@ index b0e31f5..972e96c 100644
 +    #[serde(default)]
 +    pub tile_split: Option<TileSplitSettings>,
 +    #[serde(default)]
++    pub exif_badge: Option<ExifBadgeSettings>,
++    #[serde(default)]
      pub export_masks: bool,
      #[serde(default)]
      pub preserve_folders: bool,
-@@ -120,7 +126,7 @@ pub(crate) enum ExportAdjustmentsMode {
+@@ -120,7 +150,7 @@ pub(crate) enum ExportAdjustmentsMode {
      GlobalOverride(Value),
  }
  
@@ -3183,7 +3267,7 @@ index b0e31f5..972e96c 100644
  #[serde(rename_all = "camelCase")]
  pub enum WatermarkAnchor {
      TopLeft,
-@@ -132,66 +138,455 @@ pub enum WatermarkAnchor {
+@@ -132,66 +162,455 @@ pub enum WatermarkAnchor {
      BottomLeft,
      BottomCenter,
      BottomRight,
@@ -3673,17 +3757,350 @@ index b0e31f5..972e96c 100644
      };
  
      if matches!(
-@@ -341,6 +736,9 @@ fn apply_export_resize_and_watermark(
+@@ -325,9 +744,308 @@ fn relative_export_dir_for_preserved_folders(
+         })
+ }
+ 
++fn apply_exif_badge(
++    image: DynamicImage,
++    badge_settings: &ExifBadgeSettings,
++    source_path_str: Option<&str>,
++    fallback_border_color: Option<&str>,
++) -> DynamicImage {
++    if !badge_settings.enabled {
++        return image;
++    }
++
++    let exif_map = if let Some(path_str) = source_path_str {
++        exif_processing::read_rrexif_sidecar(Path::new(path_str))
++            .or_else(|| {
++                if let Ok(bytes) = read_file_mapped(Path::new(path_str)) {
++                    Some(exif_processing::read_exif_data(path_str, &bytes))
++                } else {
++                    None
++                }
++            })
++            .unwrap_or_default()
++    } else {
++        HashMap::new()
++    };
++
++    let mut camera = String::new();
++    if badge_settings.show_camera {
++        let make = exif_map.get("Make").map(|s| s.trim()).unwrap_or("");
++        let model = exif_map.get("Model").map(|s| s.trim()).unwrap_or("");
++        if !model.is_empty() {
++            if !make.is_empty() && !model.to_lowercase().starts_with(&make.to_lowercase()) {
++                camera = format!("{} {}", make, model);
++            } else {
++                camera = model.to_string();
++            }
++        } else if !make.is_empty() {
++            camera = make.to_string();
++        }
++    }
++
++    let mut lens = String::new();
++    if badge_settings.show_lens {
++        if let Some(l) = exif_map.get("LensModel") {
++            lens = l.trim().to_string();
++        }
++    }
++
++    let mut settings_parts = Vec::new();
++    if badge_settings.show_settings {
++        let focal = exif_map
++            .get("FocalLengthIn35mmFilm")
++            .or_else(|| exif_map.get("FocalLength"));
++        if let Some(f_str) = focal {
++            if let Ok(f_val) = f_str.parse::<f32>() {
++                if f_val > 0.0 {
++                    settings_parts.push(format!("{}mm", f_val.round() as u32));
++                }
++            }
++        }
++
++        if let Some(f_str) = exif_map.get("FNumber") {
++            if let Ok(f_val) = f_str.parse::<f32>() {
++                if f_val > 0.0 {
++                    let formatted = format!("{:.1}", f_val);
++                    let clean = formatted.trim_end_matches(".0");
++                    settings_parts.push(format!("ƒ/{}", clean));
++                }
++            }
++        }
++
++        if let Some(e_str) = exif_map.get("ExposureTime") {
++            if let Ok(e_val) = e_str.parse::<f32>() {
++                if e_val > 0.0 {
++                    if e_val < 1.0 {
++                        settings_parts.push(format!("1/{}s", (1.0 / e_val).round() as u32));
++                    } else {
++                        let formatted = format!("{:.1}", e_val);
++                        let clean = formatted.trim_end_matches(".0");
++                        settings_parts.push(format!("{}s", clean));
++                    }
++                }
++            }
++        }
++
++        let iso = exif_map
++            .get("PhotographicSensitivity")
++            .or_else(|| exif_map.get("ISOSpeedRatings"));
++        if let Some(iso_val) = iso {
++            let trimmed = iso_val.trim();
++            if !trimmed.is_empty() {
++                settings_parts.push(format!("ISO {}", trimmed));
++            }
++        }
++    }
++    let settings = settings_parts.join(" • ");
++
++    let mut date_str = String::new();
++    if badge_settings.show_date {
++        if let Some(dt) = exif_map.get("DateTimeOriginal") {
++            let part = dt.split_whitespace().next().unwrap_or(dt);
++            date_str = part.replace(':', "-");
++        }
++    }
++
++    let custom_credit = badge_settings.custom_text.as_deref().unwrap_or("").trim();
++
++    if camera.is_empty() && badge_settings.show_camera && custom_credit.is_empty() {
++        camera = "CAMERA".to_string();
++    }
++
++    let font = match crate::default_font::get_default_font() {
++        Some(f) => f,
++        None => return image,
++    };
++
++    let bg_color_hex = badge_settings
++        .badge_bg_color
++        .as_deref()
++        .or(fallback_border_color)
++        .unwrap_or("#ffffff");
++    let bg_color = parse_border_color(bg_color_hex).unwrap_or(Rgba([255, 255, 255, 255]));
++
++    let text_color_hex = badge_settings
++        .badge_text_color
++        .as_deref()
++        .unwrap_or("#111827");
++    let text_color = parse_border_color(text_color_hex).unwrap_or(Rgba([17, 24, 39, 255]));
++
++    let style = badge_settings.style.as_deref().unwrap_or("bottom_strip");
++    let (width, height) = image.dimensions();
++
++    if style == "overlay_badge" {
++        let mut base_rgba = image.to_rgba8();
++        let font_px = ((width.min(height) as f32 * 0.024).clamp(13.0, 42.0)).round();
++        let scale = ab_glyph::PxScale::from(font_px);
++
++        let mut badge_items = Vec::new();
++        if !camera.is_empty() {
++            badge_items.push(camera);
++        }
++        if !custom_credit.is_empty() {
++            badge_items.push(custom_credit.to_string());
++        }
++        if !settings.is_empty() {
++            badge_items.push(settings);
++        }
++        if !date_str.is_empty() {
++            badge_items.push(date_str);
++        }
++
++        let badge_text = badge_items.join("  |  ");
++        if badge_text.is_empty() {
++            return image;
++        }
++
++        let (text_w, text_h) = imageproc::drawing::text_size(scale, &font, &badge_text);
++        let pad_h = (font_px * 0.9).round() as u32;
++        let pad_v = (font_px * 0.5).round() as u32;
++        let pill_w = text_w + pad_h * 2;
++        let pill_h = text_h + pad_v * 2;
++
++        let margin = (font_px * 1.2).round() as u32;
++        let pill_x = (width.saturating_sub(pill_w + margin)) as i32;
++        let pill_y = (height.saturating_sub(pill_h + margin)) as i32;
++
++        draw_filled_rect(
++            &mut base_rgba,
++            pill_x,
++            pill_y,
++            pill_x + pill_w as i32,
++            pill_y + pill_h as i32,
++            bg_color,
++            0.88,
++        );
++
++        let border_subtle = Rgba([text_color[0], text_color[1], text_color[2], 60]);
++        draw_rect_outline(
++            &mut base_rgba,
++            pill_x,
++            pill_y,
++            pill_x + pill_w as i32,
++            pill_y + pill_h as i32,
++            1,
++            border_subtle,
++            0.9,
++        );
++
++        imageproc::drawing::draw_text_mut(
++            &mut base_rgba,
++            text_color,
++            pill_x + pad_h as i32,
++            pill_y + pad_v as i32,
++            scale,
++            &font,
++            &badge_text,
++        );
++
++        DynamicImage::ImageRgba8(base_rgba)
++    } else {
++        let strip_h = ((height as f32 * 0.11).clamp(44.0, 360.0)).round() as u32;
++        let new_height = height + strip_h;
++        let mut output_buf = ImageBuffer::from_pixel(width, new_height, bg_color);
++
++        imageops::overlay(&mut output_buf, &image.to_rgba8(), 0, 0);
++
++        let font_title_px = ((strip_h as f32 * 0.28).clamp(13.0, 52.0)).round();
++        let font_sub_px = ((strip_h as f32 * 0.21).clamp(10.0, 38.0)).round();
++
++        let scale_title = ab_glyph::PxScale::from(font_title_px);
++        let scale_sub = ab_glyph::PxScale::from(font_sub_px);
++
++        let margin_x = ((width as f32 * 0.04).clamp(20.0, 140.0)).round() as i32;
++        let strip_top = height as i32;
++
++        let left_title = if !camera.is_empty() {
++            camera
++        } else if !custom_credit.is_empty() {
++            custom_credit.to_string()
++        } else {
++            String::new()
++        };
++
++        let left_sub = if !left_title.is_empty() && left_title != custom_credit && !custom_credit.is_empty() {
++            if !lens.is_empty() {
++                format!("{} • {}", lens, custom_credit)
++            } else {
++                custom_credit.to_string()
++            }
++        } else {
++            lens
++        };
++
++        let right_title = settings;
++        let right_sub = date_str;
++
++        let y_line1 = strip_top + ((strip_h as f32 * 0.22).round() as i32);
++        let y_line2 = strip_top + ((strip_h as f32 * 0.58).round() as i32);
++
++        let secondary_text_color = Rgba([
++            ((text_color[0] as f32 * 0.75 + bg_color[0] as f32 * 0.25).round() as u8),
++            ((text_color[1] as f32 * 0.75 + bg_color[1] as f32 * 0.25).round() as u8),
++            ((text_color[2] as f32 * 0.75 + bg_color[2] as f32 * 0.25).round() as u8),
++            255,
++        ]);
++
++        if !left_title.is_empty() {
++            imageproc::drawing::draw_text_mut(
++                &mut output_buf,
++                text_color,
++                margin_x,
++                y_line1,
++                scale_title,
++                &font,
++                &left_title,
++            );
++        }
++        if !left_sub.is_empty() {
++            imageproc::drawing::draw_text_mut(
++                &mut output_buf,
++                secondary_text_color,
++                margin_x,
++                y_line2,
++                scale_sub,
++                &font,
++                &left_sub,
++            );
++        }
++
++        if !right_title.is_empty() {
++            let (rw, _) = imageproc::drawing::text_size(scale_title, &font, &right_title);
++            let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
++            imageproc::drawing::draw_text_mut(
++                &mut output_buf,
++                text_color,
++                rx,
++                y_line1,
++                scale_title,
++                &font,
++                &right_title,
++            );
++        }
++        if !right_sub.is_empty() {
++            let (rw, _) = imageproc::drawing::text_size(scale_sub, &font, &right_sub);
++            let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
++            imageproc::drawing::draw_text_mut(
++                &mut output_buf,
++                secondary_text_color,
++                rx,
++                y_line2,
++                scale_sub,
++                &font,
++                &right_sub,
++            );
++        }
++
++        DynamicImage::ImageRgba8(output_buf)
++    }
++}
++
+ fn apply_export_resize_and_watermark(
+     mut image: DynamicImage,
+     export_settings: &ExportSettings,
++    source_path_str: Option<&str>,
+ ) -> Result<DynamicImage, String> {
+     if let Some(resize_opts) = &export_settings.resize {
+         let (current_w, current_h) = image.dimensions();
+@@ -341,6 +1059,15 @@ fn apply_export_resize_and_watermark(
      if let Some(watermark_settings) = &export_settings.watermark {
          apply_watermark(&mut image, watermark_settings)?;
      }
 +    if let Some(border_settings) = &export_settings.border {
 +        image = apply_border(image, border_settings)?;
 +    }
++    if let Some(badge_settings) = &export_settings.exif_badge {
++        if badge_settings.enabled {
++            let fallback_color = export_settings.border.as_ref().map(|b| b.color.as_str());
++            image = apply_exif_badge(image, badge_settings, source_path_str, fallback_color);
++        }
++    }
      Ok(image)
  }
  
-@@ -1008,6 +1406,7 @@ pub(crate) async fn export_images_impl(
+@@ -642,7 +1369,7 @@ fn process_image_for_export(
+         render_output_precision(output_format, export_settings),
+     )?;
+ 
+-    apply_export_resize_and_watermark(processed_image, export_settings)
++    apply_export_resize_and_watermark(processed_image, export_settings, Some(path))
+ }
+ 
+ fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
+@@ -836,7 +1563,7 @@ fn export_masks_for_image(
+             )?;
+             ensure_export_not_cancelled(cancellation_token)?;
+ 
+-            let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
++            let with_options = apply_export_resize_and_watermark(processed, export_settings, Some(source_path_str))?;
+             let (out_w, out_h) = with_options.dimensions();
+ 
+             let alpha_resized = imageops::resize(
+@@ -1008,6 +1735,7 @@ pub(crate) async fn export_images_impl(
          let total_paths = paths.len();
          let settings = load_settings(app_handle.clone()).unwrap_or_default();
  
@@ -3691,7 +4108,7 @@ index b0e31f5..972e96c 100644
          let mut base_path_counts: HashMap<String, usize> = HashMap::new();
          let mut export_items = Vec::with_capacity(total_paths);
  
-@@ -1039,6 +1438,13 @@ pub(crate) async fn export_images_impl(
+@@ -1039,6 +1767,13 @@ pub(crate) async fn export_images_impl(
              export_items.push((i, path_str, *count, explicit_vc));
          }
  
@@ -3705,7 +4122,7 @@ index b0e31f5..972e96c 100644
          let used_paths = Arc::new(Mutex::new(std::collections::HashSet::new()));
          let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
          let mut join_handles = Vec::new();
-@@ -1060,6 +1466,7 @@ pub(crate) async fn export_images_impl(
+@@ -1060,6 +1795,7 @@ pub(crate) async fn export_images_impl(
              let base_origin_folders = base_origin_folders.clone();
              let export_settings = export_settings.clone();
              let output_format = output_format.clone();
@@ -3713,7 +4130,7 @@ index b0e31f5..972e96c 100644
              let settings = settings.clone();
              let cancellation_token_clone = Arc::clone(&cancellation_token);
              let adjustments_mode = adjustments_mode.clone();
-@@ -1292,12 +1699,41 @@ pub(crate) async fn export_images_impl(
+@@ -1292,12 +2028,41 @@ pub(crate) async fn export_images_impl(
                          actual_output_format,
                      )?;
                      ensure_export_not_cancelled(&cancellation_token_clone)?;
@@ -3761,7 +4178,7 @@ index b0e31f5..972e96c 100644
                      ensure_export_not_cancelled(&cancellation_token_clone)?;
  
                      if export_settings.preserve_timestamps {
-@@ -1355,6 +1791,48 @@ pub(crate) async fn export_images_impl(
+@@ -1355,6 +2120,54 @@ pub(crate) async fn export_images_impl(
              }
          }
  
@@ -3778,6 +4195,12 @@ index b0e31f5..972e96c 100644
 +                    if let Ok(mut composite) = composite_photo_collage(&images, collage_settings, export_settings.border.as_ref()) {
 +                        if let Some(watermark_settings) = &export_settings.watermark {
 +                            let _ = apply_watermark(&mut composite, watermark_settings);
++                        }
++                        if let Some(badge_settings) = &export_settings.exif_badge {
++                            if badge_settings.enabled {
++                                let fallback_color = export_settings.border.as_ref().map(|b| b.color.as_str());
++                                composite = apply_exif_badge(composite, badge_settings, Some(&first_source_path), fallback_color);
++                            }
 +                        }
 +                        let collage_output_path = if is_explicit_file_path {
 +                            output_folder_path.to_path_buf()
@@ -3810,17 +4233,18 @@ index b0e31f5..972e96c 100644
          let errors: Vec<String> = results.into_iter().filter_map(Result::err).collect();
          let error_count = errors.len();
          let export_state = app_handle.state::<AppState>();
-@@ -1490,6 +1968,9 @@ pub async fn run_headless_export(
+@@ -1490,6 +2303,10 @@ pub async fn run_headless_export(
          strip_gps: false,
          filename_template: None,
          watermark: None,
 +        border: None,
 +        collage_grid: None,
 +        tile_split: None,
++        exif_badge: None,
          export_masks: false,
          preserve_folders: true,
          destination_type: None,
-@@ -1693,12 +2174,19 @@ pub async fn estimate_export_sizes(
+@@ -1693,12 +2510,19 @@ pub async fn estimate_export_sizes(
              apply_all_transformations(&loaded_image.image, &adjustments_clone);
          let (full_w, full_h) = transformed_full_res.dimensions();
  
@@ -3841,6 +4265,124 @@ index b0e31f5..972e96c 100644
          let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
          let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
              (final_full_w as f64 * final_full_h as f64)
+diff --git a/src-tauri/src/file_management.rs b/src-tauri/src/file_management.rs
+index 2a87459..644c130 100644
+--- a/src-tauri/src/file_management.rs
++++ b/src-tauri/src/file_management.rs
+@@ -3930,14 +3930,112 @@ pub fn generate_filename_from_template(
+ 
+     let mut result = template.to_string();
+     result = result.replace("{original_filename}", stem);
++    result = result.replace("{filename}", stem);
+     result = result.replace("{sequence}", &sequence_str);
++    result = result.replace("{seq}", &sequence_str);
+     result = result.replace("{YYYY}", &local_date.format("%Y").to_string());
+     result = result.replace("{MM}", &local_date.format("%m").to_string());
+     result = result.replace("{DD}", &local_date.format("%d").to_string());
+     result = result.replace("{hh}", &local_date.format("%H").to_string());
+     result = result.replace("{mm}", &local_date.format("%M").to_string());
++    result = result.replace("{ss}", &local_date.format("%S").to_string());
++    result = result.replace("{date}", &local_date.format("%Y-%m-%d").to_string());
++    result = result.replace("{time}", &local_date.format("%H%M%S").to_string());
++
++    if result.contains("{camera}")
++        || result.contains("{lens}")
++        || result.contains("{iso}")
++        || result.contains("{focal}")
++        || result.contains("{aperture}")
++        || result.contains("{shutter}")
++    {
++        let exif_map = crate::exif_processing::read_rrexif_sidecar(original_path)
++            .or_else(|| {
++                if let Ok(bytes) = read_file_mapped(original_path) {
++                    Some(crate::exif_processing::read_exif_data(
++                        original_path.to_str().unwrap_or(""),
++                        &bytes,
++                    ))
++                } else {
++                    None
++                }
++            })
++            .unwrap_or_default();
+ 
+-    result
++        let make = exif_map.get("Make").map(|s| s.trim()).unwrap_or("");
++        let model = exif_map.get("Model").map(|s| s.trim()).unwrap_or("");
++        let camera_val = if !model.is_empty() {
++            if !make.is_empty() && !model.to_lowercase().starts_with(&make.to_lowercase()) {
++                format!("{}_{}", make, model)
++            } else {
++                model.to_string()
++            }
++        } else if !make.is_empty() {
++            make.to_string()
++        } else {
++            "Camera".to_string()
++        };
++        let camera_clean = sanitize_filename_token(&camera_val);
++        result = result.replace("{camera}", &camera_clean);
++
++        let lens_val = exif_map.get("LensModel").map(|s| s.trim()).unwrap_or("");
++        let lens_clean = sanitize_filename_token(if lens_val.is_empty() { "Lens" } else { lens_val });
++        result = result.replace("{lens}", &lens_clean);
++
++        let iso_val = exif_map
++            .get("PhotographicSensitivity")
++            .or_else(|| exif_map.get("ISOSpeedRatings"))
++            .map(|s| s.trim())
++            .unwrap_or("100");
++        result = result.replace("{iso}", &format!("ISO{}", sanitize_filename_token(iso_val)));
++
++        let focal_val = exif_map
++            .get("FocalLengthIn35mmFilm")
++            .or_else(|| exif_map.get("FocalLength"))
++            .and_then(|s| s.parse::<f32>().ok())
++            .map(|f| format!("{}mm", f.round() as u32))
++            .unwrap_or_else(|| "50mm".to_string());
++        result = result.replace("{focal}", &focal_val);
++
++        let aperture_val = exif_map
++            .get("FNumber")
++            .and_then(|s| s.parse::<f32>().ok())
++            .map(|f| format!("f{:.1}", f).replace(".0", ""))
++            .unwrap_or_else(|| "f2.8".to_string());
++        result = result.replace("{aperture}", &aperture_val);
++
++        let shutter_val = exif_map
++            .get("ExposureTime")
++            .and_then(|s| s.parse::<f32>().ok())
++            .map(|e| {
++                if e < 1.0 {
++                    format!("1-{}s", (1.0 / e).round() as u32)
++                } else {
++                    format!("{}s", e.round() as u32)
++                }
++            })
++            .unwrap_or_else(|| "1-500s".to_string());
++        result = result.replace("{shutter}", &shutter_val);
++    }
++
++    let sanitized: String = result
++        .chars()
++        .map(|c| match c {
++            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
++            _ => c,
++        })
++        .collect();
++
++    sanitized
++}
++
++fn sanitize_filename_token(s: &str) -> String {
++    s.chars()
++        .map(|c| match c {
++            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | ' ' => '_',
++            _ => c,
++        })
++        .collect()
+ }
+ 
+ #[tauri::command]
 diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
 index 5b0bbc4..e4457cf 100644
 --- a/src-tauri/src/lib.rs
@@ -3898,10 +4440,10 @@ index 46456d1..c04e33f 100644
            return <Controls />;
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
 new file mode 100644
-index 0000000..4507e01
+index 0000000..d1789b3
 --- /dev/null
 +++ b/src/components/panel/right/CreativeExportTab.tsx
-@@ -0,0 +1,716 @@
+@@ -0,0 +1,907 @@
 +import React from 'react';
 +import { useTranslation } from 'react-i18next';
 +import { Type, Image as ImageIconLucide } from 'lucide-react';
@@ -4003,6 +4545,26 @@ index 0000000..4507e01
 +  gridOverlayOpacity: number;
 +  setGridOverlayOpacity: (opacity: number) => void;
 +  gridOverlaySize: number;
++
++  // EXIF Camera Badge & Technical Framing
++  enableExifBadge: boolean;
++  setEnableExifBadge: (enabled: boolean) => void;
++  exifBadgeStyle: 'bottom_strip' | 'overlay_badge';
++  setExifBadgeStyle: (style: 'bottom_strip' | 'overlay_badge') => void;
++  exifShowCamera: boolean;
++  setExifShowCamera: (show: boolean) => void;
++  exifShowLens: boolean;
++  setExifShowLens: (show: boolean) => void;
++  exifShowSettings: boolean;
++  setExifShowSettings: (show: boolean) => void;
++  exifShowDate: boolean;
++  setExifShowDate: (show: boolean) => void;
++  exifCustomText: string;
++  setExifCustomText: (text: string) => void;
++  exifBadgeBgColor: string;
++  setExifBadgeBgColor: (color: string) => void;
++  exifBadgeTextColor: string;
++  setExifBadgeTextColor: (color: string) => void;
 +}
 +
 +export default function CreativeExportTab({
@@ -4080,6 +4642,24 @@ index 0000000..4507e01
 +  gridOverlayOpacity,
 +  setGridOverlayOpacity,
 +  gridOverlaySize,
++  enableExifBadge,
++  setEnableExifBadge,
++  exifBadgeStyle,
++  setExifBadgeStyle,
++  exifShowCamera,
++  setExifShowCamera,
++  exifShowLens,
++  setExifShowLens,
++  exifShowSettings,
++  setExifShowSettings,
++  exifShowDate,
++  setExifShowDate,
++  exifCustomText,
++  setExifCustomText,
++  exifBadgeBgColor,
++  setExifBadgeBgColor,
++  exifBadgeTextColor,
++  setExifBadgeTextColor,
 +}: CreativeExportTabProps) {
 +  const { t } = useTranslation();
 +
@@ -4130,6 +4710,15 @@ index 0000000..4507e01
 +          setWatermarkCustomX(x);
 +          setWatermarkCustomY(y);
 +        }}
++        enableExifBadge={enableExifBadge}
++        exifBadgeStyle={exifBadgeStyle}
++        exifShowCamera={exifShowCamera}
++        exifShowLens={exifShowLens}
++        exifShowSettings={exifShowSettings}
++        exifShowDate={exifShowDate}
++        exifCustomText={exifCustomText}
++        exifBadgeBgColor={exifBadgeBgColor}
++        exifBadgeTextColor={exifBadgeTextColor}
 +      />
 +
 +      {/* 📐 Card 1: Outer Border & Fine-Art Keyline */}
@@ -4417,7 +5006,151 @@ index 0000000..4507e01
 +        )}
 +      </Section>
 +
-+      {/* 🔲 Card 3: Multi-Photo Contact Sheet / Collage */}
++      {/* 📷 Card 3: EXIF Camera Badge & Technical Framing */}
++      <Section title={t('export.exifBadge.title', 'EXIF Camera Badge & Framing')}>
++        <Switch
++          label={t('export.exifBadge.enable', 'Enable Camera Badge')}
++          checked={enableExifBadge}
++          onChange={setEnableExifBadge}
++          disabled={isExporting}
++          trackClassName="bg-surface"
++        />
++
++        {enableExifBadge && (
++          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++            {/* Style Switcher: Bottom Mat Strip vs Floating Glass Pill */}
++            <div>
++              <Text variant={TextVariants.label} className="mb-1.5">
++                {t('export.exifBadge.layoutStyle', 'Framing Style')}
++              </Text>
++              <div className="grid grid-cols-2 gap-2">
++                <button
++                  type="button"
++                  disabled={isExporting}
++                  onClick={() => setExifBadgeStyle('bottom_strip')}
++                  className={`px-3 py-2 rounded-md text-xs font-medium transition-colors border flex flex-col items-center gap-1 ${
++                    exifBadgeStyle === 'bottom_strip'
++                      ? 'bg-accent text-button-text border-accent shadow-xs'
++                      : 'bg-surface text-text-secondary border-surface hover:text-text-primary hover:bg-surface/80'
++                  }`}
++                >
++                  <span className="font-semibold">{t('export.exifBadge.bottomStrip', 'Bottom Mat Strip')}</span>
++                  <span className="text-[10px] opacity-80">{t('export.exifBadge.bottomStripDesc', 'Classic gallery bottom frame')}</span>
++                </button>
++                <button
++                  type="button"
++                  disabled={isExporting}
++                  onClick={() => setExifBadgeStyle('overlay_badge')}
++                  className={`px-3 py-2 rounded-md text-xs font-medium transition-colors border flex flex-col items-center gap-1 ${
++                    exifBadgeStyle === 'overlay_badge'
++                      ? 'bg-accent text-button-text border-accent shadow-xs'
++                      : 'bg-surface text-text-secondary border-surface hover:text-text-primary hover:bg-surface/80'
++                  }`}
++                >
++                  <span className="font-semibold">{t('export.exifBadge.overlayBadge', 'Floating Glass Pill')}</span>
++                  <span className="text-[10px] opacity-80">{t('export.exifBadge.overlayBadgeDesc', 'Compact corner pill badge')}</span>
++                </button>
++              </div>
++            </div>
++
++            {/* Metadata Elements to Include */}
++            <div>
++              <Text variant={TextVariants.label} className="mb-2">
++                {t('export.exifBadge.includeMetadata', 'Metadata to Display')}
++              </Text>
++              <div className="grid grid-cols-2 gap-2">
++                <label className="flex items-center gap-2 p-2 bg-surface/60 rounded border border-surface/80 cursor-pointer hover:bg-surface text-xs text-text-primary">
++                  <input
++                    type="checkbox"
++                    checked={exifShowCamera}
++                    onChange={(e) => setExifShowCamera(e.target.checked)}
++                    disabled={isExporting}
++                    className="rounded text-accent focus:ring-accent accent-accent"
++                  />
++                  <span>{t('export.exifBadge.cameraModel', 'Camera Model')}</span>
++                </label>
++                <label className="flex items-center gap-2 p-2 bg-surface/60 rounded border border-surface/80 cursor-pointer hover:bg-surface text-xs text-text-primary">
++                  <input
++                    type="checkbox"
++                    checked={exifShowLens}
++                    onChange={(e) => setExifShowLens(e.target.checked)}
++                    disabled={isExporting}
++                    className="rounded text-accent focus:ring-accent accent-accent"
++                  />
++                  <span>{t('export.exifBadge.lensModel', 'Lens Model')}</span>
++                </label>
++                <label className="flex items-center gap-2 p-2 bg-surface/60 rounded border border-surface/80 cursor-pointer hover:bg-surface text-xs text-text-primary">
++                  <input
++                    type="checkbox"
++                    checked={exifShowSettings}
++                    onChange={(e) => setExifShowSettings(e.target.checked)}
++                    disabled={isExporting}
++                    className="rounded text-accent focus:ring-accent accent-accent"
++                  />
++                  <span>{t('export.exifBadge.exposure', 'Exposure Settings')}</span>
++                </label>
++                <label className="flex items-center gap-2 p-2 bg-surface/60 rounded border border-surface/80 cursor-pointer hover:bg-surface text-xs text-text-primary">
++                  <input
++                    type="checkbox"
++                    checked={exifShowDate}
++                    onChange={(e) => setExifShowDate(e.target.checked)}
++                    disabled={isExporting}
++                    className="rounded text-accent focus:ring-accent accent-accent"
++                  />
++                  <span>{t('export.exifBadge.captureDate', 'Capture Date')}</span>
++                </label>
++              </div>
++            </div>
++
++            {/* Custom Photographer Credit / Signature */}
++            <div>
++              <Text variant={TextVariants.label} className="mb-1">
++                {t('export.exifBadge.customText', 'Custom Signature / Credit (Optional)')}
++              </Text>
++              <input
++                type="text"
++                value={exifCustomText}
++                onChange={(e) => setExifCustomText(e.target.value)}
++                placeholder={t('export.exifBadge.customTextPlaceholder', 'e.g. Photo by Alex Morgan')}
++                disabled={isExporting}
++                className="w-full bg-surface border border-surface rounded-md px-3 py-1.5 text-xs text-text-primary placeholder:text-text-secondary/50 focus:border-accent focus:outline-hidden"
++              />
++            </div>
++
++            {/* Color Customization */}
++            <div className="grid grid-cols-2 gap-3 pt-1">
++              <div className="flex items-center justify-between gap-2 p-2 bg-surface/40 rounded border border-surface/60">
++                <Text variant={TextVariants.small}>{t('export.exifBadge.bgColor', 'Badge / Strip')}</Text>
++                <input
++                  aria-label={t('export.exifBadge.bgColor', 'Badge Background Color')}
++                  className="h-7 w-10 cursor-pointer rounded bg-surface border-0"
++                  disabled={isExporting}
++                  onChange={(e) => setExifBadgeBgColor(e.target.value)}
++                  type="color"
++                  value={exifBadgeBgColor}
++                />
++              </div>
++              <div className="flex items-center justify-between gap-2 p-2 bg-surface/40 rounded border border-surface/60">
++                <Text variant={TextVariants.small}>{t('export.exifBadge.textColor', 'Text Color')}</Text>
++                <input
++                  aria-label={t('export.exifBadge.textColor', 'Badge Text Color')}
++                  className="h-7 w-10 cursor-pointer rounded bg-surface border-0"
++                  disabled={isExporting}
++                  onChange={(e) => setExifBadgeTextColor(e.target.value)}
++                  type="color"
++                  value={exifBadgeTextColor}
++                />
++              </div>
++            </div>
++
++            <Text variant={TextVariants.small} color={TextColors.secondary} className="italic text-[11px] block pt-1">
++              {t('export.exifBadge.liveNote', "Metadata is automatically extracted from each photo's EXIF header during single and batch export.")}
++            </Text>
++          </div>
++        )}
++      </Section>
++
++      {/* 🔲 Card 4: Multi-Photo Contact Sheet / Collage */}
 +      <Section title={t('export.grid.collageTitle', 'Grid Collage (Multi-Photo)')}>
 +        {numImages <= 1 && (
 +          <Text variant={TextVariants.small} color={TextColors.secondary} className="italic mb-1">
@@ -4720,10 +5453,10 @@ index 0000000..403f301
 +};
 diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
 new file mode 100644
-index 0000000..16effb4
+index 0000000..49a75fc
 --- /dev/null
 +++ b/src/components/panel/right/ExportLivePreview.tsx
-@@ -0,0 +1,765 @@
+@@ -0,0 +1,983 @@
 +import React, { useEffect, useRef, useState } from 'react';
 +import { createPortal } from 'react-dom';
 +import { useTranslation } from 'react-i18next';
@@ -4733,6 +5466,67 @@ index 0000000..16effb4
 +import { TextVariants } from '../../../types/typography';
 +import { SelectedImage } from '../../ui/AppProperties';
 +import { WatermarkAnchor } from '../../ui/ExportImportProperties';
++
++export function formatExifSummary(exif: any) {
++  if (!exif) {
++    return {
++      camera: 'SONY ILCE-7M4',
++      lens: 'FE 24-70mm F2.8 GM II',
++      settings: '50mm • ƒ/2.8 • 1/500s • ISO 100',
++      date: '2026-09-18',
++    };
++  }
++  const make = exif.Make ? String(exif.Make).trim() : '';
++  let model = exif.Model ? String(exif.Model).trim() : '';
++  let camera = model;
++  if (make && !model.toLowerCase().startsWith(make.toLowerCase())) {
++    camera = `${make} ${model}`;
++  }
++  if (!camera) camera = 'CAMERA';
++
++  const lens = exif.LensModel ? String(exif.LensModel).trim() : '';
++
++  const parts: string[] = [];
++  const focal = exif.FocalLengthIn35mmFilm || exif.FocalLength;
++  if (focal) {
++    const num = typeof focal === 'number' ? focal : parseFloat(focal);
++    if (!isNaN(num) && num > 0) parts.push(`${Math.round(num)}mm`);
++  }
++  const fnum = exif.FNumber;
++  if (fnum) {
++    const num = typeof fnum === 'number' ? fnum : parseFloat(fnum);
++    if (!isNaN(num) && num > 0) parts.push(`ƒ/${num.toFixed(1).replace('.0', '')}`);
++  }
++  const exp = exif.ExposureTime;
++  if (exp) {
++    const num = typeof exp === 'number' ? exp : parseFloat(exp);
++    if (!isNaN(num) && num > 0) {
++      if (num < 1) {
++        parts.push(`1/${Math.round(1 / num)}s`);
++      } else {
++        parts.push(`${num.toFixed(1).replace('.0', '')}s`);
++      }
++    }
++  }
++  const iso = exif.PhotographicSensitivity || exif.ISOSpeedRatings;
++  if (iso) {
++    parts.push(`ISO ${iso}`);
++  }
++  const settings = parts.join(' • ');
++
++  let date = '';
++  if (exif.DateTimeOriginal) {
++    const dStr = String(exif.DateTimeOriginal).split(' ')[0];
++    date = dStr.replace(/:/g, '-');
++  }
++
++  return {
++    camera: camera || 'CAMERA',
++    lens: lens || '',
++    settings: settings || 'ƒ/2.8 • 1/500s • ISO 100',
++    date: date || '',
++  };
++}
 +
 +interface ExportLivePreviewProps {
 +  selectedImage: SelectedImage | null;
@@ -4776,6 +5570,17 @@ index 0000000..16effb4
 +  watermarkCustomX?: number;
 +  watermarkCustomY?: number;
 +  onCustomPlacementChange?: (x: number, y: number) => void;
++
++  // EXIF Badge options
++  enableExifBadge?: boolean;
++  exifBadgeStyle?: 'bottom_strip' | 'overlay_badge';
++  exifShowCamera?: boolean;
++  exifShowLens?: boolean;
++  exifShowSettings?: boolean;
++  exifShowDate?: boolean;
++  exifCustomText?: string;
++  exifBadgeBgColor?: string;
++  exifBadgeTextColor?: string;
 +}
 +
 +export default function ExportLivePreview({
@@ -4818,6 +5623,15 @@ index 0000000..16effb4
 +  watermarkCustomX = 85,
 +  watermarkCustomY = 90,
 +  onCustomPlacementChange,
++  enableExifBadge = false,
++  exifBadgeStyle = 'bottom_strip',
++  exifShowCamera = true,
++  exifShowLens = true,
++  exifShowSettings = true,
++  exifShowDate = false,
++  exifCustomText = '',
++  exifBadgeBgColor = '#ffffff',
++  exifBadgeTextColor = '#111827',
 +}: ExportLivePreviewProps) {
 +  const { t } = useTranslation();
 +  const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -4994,8 +5808,13 @@ index 0000000..16effb4
 +      const borderXPx = Math.round((innerContentW * borderSizeVal) / 100);
 +      const borderYPx = Math.round((innerContentH * borderSizeVal) / 100);
 +
++      // EXIF Badge strip calculation:
++      const isExifActive = enableExifBadge;
++      const isExifStrip = isExifActive && exifBadgeStyle === 'bottom_strip';
++      const exifStripHeight = isExifStrip ? Math.max(42, Math.round(innerContentH * 0.11)) : 0;
++
 +      const totalCanvasW = innerContentW + borderXPx * 2;
-+      const totalCanvasH = innerContentH + borderYPx * 2;
++      const totalCanvasH = innerContentH + borderYPx * 2 + exifStripHeight;
 +
 +      // Fit into target display size while preserving crispness:
 +      const scale = Math.min(maxDim / totalCanvasW, (maxDim * 0.8) / totalCanvasH, 1.0);
@@ -5285,6 +6104,123 @@ index 0000000..16effb4
 +        }
 +      }
 +
++      // 7. EXIF Camera Badge & Technical Framing
++      if (enableExifBadge) {
++        const exifInfo = formatExifSummary(selectedImage?.exif);
++        const cameraText = exifShowCamera ? exifInfo.camera : '';
++        const lensText = exifShowLens ? exifInfo.lens : '';
++        const settingsText = exifShowSettings ? exifInfo.settings : '';
++        const dateText = exifShowDate ? exifInfo.date : '';
++        const customText = (exifCustomText || '').trim();
++
++        ctx.save();
++        if (exifBadgeStyle === 'overlay_badge') {
++          // Floating Pill Overlay inside photo area
++          const pillParts: string[] = [];
++          if (cameraText) pillParts.push(cameraText);
++          if (customText) pillParts.push(customText);
++          if (settingsText) pillParts.push(settingsText);
++          if (dateText) pillParts.push(dateText);
++
++          const badgeString = pillParts.join('  |  ');
++          if (badgeString) {
++            const fontPx = Math.max(11, Math.round(innerContentH * 0.024));
++            ctx.font = `600 ${fontPx}px sans-serif`;
++            const metrics = ctx.measureText(badgeString);
++            const padX = Math.round(fontPx * 0.9);
++            const padY = Math.round(fontPx * 0.5);
++            const pillW = metrics.width + padX * 2;
++            const pillH = fontPx + padY * 2;
++
++            const margin = Math.round(fontPx * 1.2);
++            const pillX = startX + innerContentW - pillW - margin;
++            const pillY = startY + innerContentH - pillH - margin;
++
++            // Pill background
++            ctx.fillStyle = exifBadgeBgColor || 'rgba(15, 23, 42, 0.85)';
++            if (typeof ctx.roundRect === 'function') {
++              ctx.beginPath();
++              ctx.roundRect(pillX, pillY, pillW, pillH, 6);
++              ctx.fill();
++              ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
++              ctx.lineWidth = 1;
++              ctx.stroke();
++            } else {
++              ctx.fillRect(pillX, pillY, pillW, pillH);
++            }
++
++            ctx.fillStyle = exifBadgeTextColor || '#ffffff';
++            ctx.textBaseline = 'middle';
++            ctx.textAlign = 'left';
++            ctx.fillText(badgeString, pillX + padX, pillY + pillH / 2);
++          }
++        } else {
++          // Matte Bottom Strip
++          const stripY = innerContentH + borderYPx * 2;
++          const stripH = exifStripHeight;
++
++          // Fill strip background if different from outer border
++          if (exifBadgeBgColor) {
++            ctx.fillStyle = exifBadgeBgColor;
++            ctx.fillRect(0, stripY, totalCanvasW, stripH);
++          }
++
++          const fontTitlePx = Math.max(12, Math.round(stripH * 0.28));
++          const fontSubPx = Math.max(10, Math.round(stripH * 0.21));
++
++          const marginX = Math.max(16, borderXPx > 0 ? borderXPx : 16);
++          const rightX = totalCanvasW - marginX;
++
++          const y1 = stripY + Math.round(stripH * 0.36);
++          const y2 = stripY + Math.round(stripH * 0.72);
++
++          const leftTitle = cameraText || customText || '';
++          const leftSub =
++            leftTitle && leftTitle !== customText && customText
++              ? lensText
++                ? `${lensText} • ${customText}`
++                : customText
++              : lensText;
++
++          const rightTitle = settingsText;
++          const rightSub = dateText;
++
++          const mainTextColor = exifBadgeTextColor || '#111827';
++
++          // Left section
++          ctx.textAlign = 'left';
++          ctx.textBaseline = 'middle';
++          if (leftTitle) {
++            ctx.font = `bold ${fontTitlePx}px sans-serif`;
++            ctx.fillStyle = mainTextColor;
++            ctx.fillText(leftTitle, marginX, y1);
++          }
++          if (leftSub) {
++            ctx.font = `normal ${fontSubPx}px sans-serif`;
++            ctx.fillStyle = mainTextColor;
++            ctx.globalAlpha = 0.75;
++            ctx.fillText(leftSub, marginX, y2);
++            ctx.globalAlpha = 1.0;
++          }
++
++          // Right section
++          ctx.textAlign = 'right';
++          if (rightTitle) {
++            ctx.font = `600 ${fontTitlePx}px sans-serif`;
++            ctx.fillStyle = mainTextColor;
++            ctx.fillText(rightTitle, rightX, y1);
++          }
++          if (rightSub) {
++            ctx.font = `normal ${fontSubPx}px sans-serif`;
++            ctx.fillStyle = mainTextColor;
++            ctx.globalAlpha = 0.75;
++            ctx.fillText(rightSub, rightX, y2);
++            ctx.globalAlpha = 1.0;
++          }
++        }
++        ctx.restore();
++      }
++
 +      ctx.restore();
 +    },
 +    [
@@ -5324,6 +6260,16 @@ index 0000000..16effb4
 +      watermarkCustomPlacement,
 +      watermarkCustomX,
 +      watermarkCustomY,
++      enableExifBadge,
++      exifBadgeStyle,
++      exifShowCamera,
++      exifShowLens,
++      exifShowSettings,
++      exifShowDate,
++      exifCustomText,
++      exifBadgeBgColor,
++      exifBadgeTextColor,
++      selectedImage?.exif,
 +      t,
 +    ]
 +  );
@@ -5415,6 +6361,11 @@ index 0000000..16effb4
 +              Watermark: {watermarkType === 'image' ? 'Logo' : 'Text'} ({watermarkOpacity}%)
 +            </span>
 +          )}
++          {enableExifBadge && (
++            <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
++              EXIF: {exifBadgeStyle === 'bottom_strip' ? 'Matte Strip' : 'Badge'}
++            </span>
++          )}
 +        </div>
 +        <div className="font-medium text-white/80">
 +          {filesCount} {filesCount === 1 ? 'file' : 'files'} to export
@@ -5490,7 +6441,7 @@ index 0000000..16effb4
 +  );
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..bee1579 100644
+index 267e321..8f30585 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -1,21 +1,16 @@
@@ -5768,8 +6719,28 @@ index 267e321..bee1579 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -252,6 +193,9 @@ export default function ExportPanel({
+@@ -250,8 +191,29 @@ export default function ExportPanel({
+     setDestinationType,
+     subfolder,
      setSubfolder,
++    enableExifBadge,
++    setEnableExifBadge,
++    exifBadgeStyle,
++    setExifBadgeStyle,
++    exifShowCamera,
++    setExifShowCamera,
++    exifShowLens,
++    setExifShowLens,
++    exifShowSettings,
++    setExifShowSettings,
++    exifShowDate,
++    setExifShowDate,
++    exifCustomText,
++    setExifCustomText,
++    exifBadgeBgColor,
++    setExifBadgeBgColor,
++    exifBadgeTextColor,
++    setExifBadgeTextColor,
    } = useExportSettings();
  
 +  const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -5778,7 +6749,7 @@ index 267e321..bee1579 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -370,8 +314,10 @@ export default function ExportPanel({
+@@ -370,8 +332,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -5790,7 +6761,7 @@ index 267e321..bee1579 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -384,7 +330,7 @@ export default function ExportPanel({
+@@ -384,7 +348,7 @@ export default function ExportPanel({
            setIsEstimating(false);
          }
        }, 500),
@@ -5799,7 +6770,7 @@ index 267e321..bee1579 100644
    );
  
    useEffect(() => {
-@@ -403,15 +349,75 @@ export default function ExportPanel({
+@@ -403,15 +367,88 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -5875,10 +6846,23 @@ index 267e321..bee1579 100644
 +            borderEachTile: tileBorderEachTile,
 +          }
 +        : null,
++      exifBadge: enableExifBadge
++        ? {
++            enabled: true,
++            style: exifBadgeStyle,
++            showCamera: exifShowCamera,
++            showLens: exifShowLens,
++            showSettings: exifShowSettings,
++            showDate: exifShowDate,
++            customText: exifCustomText,
++            badgeBgColor: exifBadgeBgColor,
++            badgeTextColor: exifBadgeTextColor,
++          }
++        : null,
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -448,11 +454,39 @@ export default function ExportPanel({
+@@ -448,11 +485,48 @@ export default function ExportPanel({
      stripGps,
      filenameTemplate,
      enableWatermark,
@@ -5915,10 +6899,19 @@ index 267e321..bee1579 100644
 +    tileSplitColumns,
 +    tileSplitRows,
 +    tileBorderEachTile,
++    enableExifBadge,
++    exifBadgeStyle,
++    exifShowCamera,
++    exifShowLens,
++    exifShowSettings,
++    exifShowDate,
++    exifCustomText,
++    exifBadgeBgColor,
++    exifBadgeTextColor,
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -489,31 +523,93 @@ export default function ExportPanel({
+@@ -489,31 +563,106 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -5994,6 +6987,19 @@ index 267e321..bee1579 100644
 +            borderEachTile: tileBorderEachTile,
 +          }
 +        : null,
++      exifBadge: enableExifBadge
++        ? {
++            enabled: true,
++            style: exifBadgeStyle,
++            showCamera: exifShowCamera,
++            showLens: exifShowLens,
++            showSettings: exifShowSettings,
++            showDate: exifShowDate,
++            customText: exifCustomText,
++            badgeBgColor: exifBadgeBgColor,
++            badgeTextColor: exifBadgeTextColor,
++          }
++        : null,
      };
  
      const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
@@ -6018,7 +7024,7 @@ index 267e321..bee1579 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,332 +688,240 @@ export default function ExportPanel({
+@@ -592,332 +741,260 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
@@ -6038,6 +7044,8 @@ index 267e321..bee1579 100644
 +  const hasActiveCreativeSettings =
 +    enableBorder ||
 +    enableKeyline ||
++    enableWatermark ||
++    enableExifBadge ||
 +    isCollageActive ||
 +    enableTileSplit ||
 +    enableGridOverlay;
@@ -6207,7 +7215,10 @@ index 267e321..bee1579 100644
 -                </div>
 -              </Section>
 -            )}
--
++              )}
++              <span className="relative z-10">{t('export.tabs.standard', 'Standard Export')}</span>
++            </button>
+ 
 -            {fileFormat !== FileFormats.Cube && (
 -              <>
 -                <Section title={t('export.sections.imageSizing')}>
@@ -6217,10 +7228,6 @@ index 267e321..bee1579 100644
 -                    onChange={setEnableResize}
 -                    disabled={isExporting}
 -                    trackClassName="bg-surface"
-+              )}
-+              <span className="relative z-10">{t('export.tabs.standard', 'Standard Export')}</span>
-+            </button>
-+
 +            <button
 +              type="button"
 +              onClick={() => handleTabChange('creative')}
@@ -6568,13 +7575,31 @@ index 267e321..bee1579 100644
 +                gridOverlayOpacity={gridOverlayOpacity}
 +                setGridOverlayOpacity={setGridOverlayOpacity}
 +                gridOverlaySize={gridOverlaySize}
++                enableExifBadge={enableExifBadge}
++                setEnableExifBadge={setEnableExifBadge}
++                exifBadgeStyle={exifBadgeStyle}
++                setExifBadgeStyle={setExifBadgeStyle}
++                exifShowCamera={exifShowCamera}
++                setExifShowCamera={setExifShowCamera}
++                exifShowLens={exifShowLens}
++                setExifShowLens={setExifShowLens}
++                exifShowSettings={exifShowSettings}
++                setExifShowSettings={setExifShowSettings}
++                exifShowDate={exifShowDate}
++                setExifShowDate={setExifShowDate}
++                exifCustomText={exifCustomText}
++                setExifCustomText={setExifCustomText}
++                exifBadgeBgColor={exifBadgeBgColor}
++                setExifBadgeBgColor={setExifBadgeBgColor}
++                exifBadgeTextColor={exifBadgeTextColor}
++                setExifBadgeTextColor={setExifBadgeTextColor}
 +              />
 +            </ErrorBoundary>
 +          )
          ) : (
            <div className="flex items-center justify-center h-full">
              <Text
-@@ -932,17 +936,18 @@ export default function ExportPanel({
+@@ -932,17 +1009,18 @@ export default function ExportPanel({
          )}
        </div>
  
@@ -6595,7 +7620,7 @@ index 267e321..bee1579 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +1006,11 @@ export default function ExportPanel({
+@@ -1001,9 +1079,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
@@ -6612,10 +7637,10 @@ index 267e321..bee1579 100644
            </Button>
 diff --git a/src/components/panel/right/StandardExportTab.tsx b/src/components/panel/right/StandardExportTab.tsx
 new file mode 100644
-index 0000000..88c2511
+index 0000000..f259c1c
 --- /dev/null
 +++ b/src/components/panel/right/StandardExportTab.tsx
-@@ -0,0 +1,366 @@
+@@ -0,0 +1,445 @@
 +import React from 'react';
 +import { motion, AnimatePresence } from 'framer-motion';
 +import { useTranslation } from 'react-i18next';
@@ -6631,6 +7656,7 @@ index 0000000..88c2511
 +  FileFormat,
 +  FILE_FORMATS,
 +  FILENAME_VARIABLES,
++  FILENAME_TOKENS,
 +  FileFormats,
 +  TiffBitDepth,
 +} from '../../ui/ExportImportProperties';
@@ -6729,6 +7755,35 @@ index 0000000..88c2511
 +}: StandardExportTabProps) {
 +  const { t } = useTranslation();
 +
++  const formatExt = React.useMemo(() => {
++    return FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpg';
++  }, [fileFormat]);
++
++  const previewFilename = React.useMemo(() => {
++    const template = filenameTemplate?.trim() || '{original_filename}_edited';
++    const res = template
++      .replace(/\{original_filename\}/g, 'DSC04921')
++      .replace(/\{filename\}/g, 'DSC04921')
++      .replace(/\{date\}/g, '2026-09-18')
++      .replace(/\{YYYY\}/g, '2026')
++      .replace(/\{MM\}/g, '09')
++      .replace(/\{DD\}/g, '18')
++      .replace(/\{time\}/g, '143022')
++      .replace(/\{hh\}/g, '14')
++      .replace(/\{mm\}/g, '30')
++      .replace(/\{ss\}/g, '22')
++      .replace(/\{camera\}/g, 'ILCE-7M4')
++      .replace(/\{lens\}/g, '24-70mm')
++      .replace(/\{iso\}/g, 'ISO100')
++      .replace(/\{focal\}/g, '50mm')
++      .replace(/\{aperture\}/g, 'f2.8')
++      .replace(/\{shutter\}/g, '1-500s')
++      .replace(/\{sequence\}/g, '01')
++      .replace(/\{seq\}/g, '01');
++
++    return `${res}.${formatExt}`;
++  }, [filenameTemplate, formatExt]);
++
 +  return (
 +    <div className="space-y-8">
 +      {/* Presets List */}
@@ -6824,8 +7879,8 @@ index 0000000..88c2511
 +      </Section>
 +
 +      {/* File Naming */}
-+      {numImages > 1 && (
-+        <Section title={t('export.sections.fileNaming')}>
++      <Section title={t('export.sections.fileNaming', 'File Naming')}>
++        <div className="space-y-3">
 +          <input
 +            className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
 +            disabled={isExporting}
@@ -6833,21 +7888,70 @@ index 0000000..88c2511
 +            ref={filenameInputRef}
 +            type="text"
 +            value={filenameTemplate}
++            placeholder="{original_filename}_edited"
 +          />
-+          <div className="flex flex-wrap gap-2 mt-2">
-+            {FILENAME_VARIABLES.map((variable: string) => (
-+              <button
-+                className="px-2 py-1 bg-surface text-text-secondary text-xs rounded-md hover:bg-card-active transition-colors disabled:opacity-50"
-+                disabled={isExporting}
-+                key={variable}
-+                onClick={() => handleVariableClick(variable)}
-+              >
-+                {variable}
-+              </button>
-+            ))}
++
++          {/* Dynamic Live Preview */}
++          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-surface/50 border border-surface rounded text-xs">
++            <span className="text-text-secondary font-medium shrink-0">
++              {t('export.naming.preview', 'Sample Output')}:
++            </span>
++            <span className="font-mono text-accent truncate select-all font-semibold">
++              {previewFilename}
++            </span>
 +          </div>
-+        </Section>
-+      )}
++
++          {/* Quick Presets */}
++          <div>
++            <Text variant={TextVariants.small} color={TextColors.secondary} className="mb-1.5 block text-[11px]">
++              {t('export.naming.presets', 'Quick Templates')}
++            </Text>
++            <div className="flex flex-wrap gap-1.5">
++              {[
++                { label: 'Original + Edited', template: '{original_filename}_edited' },
++                { label: 'Date + Filename', template: '{date}_{original_filename}' },
++                { label: 'Camera + ISO + Name', template: '{camera}_{iso}_{original_filename}' },
++                { label: 'Sequence (01..)', template: '{original_filename}_{sequence}' },
++              ].map((p) => (
++                <button
++                  key={p.template}
++                  type="button"
++                  disabled={isExporting}
++                  onClick={() => setFilenameTemplate(p.template)}
++                  className={`px-2 py-1 text-xs rounded border transition-colors ${
++                    filenameTemplate === p.template
++                      ? 'bg-accent/20 text-accent border-accent/40 font-medium'
++                      : 'bg-surface text-text-secondary border-surface hover:text-text-primary hover:bg-card-active'
++                  }`}
++                >
++                  {p.label}
++                </button>
++              ))}
++            </div>
++          </div>
++
++          {/* Insertable Metadata Tokens */}
++          <div>
++            <Text variant={TextVariants.small} color={TextColors.secondary} className="mb-1.5 block text-[11px]">
++              {t('export.naming.insertToken', 'Insert EXIF & System Tokens')}
++            </Text>
++            <div className="flex flex-wrap gap-1.5">
++              {FILENAME_TOKENS.map((tokenInfo) => (
++                <button
++                  className="px-2 py-1 bg-surface text-text-secondary hover:text-text-primary text-xs rounded border border-surface hover:border-surface-high hover:bg-card-active transition-colors disabled:opacity-50 flex items-center gap-1 font-mono"
++                  disabled={isExporting}
++                  key={tokenInfo.token}
++                  onClick={() => handleVariableClick(tokenInfo.token)}
++                  title={`Insert ${tokenInfo.token} (e.g. ${tokenInfo.example})`}
++                >
++                  <span className="text-accent">{tokenInfo.token}</span>
++                  <span className="text-[10px] text-text-secondary/70">({tokenInfo.label})</span>
++                </button>
++              ))}
++            </div>
++          </div>
++        </div>
++      </Section>
 +
 +      {/* Image Sizing */}
 +      {fileFormat !== FileFormats.Cube && (
@@ -7051,20 +8155,79 @@ index 0000000..bada860
 +  }
 +}
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
-index 86285cd..22a1afa 100644
+index 86285cd..3fbf554 100644
 --- a/src/components/ui/ExportImportProperties.tsx
 +++ b/src/components/ui/ExportImportProperties.tsx
-@@ -45,6 +45,9 @@ export interface ExportSettings {
+@@ -22,7 +22,15 @@ export const FILE_FORMATS: Array<FileFormat> = [
+ 
+ export const FILENAME_VARIABLES: Array<string> = [
+   '{original_filename}',
++  '{date}',
++  '{camera}',
++  '{lens}',
++  '{iso}',
++  '{focal}',
++  '{aperture}',
++  '{shutter}',
+   '{sequence}',
++  '{time}',
+   '{YYYY}',
+   '{MM}',
+   '{DD}',
+@@ -30,8 +38,41 @@ export const FILENAME_VARIABLES: Array<string> = [
+   '{mm}',
+ ];
+ 
++export interface FilenameTokenInfo {
++  token: string;
++  label: string;
++  example: string;
++}
++
++export const FILENAME_TOKENS: Array<FilenameTokenInfo> = [
++  { token: '{original_filename}', label: 'Filename', example: 'DSC04921' },
++  { token: '{date}', label: 'Date', example: '2026-09-18' },
++  { token: '{camera}', label: 'Camera', example: 'ILCE-7M4' },
++  { token: '{lens}', label: 'Lens', example: '24-70mm' },
++  { token: '{iso}', label: 'ISO', example: 'ISO100' },
++  { token: '{focal}', label: 'Focal Length', example: '50mm' },
++  { token: '{aperture}', label: 'Aperture', example: 'f2.8' },
++  { token: '{shutter}', label: 'Shutter', example: '1-500s' },
++  { token: '{sequence}', label: 'Seq (01)', example: '01' },
++  { token: '{time}', label: 'Time', example: '143200' },
++];
++
+ export type TiffBitDepth = 8 | 16;
+ 
++export interface ExifBadgeSettings {
++  enabled: boolean;
++  style: 'bottom_strip' | 'overlay_badge';
++  showCamera: boolean;
++  showLens: boolean;
++  showSettings: boolean;
++  showDate: boolean;
++  customText?: string;
++  badgeBgColor?: string;
++  badgeTextColor?: string;
++  backgroundColor?: string;
++  textColor?: string;
++}
++
+ export interface ExportSettings {
+   filenameTemplate: string | null;
+   jpegQuality: number;
+@@ -45,6 +86,10 @@ export interface ExportSettings {
    } | null;
    stripGps: boolean;
    watermark: WatermarkSettings | null;
 +  border?: BorderSettings | null;
 +  collageGrid?: CollageGridSettings | null;
 +  tileSplit?: TileSplitSettings | null;
++  exifBadge?: ExifBadgeSettings | null;
    exportMasks?: boolean;
    preserveFolders?: boolean;
    destinationType?: string;
-@@ -61,14 +64,60 @@ export enum WatermarkAnchor {
+@@ -61,14 +106,60 @@ export enum WatermarkAnchor {
    BottomLeft = 'bottomLeft',
    BottomCenter = 'bottomCenter',
    BottomRight = 'bottomRight',
@@ -7128,7 +8291,7 @@ index 86285cd..22a1afa 100644
  }
  
  export interface ExportState {
-@@ -117,11 +166,38 @@ export interface ExportPreset {
+@@ -117,11 +208,47 @@ export interface ExportPreset {
    preserveFolders?: boolean;
    filenameTemplate: string;
    enableWatermark: boolean;
@@ -7164,6 +8327,15 @@ index 86285cd..22a1afa 100644
 +  tileSplitColumns?: number;
 +  tileSplitRows?: number;
 +  tileBorderEachTile?: boolean;
++  enableExifBadge?: boolean;
++  exifBadgeStyle?: 'bottom_strip' | 'overlay_badge';
++  exifShowCamera?: boolean;
++  exifShowLens?: boolean;
++  exifShowSettings?: boolean;
++  exifShowDate?: boolean;
++  exifCustomText?: string;
++  exifBadgeBgColor?: string;
++  exifBadgeTextColor?: string;
    lastExportPath?: string;
    destinationType?: string;
    subfolder?: string;
@@ -7181,10 +8353,10 @@ index 6369664..9886bcb 100644
          ],
        });
 diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
-index 598487c..8cdafa8 100644
+index 598487c..0c3d20e 100644
 --- a/src/hooks/useExportSettings.ts
 +++ b/src/hooks/useExportSettings.ts
-@@ -16,34 +16,90 @@ export function useExportSettings() {
+@@ -16,34 +16,108 @@ export function useExportSettings() {
    const [preserveFolders, setPreserveFolders] = useState(false);
    const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
    const [enableWatermark, setEnableWatermark] = useState(false);
@@ -7221,6 +8393,15 @@ index 598487c..8cdafa8 100644
 +  const [tileSplitColumns, setTileSplitColumns] = useState(3);
 +  const [tileSplitRows, setTileSplitRows] = useState(1);
 +  const [tileBorderEachTile, setTileBorderEachTile] = useState(false);
++  const [enableExifBadge, setEnableExifBadge] = useState(false);
++  const [exifBadgeStyle, setExifBadgeStyle] = useState<'bottom_strip' | 'overlay_badge'>('bottom_strip');
++  const [exifShowCamera, setExifShowCamera] = useState(true);
++  const [exifShowLens, setExifShowLens] = useState(true);
++  const [exifShowSettings, setExifShowSettings] = useState(true);
++  const [exifShowDate, setExifShowDate] = useState(false);
++  const [exifCustomText, setExifCustomText] = useState('');
++  const [exifBadgeBgColor, setExifBadgeBgColor] = useState('#ffffff');
++  const [exifBadgeTextColor, setExifBadgeTextColor] = useState('#111827');
    const [destinationType, setDestinationType] = useState<string>('customFolder');
    const [subfolder, setSubfolder] = useState<string>('');
  
@@ -7291,10 +8472,19 @@ index 598487c..8cdafa8 100644
 +    setTileSplitColumns(preset.tileSplitColumns ?? 3);
 +    setTileSplitRows(preset.tileSplitRows ?? 1);
 +    setTileBorderEachTile(preset.tileBorderEachTile ?? false);
++    setEnableExifBadge(preset.enableExifBadge ?? false);
++    setExifBadgeStyle(preset.exifBadgeStyle ?? 'bottom_strip');
++    setExifShowCamera(preset.exifShowCamera ?? true);
++    setExifShowLens(preset.exifShowLens ?? true);
++    setExifShowSettings(preset.exifShowSettings ?? true);
++    setExifShowDate(preset.exifShowDate ?? false);
++    setExifCustomText(preset.exifCustomText ?? '');
++    setExifBadgeBgColor(preset.exifBadgeBgColor ?? '#ffffff');
++    setExifBadgeTextColor(preset.exifBadgeTextColor ?? '#111827');
      setDestinationType(preset.destinationType || 'customFolder');
      setSubfolder(preset.subfolder || '');
    }, []);
-@@ -64,11 +120,38 @@ export function useExportSettings() {
+@@ -64,11 +138,47 @@ export function useExportSettings() {
        preserveFolders,
        filenameTemplate,
        enableWatermark,
@@ -7330,10 +8520,19 @@ index 598487c..8cdafa8 100644
 +      tileSplitColumns,
 +      tileSplitRows,
 +      tileBorderEachTile,
++      enableExifBadge,
++      exifBadgeStyle,
++      exifShowCamera,
++      exifShowLens,
++      exifShowSettings,
++      exifShowDate,
++      exifCustomText,
++      exifBadgeBgColor,
++      exifBadgeTextColor,
        destinationType,
        subfolder,
      }),
-@@ -87,11 +170,38 @@ export function useExportSettings() {
+@@ -87,11 +197,47 @@ export function useExportSettings() {
        preserveFolders,
        filenameTemplate,
        enableWatermark,
@@ -7369,10 +8568,19 @@ index 598487c..8cdafa8 100644
 +      tileSplitColumns,
 +      tileSplitRows,
 +      tileBorderEachTile,
++      enableExifBadge,
++      exifBadgeStyle,
++      exifShowCamera,
++      exifShowLens,
++      exifShowSettings,
++      exifShowDate,
++      exifCustomText,
++      exifBadgeBgColor,
++      exifBadgeTextColor,
        destinationType,
        subfolder,
      ],
-@@ -126,6 +236,12 @@ export function useExportSettings() {
+@@ -126,6 +272,12 @@ export function useExportSettings() {
      setFilenameTemplate,
      enableWatermark,
      setEnableWatermark,
@@ -7385,7 +8593,7 @@ index 598487c..8cdafa8 100644
      watermarkPath,
      setWatermarkPath,
      watermarkAnchor,
-@@ -136,6 +252,56 @@ export function useExportSettings() {
+@@ -136,6 +288,74 @@ export function useExportSettings() {
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -7439,11 +8647,29 @@ index 598487c..8cdafa8 100644
 +    setTileSplitRows,
 +    tileBorderEachTile,
 +    setTileBorderEachTile,
++    enableExifBadge,
++    setEnableExifBadge,
++    exifBadgeStyle,
++    setExifBadgeStyle,
++    exifShowCamera,
++    setExifShowCamera,
++    exifShowLens,
++    setExifShowLens,
++    exifShowSettings,
++    setExifShowSettings,
++    exifShowDate,
++    setExifShowDate,
++    exifCustomText,
++    setExifCustomText,
++    exifBadgeBgColor,
++    setExifBadgeBgColor,
++    exifBadgeTextColor,
++    setExifBadgeTextColor,
      destinationType,
      setDestinationType,
      subfolder,
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 60dc8eb..44214ec 100644
+index 60dc8eb..d475352 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
 @@ -2,8 +2,8 @@
@@ -7536,7 +8762,7 @@ index 60dc8eb..44214ec 100644
        "exportMultiple": "Export {{count}} {{label}}",
        "exportMultiple_one": "Export {{count}} {{label}}",
        "exportMultiple_other": "Export {{count}} {{label}}",
-@@ -873,7 +918,20 @@
+@@ -873,7 +918,41 @@
        "previewText": "Preview",
        "scale": "Scale",
        "spacing": "Spacing",
@@ -7555,6 +8781,27 @@ index 60dc8eb..44214ec 100644
 +      "customX": "Horizontal Position (X %)",
 +      "customY": "Vertical Position (Y %)",
 +      "canvasDragHint": "Drag on preview to position watermark"
++    },
++    "exifBadge": {
++      "title": "EXIF Camera Badge & Technical Framing",
++      "subtitle": "Embed camera details, exposure stats, and custom signature",
++      "enable": "Enable Badge / Frame",
++      "style": "Framing Style",
++      "bottomStrip": "Matte Bottom Strip",
++      "overlayBadge": "Floating Glass Pill",
++      "camera": "Camera Model",
++      "lens": "Lens Model",
++      "exposure": "Exposure (ƒ, Shutter, ISO, Focal)",
++      "date": "Capture Date",
++      "signature": "Photographer Signature / Credit",
++      "signaturePlaceholder": "e.g. Photo by Alex Morgan",
++      "badgeBgColor": "Badge / Strip Background",
++      "badgeTextColor": "Text & Metadata Color"
++    },
++    "filename": {
++      "samplePreview": "Live Preview:",
++      "quickPresets": "Quick Presets:",
++      "availableTokens": "Available Tokens:"
      }
    },
    "library": {

@@ -72,6 +72,18 @@ This extension integrates borders, fine-art keylines, multi-photo collages, mult
 - **💾 Persistent Tab Memory**: Automatically remembers whether you were on Standard Export or Creative Export across launches and panel closures.
 - **🚨 Active Feature Status Indicator**: Displays a clear accent status dot on the `Creative Export` tab whenever borders, keylines, watermarks, collages, or tile splitters are enabled, preventing accidental bordered or branded exports.
 - **🖼️ Real-Time Sticky Live Export Preview**: Interactive canvas embedded directly in the Export Panel providing instant 60fps visual feedback for borders, keylines, watermarks, collage layouts, and tile slice lines as you adjust sliders, plus a full-screen darkroom inspection modal.
+- **📷 EXIF Camera Badge & Technical Framing (Creative Export 2.0)**: Embed camera metadata, optical exposure parameters, and custom photographer signatures directly into the exported image or frame.
+  - **Matte Bottom Strip ("Gallery Frame")**: Extends the canvas downward with an elegant matte strip featuring a clean 2-line layout—Camera, Lens, and Photographer Credit on the left, and Exposure Settings (ƒ-number, Shutter Speed, ISO, Focal Length) and Capture Date on the right.
+  - **Floating Glass Pill ("Social Badge")**: Overlays a sleek, modern translucent pill in the bottom-right corner displaying exposure stats and camera badge.
+  - **Granular Metadata Toggles**: Selectively enable or disable Camera Model, Lens Model, Exposure Details, and Capture Date.
+  - **Photographer Signature / Credit**: Add custom watermark credit text (e.g. `Photo by Alex Morgan` or `© Studio`) alongside camera metadata.
+  - **Customizable Palette**: Custom background color and text/accent color pickers for badge styling.
+  - **Real-Time Canvas Proofing & Backend Rendering**: Rendered live at 60fps on the HTML5 preview canvas and baked into final full-resolution exports via embedded Truetype rasterization.
+- **🏷️ Dynamic Filename Template System**: Robust, token-based output file naming available for both single and multi-image exports.
+  - **Clickable Token Pills**: Insert tokens with a single click: `{original_filename}`, `{filename}`, `{date}`, `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`, `{shutter}`, `{sequence}`, `{seq}`, `{time}`, `{YYYY}`, `{MM}`, `{DD}`, `{hh}`, `{mm}`, `{ss}`.
+  - **Quick One-Click Presets**: Fast preset buttons for common professional conventions (`Original + Edited`, `Date + Filename`, `Camera + ISO + Name`, `Sequence (01..)`).
+  - **Live Sample Preview**: Instantly preview the resolved output filename dynamically beneath the template input field.
+  - **Robust Backend Token Parser & Sanitizer**: Rust-level EXIF reader and sidecar parser in `file_management.rs` with automatic sanitization of illegal filesystem characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`).
 - **🔤 Real-Time Text & Image Watermarks**: High-resolution branding rendered in real time on the live preview canvas and baked seamlessly into final exports.
   - **Text Watermark (Default)**: Custom text input with adjustable scaling, text color picker, and subtle drop-shadow rendering for maximum legibility across any photograph.
   - **Image / Logo Watermark**: File picker supporting PNG, JPG, JPEG, and WebP logos with full transparency preservation.
@@ -137,18 +149,19 @@ The feature is cleanly separated across the Rust backend and React frontend:
 RapidRAW Source Tree
 ├── src-tauri/
 │   ├── src/
-│   │   ├── export_processing.rs   <-- Border math, keylines, collages, tile slicing & watermark rasterization
-│   │   ├── default_font.rs        <-- Embedded compressed DejaVuSans font for OS-independent text watermarking
-│   │   ├── app_settings.rs        <-- Preset schema & default preset values
+│   │   ├── export_processing.rs   <-- Border math, keylines, collages, tile slicing, watermarks & EXIF badge rendering
+│   │   ├── file_management.rs     <-- Dynamic filename template parser, EXIF token resolver & sanitizer
+│   │   ├── default_font.rs        <-- Embedded compressed DejaVuSans font for OS-independent text rasterization
+│   │   ├── app_settings.rs        <-- Preset schema, EXIF badge defaults & default preset values
 │   │   └── lib.rs                 <-- Tauri command bindings & font module registration
 ├── src/
 │   ├── components/
 │   │   ├── panel/right/
 │   │   │   ├── ExportPanel.tsx         <-- Tab orchestrator, session memory & export footer
-│   │   │   ├── StandardExportTab.tsx   <-- Standard file formats, sizing, destination, metadata
-│   │   │   ├── CreativeExportTab.tsx   <-- Framing, keylines, watermarks, collages & tile splitters
+│   │   │   ├── StandardExportTab.tsx   <-- File formats, sizing, dynamic filename template tokens
+│   │   │   ├── CreativeExportTab.tsx   <-- Framing, keylines, watermarks, EXIF badge & collages
 │   │   │   ├── ExportCommons.tsx       <-- Shared Section, GridNumberInput & helpers
-│   │   │   └── ExportLivePreview.tsx   <-- Real-time HTML5 preview canvas, interactive dragging & inspector
+│   │   │   └── ExportLivePreview.tsx   <-- Real-time HTML5 preview canvas, EXIF badges & inspector
 │   │   └── ui/
 │   │       ├── ExportImportProperties.tsx <-- TypeScript interface definitions
 │   │       └── ErrorBoundary.tsx          <-- Defensive React error boundary for export panels
@@ -182,6 +195,13 @@ RapidRAW Source Tree
    To prevent washed-out text when options are toggled in dark mode (where `--app-accent` is pure white `#ffffff`), all active toggle states strictly pair `bg-accent` with `text-button-text font-semibold shadow-sm`. Inactive toggles cleanly use `text-text-secondary hover:text-text-primary`.
 6. **Defensive UI Hardening (`ErrorBoundary.tsx`)**:
    RapidRAW uses a frameless, transparent webview configuration (`"transparent": true`, `"decorations": false`). Any unhandled React exception causes the root DOM to unmount, rendering the window invisible. Wrapping export tabs in `<ErrorBoundary>` intercepts exceptions and renders a recovery card with error diagnostic details and a "Try Again" reload button.
+7. **EXIF Camera Badge & Technical Framing Engine (`export_processing.rs` & `ExportLivePreview.tsx`)**:
+   - **Dual Layout Engines**: Renders either a bottom matte extension strip with a 2-line layout (Left: Camera / Lens / Signature; Right: Exposure ƒ/shutter/ISO/focal & Date) or an overlay floating pill with rounded corners and translucent background.
+   - **Automated Metadata Extraction**: Extracts camera make/model, lens, ƒ-stop, shutter speed, ISO, focal length, and capture date from EXIF cache and sidecars, formatting clean strings with fallback fallbacks.
+   - **Full-Resolution TrueType Blending**: Bakes crisp text directly into the final export raster at full sensor resolution using `ab_glyph` glyph rendering and anti-aliased font rasterization.
+8. **Dynamic Filename Template Parser (`file_management.rs`)**:
+   - **Token Resolution**: Parses tokens like `{original_filename}`, `{filename}`, `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`, `{shutter}`, `{date}`, `{time}`, `{seq}`, and calendar tokens `{YYYY}`, `{MM}`, `{DD}`, `{hh}`, `{mm}`, `{ss}`.
+   - **Filesystem Sanitization**: Automatically strips or replaces illegal path and filename characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, control characters) to ensure exported files write safely across macOS APFS, Windows NTFS, and Linux ext4.
 
 ---
 
