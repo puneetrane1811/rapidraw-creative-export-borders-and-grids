@@ -241,10 +241,15 @@ Use the included helper script:
    cd RapidRAW
    ```
 
-2. **Apply the patch**:
-   ```bash
-   git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
-   ```
+2. **Apply the patches**:
+   - **Patch 1: Creative Export Engine (Core Borders, Grids, EXIF Badges & Filename Templates)**:
+     ```bash
+     git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
+     ```
+   - **Patch 2: Center Stage Export Studio (Full-stage darkroom workspace with bottom photo roll)**:
+     ```bash
+     git apply --ignore-whitespace /path/to/center-stage-creative-export-studio.patch
+     ```
 
 3. **Build the macOS DMG**:
    ```bash

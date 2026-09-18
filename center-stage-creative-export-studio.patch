@@ -1,0 +1,2189 @@
+diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
+index 6bf6930..17c487b 100644
+--- a/src-tauri/Cargo.lock
++++ b/src-tauri/Cargo.lock
+@@ -6,6 +6,7 @@ version = 4
+ name = "RapidRAW"
+ version = "0.0.0"
+ dependencies = [
++ "ab_glyph",
+  "anyhow",
+  "base64 0.23.1",
+  "blake3",
+@@ -36,6 +37,7 @@ dependencies = [
+  "log",
+  "memmap2",
+  "mimalloc",
++ "miniz_oxide",
+  "mozjpeg-rs",
+  "nalgebra",
+  "ndarray",
+diff --git a/src/App.tsx b/src/App.tsx
+index c04e33f..fd9c1c3 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -20,6 +20,7 @@ import TitleBar from './window/TitleBar';
+ import FolderTree from './components/panel/right/FolderTree';
+ import SettingsPanel from './components/panel/SettingsPanel';
+ import ExportPanel from './components/panel/right/ExportPanel';
++import ExportView from './components/views/ExportView';
+ import ErrorBoundary from './components/ui/ErrorBoundary';
+ import GlobalTooltip from './components/ui/GlobalTooltip';
+ import AppModals from './components/modals/AppModals';
+@@ -155,6 +156,7 @@ function App() {
+ 
+   const {
+     activeView,
++    previousView,
+     isFullScreen,
+     isWindowFullScreen,
+     isInstantTransition,
+@@ -173,6 +175,7 @@ function App() {
+   } = useUIStore(
+     useShallow((state) => ({
+       activeView: state.activeView,
++      previousView: state.previousView,
+       isFullScreen: state.isFullScreen,
+       isWindowFullScreen: state.isWindowFullScreen,
+       isInstantTransition: state.isInstantTransition,
+@@ -775,8 +778,14 @@ function App() {
+     ],
+   );
+ 
++  const handleCloseExportStudio = useCallback(() => {
++    const target = previousView || 'library';
++    setUI({ activeView: target });
++  }, [previousView, setUI]);
++
+   const hasRoots = rootPaths && rootPaths.length > 0;
+-  const hasMainContent = hasRoots || (activeView === 'editor' && !!selectedImage);
++  const isExportView = activeView === 'export';
++  const hasMainContent = hasRoots || (activeView === 'editor' && !!selectedImage) || isExportView;
+ 
+   const shouldHideFolderTree = useCompactPanels || useWidePanels;
+   const isWgpuActive =
+@@ -889,7 +898,7 @@ function App() {
+             }}
+           >
+             <div className="flex flex-row grow h-full min-h-0">
+-              {!shouldHideFolderTree && hasMainContent && (
++              {!shouldHideFolderTree && hasMainContent && !isExportView && (
+                 <SidePanelArea
+                   side="left"
+                   width={effectiveLeftWidth}
+@@ -910,74 +919,92 @@ function App() {
+                     onDone={finishExternalEdit}
+                   />
+                 )}
+-                <div
+-                  className={clsx(
+-                    'flex-1 flex flex-col min-w-0 h-full',
+-                    activeView === 'editor' && selectedImage ? 'flex' : 'hidden',
+-                  )}
+-                >
+-                  {selectedImage && (
+-                    <EditorView
+-                      transformWrapperRef={transformWrapperRef}
+-                      isResizing={isResizing}
+-                      layoutMode={layoutMode}
+-                      isAndroid={isAndroid}
+-                      compactEditorPanelHeight={compactEditorPanelHeight}
+-                      compactEditorPanelCollapsedHeight={compactEditorPanelCollapsedHeight}
+-                      thumbnailAspectRatio={thumbnailAspectRatio}
+-                      sortedImageList={sortedImageList}
+-                      createResizeHandler={createResizeHandler}
+-                      createResizeResetHandler={createResizeResetHandler}
+-                      handleBackToLibrary={handleBackToLibrary}
+-                      handleEditorContextMenu={handleEditorContextMenu}
+-                      handleThumbnailContextMenu={handleThumbnailContextMenu}
+-                      handleMainLibraryContextMenu={handleMainLibraryContextMenu}
+-                      handleImageClick={handleImageClick}
+-                      handleClearSelection={handleClearSelection}
+-                      handleCopyAdjustments={handleCopyAdjustments}
+-                      handlePasteAdjustments={handlePasteAdjustments}
+-                      handleRate={handleRate}
+-                      handleZoomChange={handleZoomChange}
+-                      handlePanelSelect={handlePanelSelect}
+-                      requestThumbnails={requestThumbnails}
+-                      renderAppPanel={renderAppPanel}
+-                    />
+-                  )}
+-                </div>
+-                <div
+-                  className={clsx(
+-                    'flex-1 flex flex-col min-w-0 h-full',
+-                    activeView === 'editor' && selectedImage ? 'hidden' : 'flex',
+-                  )}
+-                >
+-                  <LibraryView
++                {isExportView ? (
++                  <ExportView
++                    exportState={exportState}
++                    setExportState={setExportState}
++                    selectedImage={selectedImage}
++                    multiSelectedPaths={multiSelectedPaths}
+                     sortedImageList={sortedImageList}
+-                    groupBadgeInfo={groupBadgeInfo}
+-                    thumbnailSize={thumbnailSize}
+-                    thumbnailAspectRatio={thumbnailAspectRatio}
+-                    libraryViewMode={libraryViewMode}
+-                    isAndroid={isAndroid}
+-                    layoutMode={layoutMode}
+-                    setThumbnailSize={setThumbnailSize}
+-                    setThumbnailAspectRatio={setThumbnailAspectRatio}
+-                    setLibraryViewMode={setLibraryViewMode}
+-                    handleClearSelection={handleClearSelection}
+-                    handleLibraryImageSingleClick={handleLibraryImageSingleClick}
++                    appSettings={appSettings}
++                    onSettingsChange={handleSettingsChange}
++                    rootPaths={rootPaths}
++                    onClose={handleCloseExportStudio}
+                     handleImageSelect={handleImageSelect}
+-                    handleRate={handleRate}
+-                    handleThumbnailContextMenu={handleThumbnailContextMenu}
+-                    handleMainLibraryContextMenu={handleMainLibraryContextMenu}
+-                    handleContinueSession={handleContinueSession}
+-                    handleGoHome={handleGoHome}
+-                    handleOpenFolder={handleOpenFolder}
+-                    handleImportClick={handleImportClick}
+-                    handleLibraryRefresh={handleLibraryRefresh}
+-                    handleCopyAdjustments={handleCopyAdjustments}
+-                    handlePasteAdjustments={handlePasteAdjustments}
+-                    handleResetAdjustments={handleResetAdjustments}
+-                    requestThumbnails={requestThumbnails}
++                    handleSetMultiSelect={(paths) => setLibrary({ multiSelectedPaths: paths })}
+                   />
+-                </div>
++                ) : (
++                  <>
++                    <div
++                      className={clsx(
++                        'flex-1 flex flex-col min-w-0 h-full',
++                        activeView === 'editor' && selectedImage ? 'flex' : 'hidden',
++                      )}
++                    >
++                      {selectedImage && (
++                        <EditorView
++                          transformWrapperRef={transformWrapperRef}
++                          isResizing={isResizing}
++                          layoutMode={layoutMode}
++                          isAndroid={isAndroid}
++                          compactEditorPanelHeight={compactEditorPanelHeight}
++                          compactEditorPanelCollapsedHeight={compactEditorPanelCollapsedHeight}
++                          thumbnailAspectRatio={thumbnailAspectRatio}
++                          sortedImageList={sortedImageList}
++                          createResizeHandler={createResizeHandler}
++                          createResizeResetHandler={createResizeResetHandler}
++                          handleBackToLibrary={handleBackToLibrary}
++                          handleEditorContextMenu={handleEditorContextMenu}
++                          handleThumbnailContextMenu={handleThumbnailContextMenu}
++                          handleMainLibraryContextMenu={handleMainLibraryContextMenu}
++                          handleImageClick={handleImageClick}
++                          handleClearSelection={handleClearSelection}
++                          handleCopyAdjustments={handleCopyAdjustments}
++                          handlePasteAdjustments={handlePasteAdjustments}
++                          handleRate={handleRate}
++                          handleZoomChange={handleZoomChange}
++                          handlePanelSelect={handlePanelSelect}
++                          requestThumbnails={requestThumbnails}
++                          renderAppPanel={renderAppPanel}
++                        />
++                      )}
++                    </div>
++                    <div
++                      className={clsx(
++                        'flex-1 flex flex-col min-w-0 h-full',
++                        activeView === 'editor' && selectedImage ? 'hidden' : 'flex',
++                      )}
++                    >
++                      <LibraryView
++                        sortedImageList={sortedImageList}
++                        groupBadgeInfo={groupBadgeInfo}
++                        thumbnailSize={thumbnailSize}
++                        thumbnailAspectRatio={thumbnailAspectRatio}
++                        libraryViewMode={libraryViewMode}
++                        isAndroid={isAndroid}
++                        layoutMode={layoutMode}
++                        setThumbnailSize={setThumbnailSize}
++                        setThumbnailAspectRatio={setThumbnailAspectRatio}
++                        setLibraryViewMode={setLibraryViewMode}
++                        handleClearSelection={handleClearSelection}
++                        handleLibraryImageSingleClick={handleLibraryImageSingleClick}
++                        handleImageSelect={handleImageSelect}
++                        handleRate={handleRate}
++                        handleThumbnailContextMenu={handleThumbnailContextMenu}
++                        handleMainLibraryContextMenu={handleMainLibraryContextMenu}
++                        handleContinueSession={handleContinueSession}
++                        handleGoHome={handleGoHome}
++                        handleOpenFolder={handleOpenFolder}
++                        handleImportClick={handleImportClick}
++                        handleLibraryRefresh={handleLibraryRefresh}
++                        handleCopyAdjustments={handleCopyAdjustments}
++                        handlePasteAdjustments={handlePasteAdjustments}
++                        handleResetAdjustments={handleResetAdjustments}
++                        requestThumbnails={requestThumbnails}
++                      />
++                    </div>
++                  </>
++                )}
+                 {isSettingsOpen && appSettings && hasRoots && (
+                   <div className="absolute inset-0 z-50 flex bg-bg-secondary rounded-lg">
+                     <div className="w-full h-full flex flex-col p-4 lg:p-8 overflow-y-auto custom-scrollbar">
+@@ -992,7 +1019,7 @@ function App() {
+                   </div>
+                 )}
+               </div>
+-              {!useCompactPanels && hasMainContent && (
++              {!useCompactPanels && hasMainContent && !isExportView && (
+                 <SidePanelArea
+                   side="right"
+                   width={effectiveRightWidth}
+diff --git a/src/components/panel/BottomBar.tsx b/src/components/panel/BottomBar.tsx
+index 0645d3c..ceea99d 100644
+--- a/src/components/panel/BottomBar.tsx
++++ b/src/components/panel/BottomBar.tsx
+@@ -1,5 +1,5 @@
+ import { useState, useEffect, useRef } from 'react';
+-import { Star, Copy, ClipboardPaste, Check, Settings, Filter, PanelLeft, PanelBottom, PanelRight } from 'lucide-react';
++import { Star, Copy, ClipboardPaste, Check, Settings, Filter, PanelLeft, PanelBottom, PanelRight, FileInput } from 'lucide-react';
+ import clsx from 'clsx';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import { useShallow } from 'zustand/react/shallow';
+@@ -554,6 +554,25 @@ export default function BottomBar({
+               {t('ui.bottomBar.imagesSelected', { current: numSelected, total })}
+             </Text>
+           </div>
++
++          {onExportClick && (
++            <div className="flex items-center ml-2">
++              <button
++                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-surface hover:bg-surface-hover text-text-primary hover:text-accent border border-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
++                onClick={onExportClick}
++                disabled={isExportDisabled}
++                data-tooltip={t('editor.switcher.tooltips.export', 'Export')}
++              >
++                <FileInput size={14} className="text-accent" />
++                <span>Export</span>
++                {numSelected > 0 && (
++                  <span className="px-1.5 py-0.2 rounded-full bg-accent/20 text-accent text-[10px] font-mono font-medium">
++                    {numSelected}
++                  </span>
++                )}
++              </button>
++            </div>
++          )}
+         </div>
+ 
+         <div className="grow" />
+diff --git a/src/components/panel/PanelSwitcher.tsx b/src/components/panel/PanelSwitcher.tsx
+index 4978036..a4a9824 100644
+--- a/src/components/panel/PanelSwitcher.tsx
++++ b/src/components/panel/PanelSwitcher.tsx
+@@ -60,6 +60,10 @@ function PanelTab({ panel, region, side }: { panel: Panel; region: PanelRegion;
+   });
+ 
+   const handleClick = () => {
++    if (panel === Panel.Export) {
++      setUI((state) => ({ previousView: state.activeView, activeView: 'export' }));
++      return;
++    }
+     setActivePanel(region, panel);
+     if (side === 'left' && leftPanelWidth < 200) {
+       setUI({ leftPanelWidth: 350 });
+@@ -260,6 +264,7 @@ export function MobilePanelSwitcher({
+   ];
+ 
+   const isVertical = placement === 'right';
++  const setUI = useUIStore((s) => s.setUI);
+ 
+   return (
+     <div className={clsx(
+@@ -273,7 +278,13 @@ export function MobilePanelSwitcher({
+         return (
+           <button
+             key={id}
+-            onClick={() => onPanelSelect(id)}
++            onClick={() => {
++              if (id === Panel.Export) {
++                setUI((state) => ({ previousView: state.activeView, activeView: 'export' }));
++                return;
++              }
++              onPanelSelect(id);
++            }}
+             className={clsx(
+               'p-2 rounded-md shrink-0 transition-colors',
+               isActive
+diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
+index d1789b3..2c60429 100644
+--- a/src/components/panel/right/CreativeExportTab.tsx
++++ b/src/components/panel/right/CreativeExportTab.tsx
+@@ -13,6 +13,7 @@ import ExportLivePreview from './ExportLivePreview';
+ import { Section, GridNumberInput } from './ExportCommons';
+ 
+ export interface CreativeExportTabProps {
++  hideEmbeddedPreview?: boolean;
+   selectedImage: SelectedImage | null;
+   finalPreviewUrl: string | null;
+   pathsToExport: string[];
+@@ -122,6 +123,7 @@ export interface CreativeExportTabProps {
+ }
+ 
+ export default function CreativeExportTab({
++  hideEmbeddedPreview = false,
+   selectedImage,
+   finalPreviewUrl,
+   pathsToExport,
+@@ -220,60 +222,62 @@ export default function CreativeExportTab({
+   return (
+     <div className="space-y-6">
+       {/* 🖼️ Hero Live Interactive Preview */}
+-      <ExportLivePreview
+-        selectedImage={selectedImage}
+-        finalPreviewUrl={finalPreviewUrl}
+-        multiSelectedPaths={pathsToExport}
+-        thumbnailMap={thumbnails}
+-        enableBorder={enableBorder}
+-        borderSize={borderSize}
+-        borderColor={borderColor}
+-        enableKeyline={enableKeyline}
+-        keylineSize={keylineSize}
+-        keylineColor={keylineColor}
+-        keylineInset={keylineInset}
+-        enableGridOverlay={enableGridOverlay}
+-        gridOverlayRows={gridOverlayRows}
+-        gridOverlayCols={gridOverlayCols}
+-        gridOverlayColor={gridOverlayColor}
+-        gridOverlayOpacity={gridOverlayOpacity}
+-        gridOverlaySize={gridOverlaySize}
+-        enableCollageGrid={enableCollageGrid}
+-        collageColumns={collageColumns}
+-        collageRows={collageRows}
+-        collageGutter={collageGutter}
+-        collageCellFit={collageCellFit}
+-        enableTileSplit={enableTileSplit}
+-        tileSplitColumns={tileSplitColumns}
+-        tileSplitRows={tileSplitRows}
+-        tileBorderEachTile={tileBorderEachTile}
+-        enableWatermark={enableWatermark}
+-        watermarkType={watermarkType}
+-        watermarkText={watermarkText}
+-        watermarkColor={watermarkColor}
+-        watermarkPath={watermarkPath}
+-        watermarkAnchor={watermarkAnchor}
+-        watermarkScale={watermarkScale}
+-        watermarkSpacing={watermarkSpacing}
+-        watermarkOpacity={watermarkOpacity}
+-        watermarkCustomPlacement={watermarkCustomPlacement}
+-        watermarkCustomX={watermarkCustomX}
+-        watermarkCustomY={watermarkCustomY}
+-        onCustomPlacementChange={(x, y) => {
+-          setWatermarkCustomPlacement(true);
+-          setWatermarkCustomX(x);
+-          setWatermarkCustomY(y);
+-        }}
+-        enableExifBadge={enableExifBadge}
+-        exifBadgeStyle={exifBadgeStyle}
+-        exifShowCamera={exifShowCamera}
+-        exifShowLens={exifShowLens}
+-        exifShowSettings={exifShowSettings}
+-        exifShowDate={exifShowDate}
+-        exifCustomText={exifCustomText}
+-        exifBadgeBgColor={exifBadgeBgColor}
+-        exifBadgeTextColor={exifBadgeTextColor}
+-      />
++      {!hideEmbeddedPreview && (
++        <ExportLivePreview
++          selectedImage={selectedImage}
++          finalPreviewUrl={finalPreviewUrl}
++          multiSelectedPaths={pathsToExport}
++          thumbnailMap={thumbnails}
++          enableBorder={enableBorder}
++          borderSize={borderSize}
++          borderColor={borderColor}
++          enableKeyline={enableKeyline}
++          keylineSize={keylineSize}
++          keylineColor={keylineColor}
++          keylineInset={keylineInset}
++          enableGridOverlay={enableGridOverlay}
++          gridOverlayRows={gridOverlayRows}
++          gridOverlayCols={gridOverlayCols}
++          gridOverlayColor={gridOverlayColor}
++          gridOverlayOpacity={gridOverlayOpacity}
++          gridOverlaySize={gridOverlaySize}
++          enableCollageGrid={enableCollageGrid}
++          collageColumns={collageColumns}
++          collageRows={collageRows}
++          collageGutter={collageGutter}
++          collageCellFit={collageCellFit}
++          enableTileSplit={enableTileSplit}
++          tileSplitColumns={tileSplitColumns}
++          tileSplitRows={tileSplitRows}
++          tileBorderEachTile={tileBorderEachTile}
++          enableWatermark={enableWatermark}
++          watermarkType={watermarkType}
++          watermarkText={watermarkText}
++          watermarkColor={watermarkColor}
++          watermarkPath={watermarkPath}
++          watermarkAnchor={watermarkAnchor}
++          watermarkScale={watermarkScale}
++          watermarkSpacing={watermarkSpacing}
++          watermarkOpacity={watermarkOpacity}
++          watermarkCustomPlacement={watermarkCustomPlacement}
++          watermarkCustomX={watermarkCustomX}
++          watermarkCustomY={watermarkCustomY}
++          onCustomPlacementChange={(x, y) => {
++            setWatermarkCustomPlacement(true);
++            setWatermarkCustomX(x);
++            setWatermarkCustomY(y);
++          }}
++          enableExifBadge={enableExifBadge}
++          exifBadgeStyle={exifBadgeStyle}
++          exifShowCamera={exifShowCamera}
++          exifShowLens={exifShowLens}
++          exifShowSettings={exifShowSettings}
++          exifShowDate={exifShowDate}
++          exifCustomText={exifCustomText}
++          exifBadgeBgColor={exifBadgeBgColor}
++          exifBadgeTextColor={exifBadgeTextColor}
++        />
++      )}
+ 
+       {/* 📐 Card 1: Outer Border & Fine-Art Keyline */}
+       <Section title={t('export.sections.border', 'Framing & Keylines')}>
+diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
+index 49a75fc..bdcd3a9 100644
+--- a/src/components/panel/right/ExportLivePreview.tsx
++++ b/src/components/panel/right/ExportLivePreview.tsx
+@@ -122,9 +122,15 @@ interface ExportLivePreviewProps {
+   exifCustomText?: string;
+   exifBadgeBgColor?: string;
+   exifBadgeTextColor?: string;
++
++  // Layout mode & dimension overrides
++  mode?: 'sidebar' | 'studio';
++  canvasMaxDimension?: number;
+ }
+ 
+ export default function ExportLivePreview({
++  mode = 'sidebar',
++  canvasMaxDimension,
+   selectedImage,
+   finalPreviewUrl,
+   multiSelectedPaths,
+@@ -815,10 +821,12 @@ export default function ExportLivePreview({
+     ]
+   );
+ 
++  const effectiveMaxDim = canvasMaxDimension ?? (mode === 'studio' ? 850 : 380);
++
+   // Render on main panel canvas
+   useEffect(() => {
+-    renderToCanvas(canvasRef.current, 380, false);
+-  }, [renderToCanvas]);
++    renderToCanvas(canvasRef.current, effectiveMaxDim, false);
++  }, [renderToCanvas, effectiveMaxDim]);
+ 
+   // Render on modal canvas if modal open
+   useEffect(() => {
+@@ -837,6 +845,147 @@ export default function ExportLivePreview({
+     return Math.max(1, multiSelectedPaths.length);
+   }, [enableTileSplit, tileSplitColumns, tileSplitRows, enableCollageGrid, multiSelectedPaths]);
+ 
++  if (mode === 'studio') {
++    return (
++      <div className="w-full h-full flex flex-col justify-between p-4 min-h-0 select-none">
++        {/* Darkroom Stage */}
++        <div className="relative flex-1 w-full flex flex-col items-center justify-center overflow-hidden rounded-xl bg-app-bg/80 border border-surface shadow-2xl p-4 min-h-0">
++          <div className="relative max-w-full max-h-full flex items-center justify-center">
++            <canvas
++              ref={canvasRef}
++              onPointerDown={(e) => handlePointerDown(e, false)}
++              onPointerMove={(e) => handlePointerMove(e, false)}
++              onPointerUp={handlePointerUp}
++              onPointerCancel={handlePointerUp}
++              className={`max-w-full max-h-[calc(100vh-280px)] object-contain rounded-md shadow-2xl transition-all duration-75 select-none ${
++                enableWatermark ? 'cursor-crosshair' : 'cursor-default'
++              }`}
++            />
++          </div>
++
++          {enableWatermark && onCustomPlacementChange && (
++            <div className="absolute bottom-3 bg-black/75 backdrop-blur-md px-3 py-1 rounded-full text-xs text-accent select-none tracking-wide shadow-md flex items-center gap-1.5 border border-accent/30">
++              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
++              {t('export.watermark.canvasDragHint', 'Drag on preview to position watermark freely')}
++            </div>
++          )}
++
++          <button
++            type="button"
++            aria-label={t('export.preview.expand', 'Expand Preview')}
++            title={t('export.preview.expand', 'Expand Preview')}
++            onClick={() => setIsModalOpen(true)}
++            className="absolute top-3 right-3 p-2 bg-black/60 hover:bg-black/80 rounded-lg text-text-secondary hover:text-text-primary transition-colors border border-surface/50 shadow-md"
++          >
++            <Maximize2 className="w-4 h-4" />
++          </button>
++        </div>
++
++        {/* Studio Status & Badge Info Bar */}
++        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-secondary pt-3 px-1">
++          <div className="flex items-center gap-2 flex-wrap">
++            {enableCollageGrid && multiSelectedPaths.length > 1 && (
++              <span className="inline-flex items-center gap-1.5 bg-accent/20 text-accent px-2 py-0.5 rounded-md font-mono text-xs font-semibold">
++                <Grid className="w-3.5 h-3.5" />
++                {collageColumns}×{collageRows} Collage
++              </span>
++            )}
++            {enableTileSplit && (
++              <span className="inline-flex items-center gap-1.5 bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-md font-mono text-xs font-semibold">
++                <SplitSquareVertical className="w-3.5 h-3.5" />
++                {tileSplitColumns}×{tileSplitRows} Split
++              </span>
++            )}
++            {enableBorder && (
++              <span className="inline-flex items-center gap-1 bg-surface px-2 py-0.5 rounded-md font-mono text-xs text-text-primary border border-surface">
++                Border: {borderSize}%
++              </span>
++            )}
++            {enableWatermark && (
++              <span className="inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-md font-mono text-xs">
++                Watermark: {watermarkType === 'image' ? 'Logo' : 'Text'} ({watermarkOpacity}%)
++              </span>
++            )}
++            {enableExifBadge && (
++              <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-md font-mono text-xs">
++                EXIF: {exifBadgeStyle === 'bottom_strip' ? 'Matte Strip' : 'Badge'}
++              </span>
++            )}
++          </div>
++          <div className="font-semibold text-text-primary text-xs bg-surface/60 px-2.5 py-1 rounded-md border border-surface">
++            {filesCount} {filesCount === 1 ? 'file ready for export' : 'files ready for export'}
++          </div>
++        </div>
++
++        {/* Fullscreen / Enlarged Preview Modal */}
++        {isModalOpen &&
++          (typeof document !== 'undefined'
++            ? createPortal(
++                <div
++                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-6"
++                  onClick={() => setIsModalOpen(false)}
++                >
++                  <div
++                    className="relative max-w-5xl w-full max-h-[92vh] bg-surface-lowest rounded-xl border border-surface shadow-2xl p-5 flex flex-col space-y-3"
++                    onClick={(e) => e.stopPropagation()}
++                  >
++                    <div className="flex items-center justify-between border-b border-surface pb-3">
++                      <div className="flex items-center gap-2">
++                        <Layers className="w-5 h-5 text-accent" />
++                        <Text variant={TextVariants.heading}>
++                          {t('export.preview.highResTitle', 'Export Output Inspector')}
++                        </Text>
++                      </div>
++                      <button
++                        type="button"
++                        onClick={() => setIsModalOpen(false)}
++                        className="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
++                      >
++                        <X className="w-5 h-5" />
++                      </button>
++                    </div>
++
++                    <div className="w-full h-[68vh] flex flex-col items-center justify-center bg-[radial-gradient(#222_1px,transparent_1px)] [background-size:16px_16px] bg-black/70 rounded-lg overflow-auto p-4 border border-surface/40 relative">
++                      <canvas
++                        ref={modalCanvasRef}
++                        onPointerDown={(e) => handlePointerDown(e, true)}
++                        onPointerMove={(e) => handlePointerMove(e, true)}
++                        onPointerUp={handlePointerUp}
++                        onPointerCancel={handlePointerUp}
++                        className={`max-h-full max-w-full object-contain rounded shadow-2xl select-none ${
++                          enableWatermark ? 'cursor-crosshair' : ''
++                        }`}
++                      />
++                      {enableWatermark && onCustomPlacementChange && (
++                        <div className="mt-2 text-xs text-accent/80 select-none tracking-wide">
++                          {t('export.watermark.canvasDragHint', 'Drag on preview to position watermark')}
++                        </div>
++                      )}
++                    </div>
++
++                    <div className="flex items-center justify-between text-xs text-text-secondary pt-1">
++                      <span>
++                        {enableCollageGrid && multiSelectedPaths.length > 1
++                          ? `Multi-Photo Collage: ${multiSelectedPaths.length} photos (${collageColumns} cols × ${collageRows} rows)`
++                          : `Single Image Export`}
++                      </span>
++                      <button
++                        type="button"
++                        onClick={() => setIsModalOpen(false)}
++                        className="px-3 py-1 bg-surface hover:bg-surface/80 text-white rounded text-xs"
++                      >
++                        {t('common.close', 'Close')}
++                      </button>
++                    </div>
++                  </div>
++                </div>,
++                document.body,
++              )
++            : null)}
++      </div>
++    );
++  }
++
+   return (
+     <div className="sticky top-0 z-10 w-full bg-surface-lowest/95 backdrop-blur-md rounded-lg border border-surface p-3 mb-4 space-y-2 shadow-lg">
+       {/* Header with Title and Expand button */}
+diff --git a/src/components/views/EditorView.tsx b/src/components/views/EditorView.tsx
+index 9310f14..95051f3 100644
+--- a/src/components/views/EditorView.tsx
++++ b/src/components/views/EditorView.tsx
+@@ -129,6 +129,9 @@ export default function EditorView({
+       onImageSelect={handleImageClick}
+       onPaste={() => handlePasteAdjustments()}
+       onRate={handleRate}
++      onExportClick={() => {
++        setUI({ previousView: 'editor', activeView: 'export' });
++      }}
+       onRequestThumbnails={requestThumbnails}
+       onZoomChange={handleZoomChange}
+       rating={imageRatings[selectedImage?.path || ''] || 0}
+diff --git a/src/components/views/ExportView.tsx b/src/components/views/ExportView.tsx
+new file mode 100644
+index 0000000..4a7cd09
+--- /dev/null
++++ b/src/components/views/ExportView.tsx
+@@ -0,0 +1,1440 @@
++import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
++import { motion, AnimatePresence } from 'framer-motion';
++import { useTranslation } from 'react-i18next';
++import { save, open } from '@tauri-apps/plugin-dialog';
++import { invoke, convertFileSrc } from '@tauri-apps/api/core';
++import clsx from 'clsx';
++import {
++  ArrowLeft,
++  X,
++  FileInput,
++  CheckSquare,
++  Square,
++  Film,
++  ChevronDown,
++  ChevronUp,
++  Sparkles,
++  Ban,
++  Star,
++} from 'lucide-react';
++import {
++  ExportPreset,
++  ExportSettings,
++  FileFormat,
++  FILE_FORMATS,
++  Status,
++  ExportState,
++  FileFormats,
++  TiffBitDepth,
++  WatermarkAnchor,
++} from '../ui/ExportImportProperties';
++import { Invokes, SelectedImage, AppSettings, ImageFile } from '../ui/AppProperties';
++import { useExportSettings } from '../../hooks/useExportSettings';
++import { useOsPlatform } from '../../hooks/useOsPlatform';
++import { useEditorStore } from '../../store/useEditorStore';
++import { useProcessStore } from '../../store/useProcessStore';
++import { useUIStore } from '../../store/useUIStore';
++import { formatBytes } from '../panel/right/ExportCommons';
++import StandardExportTab from '../panel/right/StandardExportTab';
++import CreativeExportTab from '../panel/right/CreativeExportTab';
++import ExportLivePreview, { formatExifSummary } from '../panel/right/ExportLivePreview';
++import debounce from 'lodash.debounce';
++
++export interface ExportViewProps {
++  exportState: ExportState;
++  setExportState(state: any): void;
++  selectedImage: SelectedImage | null;
++  multiSelectedPaths: Array<string>;
++  sortedImageList: ImageFile[];
++  appSettings: AppSettings | null;
++  onSettingsChange: (settings: AppSettings) => void;
++  rootPaths: string[];
++  onClose: () => void;
++  handleImageSelect: (path: string) => void;
++  handleSetMultiSelect: (paths: string[]) => void;
++}
++
++export default function ExportView({
++  exportState,
++  setExportState,
++  selectedImage,
++  multiSelectedPaths,
++  sortedImageList,
++  appSettings,
++  onSettingsChange,
++  rootPaths,
++  onClose,
++  handleImageSelect,
++  handleSetMultiSelect,
++}: ExportViewProps) {
++  const { t } = useTranslation();
++  const osPlatform = useOsPlatform();
++  const isAndroid = osPlatform === 'android';
++
++  const previousView = useUIStore((s) => s.previousView) || 'library';
++  const isExportPhotoRollVisible = useUIStore((s) => s.isExportPhotoRollVisible);
++  const setUI = useUIStore((s) => s.setUI);
++
++  const thumbnails = useProcessStore((s) => s.thumbnails);
++  const currentAdjustments = useEditorStore((s) => s.currentAdjustments);
++
++  const [activeTab, setActiveTab] = useState<'standard' | 'creative'>(() => {
++    try {
++      const saved = localStorage.getItem('rapidraw_export_active_tab');
++      if (saved === 'creative' || saved === 'standard') {
++        return saved;
++      }
++    } catch {}
++    return 'creative';
++  });
++
++  const handleTabChange = (tab: 'standard' | 'creative') => {
++    setActiveTab(tab);
++    try {
++      localStorage.setItem('rapidraw_export_active_tab', tab);
++    } catch {}
++  };
++
++  const {
++    fileFormat,
++    setFileFormat,
++    jpegQuality,
++    setJpegQuality,
++    tiffBitDepth,
++    setTiffBitDepth,
++    enableResize,
++    setEnableResize,
++    resizeMode,
++    setResizeMode,
++    resizeValue,
++    setResizeValue,
++    dontEnlarge,
++    setDontEnlarge,
++    keepMetadata,
++    setKeepMetadata,
++    preserveTimestamps,
++    setPreserveTimestamps,
++    preserveFolders,
++    setPreserveFolders,
++    destinationType,
++    setDestinationType,
++    subfolder,
++    setSubfolder,
++    filenameTemplate,
++    setFilenameTemplate,
++    stripGps,
++    setStripGps,
++    exportMasks,
++    setExportMasks,
++    enableWatermark,
++    setEnableWatermark,
++    watermarkType,
++    setWatermarkType,
++    watermarkText,
++    setWatermarkText,
++    watermarkColor,
++    setWatermarkColor,
++    watermarkPath,
++    setWatermarkPath,
++    watermarkAnchor,
++    setWatermarkAnchor,
++    watermarkScale,
++    setWatermarkScale,
++    watermarkSpacing,
++    setWatermarkSpacing,
++    watermarkOpacity,
++    setWatermarkOpacity,
++    watermarkCustomPlacement,
++    setWatermarkCustomPlacement,
++    watermarkCustomX,
++    setWatermarkCustomX,
++    watermarkCustomY,
++    setWatermarkCustomY,
++    enableBorder,
++    setEnableBorder,
++    borderSize,
++    setBorderSize,
++    borderColor,
++    setBorderColor,
++    enableKeyline,
++    setEnableKeyline,
++    keylineSize,
++    setKeylineSize,
++    keylineColor,
++    setKeylineColor,
++    keylineInset,
++    setKeylineInset,
++    enableGridOverlay,
++    setEnableGridOverlay,
++    gridOverlayRows,
++    setGridOverlayRows,
++    gridOverlayCols,
++    setGridOverlayCols,
++    gridOverlayColor,
++    setGridOverlayColor,
++    gridOverlayOpacity,
++    setGridOverlayOpacity,
++    gridOverlaySize,
++    setGridOverlaySize,
++    enableCollageGrid,
++    setEnableCollageGrid,
++    collageColumns,
++    setCollageColumns,
++    collageRows,
++    setCollageRows,
++    collageGutter,
++    setCollageGutter,
++    collageCellFit,
++    setCollageCellFit,
++    enableTileSplit,
++    setEnableTileSplit,
++    tileSplitColumns,
++    setTileSplitColumns,
++    tileSplitRows,
++    setTileSplitRows,
++    tileBorderEachTile,
++    setTileBorderEachTile,
++    enableExifBadge,
++    setEnableExifBadge,
++    exifBadgeStyle,
++    setExifBadgeStyle,
++    exifShowCamera,
++    setExifShowCamera,
++    exifShowLens,
++    setExifShowLens,
++    exifShowSettings,
++    setExifShowSettings,
++    exifShowDate,
++    setExifShowDate,
++    exifCustomText,
++    setExifCustomText,
++    exifBadgeBgColor,
++    setExifBadgeBgColor,
++    exifBadgeTextColor,
++    setExifBadgeTextColor,
++    applyPreset,
++  } = useExportSettings();
++
++  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState<boolean>(false);
++  const [estimatedSize, setEstimatedSize] = useState<number | null>(null);
++  const [isEstimating, setIsEstimating] = useState<boolean>(false);
++  const [previewDims, setPreviewDims] = useState<{ width: number; height: number } | null>(null);
++  const filenameInputRef = useRef<HTMLInputElement>(null);
++
++  const { status, progress, errorMessage } = exportState;
++  const isExporting = [Status.Exporting, Status.Cancelling].includes(status);
++  const isCancelling = status === Status.Cancelling;
++
++  // Paths to export: multiSelectedPaths or selectedImage or first sorted image
++  const pathsToExport = useMemo(() => {
++    if (multiSelectedPaths.length > 0) return multiSelectedPaths;
++    if (selectedImage?.path) return [selectedImage.path];
++    if (sortedImageList.length > 0) return [sortedImageList[0].path];
++    return [];
++  }, [multiSelectedPaths, selectedImage?.path, sortedImageList]);
++
++  const numImages = pathsToExport.length;
++
++  // Active preview image path
++  const activePreviewPath = selectedImage?.path || pathsToExport[0] || (sortedImageList.length > 0 ? sortedImageList[0].path : null);
++  const activeImageFile = useMemo(() => {
++    return sortedImageList.find((img) => img.path === activePreviewPath) || null;
++  }, [sortedImageList, activePreviewPath]);
++
++  // Sync selectedImage if needed
++  useEffect(() => {
++    if (activePreviewPath && (!selectedImage || selectedImage.path !== activePreviewPath)) {
++      handleImageSelect(activePreviewPath);
++    }
++  }, [activePreviewPath]);
++
++  // Query dimensions of actively previewed image
++  useEffect(() => {
++    const fetchDims = async () => {
++      if (!activePreviewPath) {
++        setPreviewDims(null);
++        return;
++      }
++      try {
++        const dims: any = await invoke('get_image_dimensions', { path: activePreviewPath });
++        if (dims && dims.width > 0 && dims.height > 0) {
++          setPreviewDims({ width: dims.width, height: dims.height });
++          return;
++        }
++      } catch {}
++      if (selectedImage && selectedImage.width && selectedImage.height) {
++        setPreviewDims({ width: selectedImage.width, height: selectedImage.height });
++      }
++    };
++    fetchDims();
++  }, [activePreviewPath, selectedImage?.width, selectedImage?.height]);
++
++  const resizeModeOptions = useMemo(
++    () => [
++      { label: t('export.resize.modes.longEdge'), value: 'longEdge' },
++      { label: t('export.resize.modes.shortEdge'), value: 'shortEdge' },
++      { label: t('export.resize.modes.width'), value: 'width' },
++      { label: t('export.resize.modes.height'), value: 'height' },
++    ],
++    [t],
++  );
++
++  const tiffBitDepthOptions = useMemo(
++    () => [
++      { label: t('export.file.tiffBitDepth8'), value: '8' },
++      { label: t('export.file.tiffBitDepth16'), value: '16' },
++    ],
++    [t],
++  );
++
++  const anchorOptions = useMemo(
++    () => [
++      { label: t('export.watermark.anchors.topLeft'), value: WatermarkAnchor.TopLeft },
++      { label: t('export.watermark.anchors.topCenter'), value: WatermarkAnchor.TopCenter },
++      { label: t('export.watermark.anchors.topRight'), value: WatermarkAnchor.TopRight },
++      { label: t('export.watermark.anchors.centerLeft'), value: WatermarkAnchor.CenterLeft },
++      { label: t('export.watermark.anchors.center'), value: WatermarkAnchor.Center },
++      { label: t('export.watermark.anchors.centerRight'), value: WatermarkAnchor.CenterRight },
++      { label: t('export.watermark.anchors.bottomLeft'), value: WatermarkAnchor.BottomLeft },
++      { label: t('export.watermark.anchors.bottomCenter'), value: WatermarkAnchor.BottomCenter },
++      { label: t('export.watermark.anchors.bottomRight'), value: WatermarkAnchor.BottomRight },
++    ],
++    [t],
++  );
++
++  // Debounced size estimation
++  const debouncedEstimateSize = useMemo(
++    () =>
++      debounce(async (paths, currentAdj, currentPath, exportSettings, format) => {
++        if (paths.length === 0) {
++          setEstimatedSize(null);
++          return;
++        }
++        setIsEstimating(true);
++        try {
++          const isCollage = exportSettings.collageGrid?.enabled && paths.length > 1;
++          const pathsToEstimate = isCollage ? [paths[0]] : paths;
++          const size: number = await invoke(Invokes.EstimateExportSizes, {
++            paths: pathsToEstimate,
++            exportSettings,
++            outputFormat: format,
++            currentEditPath: currentPath || null,
++            currentEditAdjustments: currentAdj || null,
++          });
++          setEstimatedSize(size);
++        } catch {
++          setEstimatedSize(null);
++        } finally {
++          setIsEstimating(false);
++        }
++      }, 400),
++    [],
++  );
++
++  const currentSettingsObject = useMemo(
++    () => ({
++      filenameTemplate,
++      fileFormat,
++      jpegQuality,
++      tiffBitDepth,
++      enableResize,
++      resizeMode,
++      resizeValue,
++      dontEnlarge,
++      keepMetadata,
++      preserveTimestamps,
++      preserveFolders,
++      destinationType,
++      subfolder,
++      stripGps,
++      exportMasks,
++      enableWatermark,
++      watermarkType,
++      watermarkText,
++      watermarkColor,
++      watermarkPath,
++      watermarkAnchor,
++      watermarkScale,
++      watermarkSpacing,
++      watermarkOpacity,
++      watermarkCustomPlacement,
++      watermarkCustomX,
++      watermarkCustomY,
++      enableBorder,
++      borderSize,
++      borderColor,
++      enableKeyline,
++      keylineSize,
++      keylineColor,
++      keylineInset,
++      enableGridOverlay,
++      gridOverlayRows,
++      gridOverlayCols,
++      gridOverlayColor,
++      gridOverlayOpacity,
++      gridOverlaySize,
++      enableCollageGrid,
++      collageColumns,
++      collageRows,
++      collageGutter,
++      collageCellFit,
++      enableTileSplit,
++      tileSplitColumns,
++      tileSplitRows,
++      tileBorderEachTile,
++      enableExifBadge,
++      exifBadgeStyle,
++      exifShowCamera,
++      exifShowLens,
++      exifShowSettings,
++      exifShowDate,
++      exifCustomText,
++      exifBadgeBgColor,
++      exifBadgeTextColor,
++    }),
++    [
++      filenameTemplate,
++      fileFormat,
++      jpegQuality,
++      tiffBitDepth,
++      enableResize,
++      resizeMode,
++      resizeValue,
++      dontEnlarge,
++      keepMetadata,
++      preserveTimestamps,
++      preserveFolders,
++      destinationType,
++      subfolder,
++      stripGps,
++      exportMasks,
++      enableWatermark,
++      watermarkType,
++      watermarkText,
++      watermarkColor,
++      watermarkPath,
++      watermarkAnchor,
++      watermarkScale,
++      watermarkSpacing,
++      watermarkOpacity,
++      watermarkCustomPlacement,
++      watermarkCustomX,
++      watermarkCustomY,
++      enableBorder,
++      borderSize,
++      borderColor,
++      enableKeyline,
++      keylineSize,
++      keylineColor,
++      keylineInset,
++      enableGridOverlay,
++      gridOverlayRows,
++      gridOverlayCols,
++      gridOverlayColor,
++      gridOverlayOpacity,
++      gridOverlaySize,
++      enableCollageGrid,
++      collageColumns,
++      collageRows,
++      collageGutter,
++      collageCellFit,
++      enableTileSplit,
++      tileSplitColumns,
++      tileSplitRows,
++      tileBorderEachTile,
++      enableExifBadge,
++      exifBadgeStyle,
++      exifShowCamera,
++      exifShowLens,
++      exifShowSettings,
++      exifShowDate,
++      exifCustomText,
++      exifBadgeBgColor,
++      exifBadgeTextColor,
++    ],
++  );
++
++  useEffect(() => {
++    const selectedFormat: any = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat);
++    const exportSettings: ExportSettings = {
++      filenameTemplate,
++      jpegQuality,
++      tiffBitDepth,
++      keepMetadata,
++      preserveTimestamps,
++      preserveFolders,
++      destinationType,
++      subfolder,
++      resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
++      stripGps,
++      exportMasks,
++      watermark: enableWatermark
++        ? {
++            watermarkType,
++            text: watermarkText,
++            textColor: watermarkColor,
++            path: watermarkType === 'image' ? watermarkPath || undefined : undefined,
++            anchor: watermarkCustomPlacement ? WatermarkAnchor.Custom : watermarkAnchor,
++            scale: watermarkScale,
++            spacing: watermarkSpacing,
++            opacity: watermarkOpacity,
++            customX: watermarkCustomX,
++            customY: watermarkCustomY,
++          }
++        : null,
++      border: enableBorder
++        ? {
++            size: borderSize,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : null,
++      collageGrid: enableCollageGrid
++        ? {
++            enabled: true,
++            columns: collageColumns,
++            rows: collageRows,
++            gutter: collageGutter,
++            cellFit: collageCellFit,
++            backgroundColor: borderColor,
++          }
++        : null,
++      tileSplit: enableTileSplit
++        ? {
++            enabled: true,
++            columns: tileSplitColumns,
++            rows: tileSplitRows,
++            borderEachTile: tileBorderEachTile,
++          }
++        : null,
++      exifBadge: enableExifBadge
++        ? {
++            enabled: true,
++            style: exifBadgeStyle,
++            showCamera: exifShowCamera,
++            showLens: exifShowLens,
++            showSettings: exifShowSettings,
++            showDate: exifShowDate,
++            customText: exifCustomText,
++            badgeBgColor: exifBadgeBgColor,
++            badgeTextColor: exifBadgeTextColor,
++          }
++        : null,
++    };
++
++    debouncedEstimateSize(
++      pathsToExport,
++      currentAdjustments,
++      selectedImage?.path,
++      exportSettings,
++      selectedFormat?.extensions[0] || 'jpg',
++    );
++  }, [
++    pathsToExport,
++    currentAdjustments,
++    selectedImage?.path,
++    filenameTemplate,
++    fileFormat,
++    jpegQuality,
++    tiffBitDepth,
++    enableResize,
++    resizeMode,
++    resizeValue,
++    dontEnlarge,
++    keepMetadata,
++    preserveTimestamps,
++    preserveFolders,
++    destinationType,
++    subfolder,
++    stripGps,
++    exportMasks,
++    enableWatermark,
++    watermarkType,
++    watermarkText,
++    watermarkColor,
++    watermarkPath,
++    watermarkAnchor,
++    watermarkScale,
++    watermarkSpacing,
++    watermarkOpacity,
++    watermarkCustomPlacement,
++    watermarkCustomX,
++    watermarkCustomY,
++    enableBorder,
++    borderSize,
++    borderColor,
++    enableKeyline,
++    keylineSize,
++    keylineColor,
++    keylineInset,
++    enableGridOverlay,
++    gridOverlayRows,
++    gridOverlayCols,
++    gridOverlayColor,
++    gridOverlayOpacity,
++    gridOverlaySize,
++    enableCollageGrid,
++    collageColumns,
++    collageRows,
++    collageGutter,
++    collageCellFit,
++    enableTileSplit,
++    tileSplitColumns,
++    tileSplitRows,
++    tileBorderEachTile,
++    enableExifBadge,
++    exifBadgeStyle,
++    exifShowCamera,
++    exifShowLens,
++    exifShowSettings,
++    exifShowDate,
++    exifCustomText,
++    exifBadgeBgColor,
++    exifBadgeTextColor,
++    debouncedEstimateSize,
++  ]);
++
++  const handleVariableClick = (variable: string) => {
++    if (!filenameInputRef.current) return;
++    const input: HTMLInputElement = filenameInputRef.current;
++    const start = Number(input.selectionStart);
++    const end = Number(input.selectionEnd);
++    const currentValue = input.value;
++    const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
++    setFilenameTemplate(newValue);
++    setTimeout(() => {
++      input.focus();
++      input.setSelectionRange(start + variable.length, start + variable.length);
++    }, 0);
++  };
++
++  const saveLastUsedPreset = useCallback(
++    (lastPath: string) => {
++      if (!appSettings) return;
++      const lastUsedPreset: ExportPreset = {
++        id: '__last_used__',
++        name: 'Last Used',
++        lastExportPath: lastPath,
++        ...currentSettingsObject,
++      };
++      const existingPresets = appSettings.exportPresets || [];
++      const updatedPresets = existingPresets.some((p) => p.id === '__last_used__')
++        ? existingPresets.map((p) => (p.id === '__last_used__' ? lastUsedPreset : p))
++        : [...existingPresets, lastUsedPreset];
++      onSettingsChange({
++        ...appSettings,
++        exportPresets: updatedPresets,
++      });
++    },
++    [appSettings, onSettingsChange, currentSettingsObject],
++  );
++
++  const handleExport = async () => {
++    if (numImages === 0 || isExporting) return;
++
++    const exportSettings: ExportSettings = {
++      filenameTemplate,
++      jpegQuality,
++      tiffBitDepth,
++      keepMetadata,
++      preserveTimestamps,
++      preserveFolders,
++      destinationType,
++      subfolder,
++      resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
++      stripGps,
++      exportMasks,
++      watermark: enableWatermark
++        ? {
++            watermarkType,
++            text: watermarkText,
++            textColor: watermarkColor,
++            path: watermarkType === 'image' ? watermarkPath || undefined : undefined,
++            anchor: watermarkCustomPlacement ? WatermarkAnchor.Custom : watermarkAnchor,
++            scale: watermarkScale,
++            spacing: watermarkSpacing,
++            opacity: watermarkOpacity,
++            customX: watermarkCustomX,
++            customY: watermarkCustomY,
++          }
++        : null,
++      border: enableBorder
++        ? {
++            size: borderSize,
++            color: borderColor,
++            keyline: enableKeyline
++              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++              : null,
++            gridOverlay: enableGridOverlay
++              ? {
++                  enabled: true,
++                  rows: gridOverlayRows,
++                  columns: gridOverlayCols,
++                  color: gridOverlayColor,
++                  opacity: gridOverlayOpacity,
++                  size: gridOverlaySize,
++                }
++              : null,
++          }
++        : null,
++      collageGrid: enableCollageGrid
++        ? {
++            enabled: true,
++            columns: collageColumns,
++            rows: collageRows,
++            gutter: collageGutter,
++            cellFit: collageCellFit,
++            backgroundColor: borderColor,
++          }
++        : null,
++      tileSplit: enableTileSplit
++        ? {
++            enabled: true,
++            columns: tileSplitColumns,
++            rows: tileSplitRows,
++            borderEachTile: tileBorderEachTile,
++          }
++        : null,
++      exifBadge: enableExifBadge
++        ? {
++            enabled: true,
++            style: exifBadgeStyle,
++            showCamera: exifShowCamera,
++            showLens: exifShowLens,
++            showSettings: exifShowSettings,
++            showDate: exifShowDate,
++            customText: exifCustomText,
++            badgeBgColor: exifBadgeBgColor,
++            badgeTextColor: exifBadgeTextColor,
++          }
++        : null,
++    };
++
++    const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
++
++    try {
++      const selectedFormat: any = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat);
++
++      let outputFolderOrFile = '';
++      const isOriginalFolder = destinationType === 'originalFolder';
++      const isSingleOutput = (numImages === 1 || (enableCollageGrid && numImages > 1)) && !enableTileSplit;
++      const shouldChooseOutputFile = isSingleOutput && !preserveFolders && !isOriginalFolder;
++
++      if (isOriginalFolder) {
++        outputFolderOrFile = 'originalFolderDummy';
++      } else if (shouldChooseOutputFile) {
++        const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
++        const baseStem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
++        const stem = enableCollageGrid && numImages > 1 ? `${baseStem}_collage` : baseStem;
++        const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
++        const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
++
++        outputFolderOrFile = isAndroid
++          ? outputFileName
++          : ((await save({
++              title: t('export.dialog.saveEditedImageTitle'),
++              defaultPath: lastExportPath ? `${lastExportPath}/${outputFileName}` : outputFileName,
++              filters: [
++                { name: selectedFormat.name, extensions: selectedFormat.extensions },
++                ...FILE_FORMATS.filter((f: FileFormat) => f.id !== fileFormat).map((f: FileFormat) => ({
++                  name: f.name,
++                  extensions: f.extensions,
++                })),
++              ],
++            })) as string);
++      } else {
++        outputFolderOrFile = isAndroid
++          ? ''
++          : ((await open({
++              title: t('export.dialog.selectFolderTitle', { count: numImages }),
++              directory: true,
++              defaultPath: lastExportPath ?? undefined,
++            })) as string);
++      }
++
++      if (isAndroid || outputFolderOrFile) {
++        if (!isAndroid) {
++          if (isOriginalFolder) {
++            saveLastUsedPreset(lastExportPath || '');
++          } else {
++            const dir = shouldChooseOutputFile
++              ? outputFolderOrFile.substring(
++                  0,
++                  Math.max(outputFolderOrFile.lastIndexOf('/'), outputFolderOrFile.lastIndexOf('\\')),
++                )
++              : outputFolderOrFile;
++            if (dir) saveLastUsedPreset(dir);
++          }
++        }
++
++        setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
++        await invoke(Invokes.ExportImages, {
++          paths: pathsToExport,
++          outputFolderOrFile: outputFolderOrFile,
++          isExplicitFilePath: shouldChooseOutputFile,
++          baseOriginFolders: rootPaths,
++          exportSettings,
++          outputFormat: selectedFormat.extensions[0],
++          currentEditPath: selectedImage?.path || null,
++          currentEditAdjustments: currentAdjustments || null,
++        });
++      }
++    } catch (error) {
++      setExportState({
++        errorMessage: typeof error === 'string' ? error : t('export.status.failed'),
++        progress,
++        status: Status.Error,
++      });
++    }
++  };
++
++  const handleCancel = async () => {
++    setExportState((current: ExportState) =>
++      current.status === Status.Exporting ? { status: Status.Cancelling } : {},
++    );
++    try {
++      await invoke(Invokes.CancelExport);
++    } catch (error) {
++      console.error('Failed to cancel:', error);
++      setExportState((current: ExportState) =>
++        current.status === Status.Cancelling ? { status: Status.Exporting } : {},
++      );
++    }
++  };
++
++  const isCollageActive = enableCollageGrid && numImages > 1;
++  const isTileSplitActive = enableTileSplit;
++
++  const exportOutputCount = useMemo(() => {
++    const base = isCollageActive ? 1 : numImages;
++    if (isTileSplitActive) {
++      return base * tileSplitColumns * tileSplitRows;
++    }
++    return base;
++  }, [isCollageActive, numImages, isTileSplitActive, tileSplitColumns, tileSplitRows]);
++
++  const hasActiveCreativeSettings =
++    enableBorder ||
++    enableKeyline ||
++    enableWatermark ||
++    enableExifBadge ||
++    isCollageActive ||
++    enableTileSplit ||
++    enableGridOverlay;
++
++  // Photo roll selection handlers
++  const handleSelectAll = () => {
++    handleSetMultiSelect(sortedImageList.map((img) => img.path));
++  };
++
++  const handleClearAll = () => {
++    handleSetMultiSelect([]);
++  };
++
++  const handleInvertSelection = () => {
++    const currentSet = new Set(multiSelectedPaths);
++    const inverted = sortedImageList
++      .filter((img) => !currentSet.has(img.path))
++      .map((img) => img.path);
++    handleSetMultiSelect(inverted);
++  };
++
++  const handleTogglePhotoInExport = (path: string, e?: React.MouseEvent) => {
++    e?.stopPropagation();
++    if (multiSelectedPaths.includes(path)) {
++      handleSetMultiSelect(multiSelectedPaths.filter((p) => p !== path));
++    } else {
++      handleSetMultiSelect([...multiSelectedPaths, path]);
++    }
++  };
++
++  const exifSummary = useMemo(() => {
++    return formatExifSummary(activeImageFile?.exif || selectedImage?.exif);
++  }, [activeImageFile, selectedImage]);
++
++  const activeFilename = activePreviewPath ? activePreviewPath.split(/[\\/]/).pop() || '' : '';
++
++  return (
++    <div className="flex flex-col w-full h-full bg-app-bg text-text-primary min-w-0 select-none overflow-hidden">
++      {/* 🧭 Top Studio Header */}
++      <header className="h-12 border-b border-surface px-4 flex items-center justify-between shrink-0 bg-surface-lowest/70 backdrop-blur-md z-20">
++        <div className="flex items-center gap-3 min-w-0">
++          <button
++            type="button"
++            onClick={onClose}
++            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
++            title={previousView === 'editor' ? 'Back to Editor (Esc)' : 'Back to Library (Esc)'}
++          >
++            <ArrowLeft size={16} />
++            <span className="hidden sm:inline">
++              {previousView === 'editor' ? t('common.backToEditor', 'Back to Editor') : t('common.backToLibrary', 'Back to Library')}
++            </span>
++          </button>
++
++          <div className="h-4 w-px bg-surface" />
++
++          <div className="flex items-center gap-2 min-w-0">
++            <div className="w-7 h-7 rounded-lg bg-accent/20 flex items-center justify-center text-accent shrink-0">
++              <Sparkles size={16} />
++            </div>
++            <div className="flex flex-col min-w-0">
++              <div className="flex items-center gap-2">
++                <span className="text-sm font-semibold tracking-tight text-text-primary truncate">
++                  {t('export.studioTitle', 'Export Studio')}
++                </span>
++                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono uppercase bg-surface text-text-secondary border border-surface/80">
++                  {fileFormat.toUpperCase()}
++                </span>
++                {hasActiveCreativeSettings && (
++                  <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-accent/20 text-accent border border-accent/30">
++                    Creative Active
++                  </span>
++                )}
++              </div>
++            </div>
++          </div>
++        </div>
++
++        {/* Right Header: Selection Stats & Close Button */}
++        <div className="flex items-center gap-3">
++          <div className="text-xs text-text-secondary hidden md:flex items-center gap-1.5">
++            <Film size={14} className="text-accent" />
++            <span>
++              <strong className="text-text-primary font-semibold">{numImages}</strong> photo{numImages === 1 ? '' : 's'} queued
++            </span>
++            {estimatedSize !== null && (
++              <span className="text-text-secondary/70">({formatBytes(estimatedSize)})</span>
++            )}
++          </div>
++
++          <button
++            type="button"
++            onClick={onClose}
++            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface transition-colors"
++            title="Close Export Studio (Esc)"
++          >
++            <X size={18} />
++          </button>
++        </div>
++      </header>
++
++      {/* 🖼️ Main 2-Column Split Workspace */}
++      <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
++        {/* 🎨 Left Column: Interactive Darkroom Canvas (Full stage preview) */}
++        <div className="flex-1 flex flex-col min-w-0 h-full relative bg-black/40 border-r border-surface overflow-hidden">
++          {/* Canvas Metadata Info Header */}
++          <div className="px-4 py-2 flex items-center justify-between border-b border-surface/50 text-xs text-text-secondary shrink-0 bg-surface-lowest/40">
++            <div className="flex items-center gap-2 min-w-0 truncate">
++              <span className="font-medium text-text-primary truncate">{activeFilename || 'No Image Selected'}</span>
++              {previewDims && (
++                <span className="font-mono text-[11px] text-text-secondary/80 bg-surface/50 px-1.5 py-0.5 rounded">
++                  {previewDims.width} × {previewDims.height} px
++                </span>
++              )}
++            </div>
++            {exifSummary.camera && (
++              <div className="hidden lg:flex items-center gap-2 text-[11px] text-text-secondary font-mono truncate">
++                <span>{exifSummary.camera}</span>
++                {exifSummary.settings && <span>• {exifSummary.settings}</span>}
++              </div>
++            )}
++          </div>
++
++          {/* Large Studio Darkroom Canvas */}
++          <div className="flex-1 w-full h-full min-h-0 relative flex items-center justify-center p-2">
++            <ExportLivePreview
++              mode="studio"
++              canvasMaxDimension={950}
++              selectedImage={selectedImage}
++              finalPreviewUrl={null}
++              multiSelectedPaths={pathsToExport}
++              thumbnailMap={thumbnails}
++              enableBorder={enableBorder}
++              borderSize={borderSize}
++              borderColor={borderColor}
++              enableKeyline={enableKeyline}
++              keylineSize={keylineSize}
++              keylineColor={keylineColor}
++              keylineInset={keylineInset}
++              enableGridOverlay={enableGridOverlay}
++              gridOverlayRows={gridOverlayRows}
++              gridOverlayCols={gridOverlayCols}
++              gridOverlayColor={gridOverlayColor}
++              gridOverlayOpacity={gridOverlayOpacity}
++              gridOverlaySize={gridOverlaySize}
++              enableCollageGrid={enableCollageGrid}
++              collageColumns={collageColumns}
++              collageRows={collageRows}
++              collageGutter={collageGutter}
++              collageCellFit={collageCellFit}
++              enableTileSplit={enableTileSplit}
++              tileSplitColumns={tileSplitColumns}
++              tileSplitRows={tileSplitRows}
++              tileBorderEachTile={tileBorderEachTile}
++              enableWatermark={enableWatermark}
++              watermarkType={watermarkType}
++              watermarkText={watermarkText}
++              watermarkColor={watermarkColor}
++              watermarkPath={watermarkPath}
++              watermarkAnchor={watermarkAnchor}
++              watermarkScale={watermarkScale}
++              watermarkSpacing={watermarkSpacing}
++              watermarkOpacity={watermarkOpacity}
++              watermarkCustomPlacement={watermarkCustomPlacement}
++              watermarkCustomX={watermarkCustomX}
++              watermarkCustomY={watermarkCustomY}
++              onCustomPlacementChange={(x, y) => {
++                setWatermarkCustomPlacement(true);
++                setWatermarkCustomX(x);
++                setWatermarkCustomY(y);
++              }}
++              enableExifBadge={enableExifBadge}
++              exifBadgeStyle={exifBadgeStyle}
++              exifShowCamera={exifShowCamera}
++              exifShowLens={exifShowLens}
++              exifShowSettings={exifShowSettings}
++              exifShowDate={exifShowDate}
++              exifCustomText={exifCustomText}
++              exifBadgeBgColor={exifBadgeBgColor}
++              exifBadgeTextColor={exifBadgeTextColor}
++            />
++          </div>
++        </div>
++
++        {/* ⚙️ Right Column: Settings & Export Execution Panel */}
++        <div className="w-80 md:w-96 lg:w-[420px] flex flex-col h-full bg-bg-secondary shrink-0 border-l border-surface min-w-0">
++          {/* Segmented Tab Switcher */}
++          <div className="p-3 border-b border-surface shrink-0 bg-surface-lowest/40">
++            <div className="flex bg-surface-lowest p-1 rounded-lg border border-surface relative">
++              <button
++                type="button"
++                onClick={() => handleTabChange('standard')}
++                disabled={isExporting}
++                className={`relative z-10 flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
++                  activeTab === 'standard' ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
++                }`}
++              >
++                {activeTab === 'standard' && (
++                  <motion.div
++                    layoutId="export-studio-active-tab-indicator"
++                    className="absolute inset-0 bg-surface rounded-md shadow-xs"
++                    transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
++                  />
++                )}
++                <span className="relative z-10">{t('export.tabs.standard', 'Standard Export')}</span>
++              </button>
++
++              <button
++                type="button"
++                onClick={() => handleTabChange('creative')}
++                disabled={isExporting}
++                className={`relative z-10 flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
++                  activeTab === 'creative' ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
++                }`}
++              >
++                {activeTab === 'creative' && (
++                  <motion.div
++                    layoutId="export-studio-active-tab-indicator"
++                    className="absolute inset-0 bg-surface rounded-md shadow-xs"
++                    transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
++                  />
++                )}
++                <span className="relative z-10 flex items-center gap-1.5">
++                  {t('export.tabs.creative', 'Creative Export')}
++                  {hasActiveCreativeSettings && (
++                    <span
++                      className="w-2 h-2 rounded-full bg-accent inline-block shadow-xs"
++                      title="Creative export features active"
++                    />
++                  )}
++                </span>
++              </button>
++            </div>
++          </div>
++
++          {/* Scrollable Settings Body */}
++          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 min-h-0">
++            {activeTab === 'standard' ? (
++              <StandardExportTab
++                isExporting={isExporting}
++                appSettings={appSettings}
++                onSettingsChange={onSettingsChange}
++                currentSettingsObject={currentSettingsObject}
++                handleApplyPreset={applyPreset}
++                fileFormat={fileFormat}
++                setFileFormat={setFileFormat}
++                jpegQuality={jpegQuality}
++                setJpegQuality={setJpegQuality}
++                tiffBitDepth={tiffBitDepth}
++                setTiffBitDepth={setTiffBitDepth}
++                destinationType={destinationType}
++                setDestinationType={setDestinationType}
++                subfolder={subfolder}
++                setSubfolder={setSubfolder}
++                numImages={numImages}
++                filenameTemplate={filenameTemplate}
++                setFilenameTemplate={setFilenameTemplate}
++                filenameInputRef={filenameInputRef}
++                handleVariableClick={handleVariableClick}
++                enableResize={enableResize}
++                setEnableResize={setEnableResize}
++                resizeMode={resizeMode}
++                setResizeMode={setResizeMode}
++                resizeValue={resizeValue}
++                setResizeValue={setResizeValue}
++                dontEnlarge={dontEnlarge}
++                setDontEnlarge={setDontEnlarge}
++                keepMetadata={keepMetadata}
++                setKeepMetadata={setKeepMetadata}
++                stripGps={stripGps}
++                setStripGps={setStripGps}
++                preserveFolders={preserveFolders}
++                setPreserveFolders={setPreserveFolders}
++                preserveTimestamps={preserveTimestamps}
++                setPreserveTimestamps={setPreserveTimestamps}
++                exportMasks={exportMasks}
++                setExportMasks={setExportMasks}
++                isAdvancedExpanded={isAdvancedExpanded}
++                setIsAdvancedExpanded={setIsAdvancedExpanded}
++                resizeModeOptions={resizeModeOptions}
++                tiffBitDepthOptions={tiffBitDepthOptions}
++              />
++            ) : (
++              <CreativeExportTab
++                hideEmbeddedPreview={true}
++                selectedImage={selectedImage}
++                finalPreviewUrl={null}
++                pathsToExport={pathsToExport}
++                thumbnails={thumbnails}
++                isExporting={isExporting}
++                numImages={numImages}
++                enableBorder={enableBorder}
++                setEnableBorder={setEnableBorder}
++                borderSize={borderSize}
++                setBorderSize={setBorderSize}
++                borderColor={borderColor}
++                setBorderColor={setBorderColor}
++                enableKeyline={enableKeyline}
++                setEnableKeyline={setEnableKeyline}
++                keylineSize={keylineSize}
++                setKeylineSize={setKeylineSize}
++                keylineColor={keylineColor}
++                setKeylineColor={setKeylineColor}
++                keylineInset={keylineInset}
++                setKeylineInset={setKeylineInset}
++                enableWatermark={enableWatermark}
++                setEnableWatermark={setEnableWatermark}
++                watermarkType={watermarkType}
++                setWatermarkType={setWatermarkType}
++                watermarkText={watermarkText}
++                setWatermarkText={setWatermarkText}
++                watermarkColor={watermarkColor}
++                setWatermarkColor={setWatermarkColor}
++                watermarkPath={watermarkPath}
++                setWatermarkPath={setWatermarkPath}
++                watermarkAnchor={watermarkAnchor}
++                setWatermarkAnchor={setWatermarkAnchor}
++                watermarkScale={watermarkScale}
++                setWatermarkScale={setWatermarkScale}
++                watermarkSpacing={watermarkSpacing}
++                setWatermarkSpacing={setWatermarkSpacing}
++                watermarkOpacity={watermarkOpacity}
++                setWatermarkOpacity={setWatermarkOpacity}
++                watermarkCustomPlacement={watermarkCustomPlacement}
++                setWatermarkCustomPlacement={setWatermarkCustomPlacement}
++                watermarkCustomX={watermarkCustomX}
++                setWatermarkCustomX={setWatermarkCustomX}
++                watermarkCustomY={watermarkCustomY}
++                setWatermarkCustomY={setWatermarkCustomY}
++                anchorOptions={anchorOptions}
++                enableCollageGrid={enableCollageGrid}
++                setEnableCollageGrid={setEnableCollageGrid}
++                collageColumns={collageColumns}
++                setCollageColumns={setCollageColumns}
++                collageRows={collageRows}
++                setCollageRows={setCollageRows}
++                collageGutter={collageGutter}
++                setCollageGutter={setCollageGutter}
++                collageCellFit={collageCellFit}
++                setCollageCellFit={setCollageCellFit}
++                enableTileSplit={enableTileSplit}
++                setEnableTileSplit={setEnableTileSplit}
++                tileSplitColumns={tileSplitColumns}
++                setTileSplitColumns={setTileSplitColumns}
++                tileSplitRows={tileSplitRows}
++                setTileSplitRows={setTileSplitRows}
++                tileBorderEachTile={tileBorderEachTile}
++                setTileBorderEachTile={setTileBorderEachTile}
++                enableGridOverlay={enableGridOverlay}
++                setEnableGridOverlay={setEnableGridOverlay}
++                gridOverlayRows={gridOverlayRows}
++                setGridOverlayRows={setGridOverlayRows}
++                gridOverlayCols={gridOverlayCols}
++                setGridOverlayCols={setGridOverlayCols}
++                gridOverlayColor={gridOverlayColor}
++                setGridOverlayColor={setGridOverlayColor}
++                gridOverlayOpacity={gridOverlayOpacity}
++                setGridOverlayOpacity={setGridOverlayOpacity}
++                gridOverlaySize={gridOverlaySize}
++                setGridOverlaySize={setGridOverlaySize}
++                enableExifBadge={enableExifBadge}
++                setEnableExifBadge={setEnableExifBadge}
++                exifBadgeStyle={exifBadgeStyle}
++                setExifBadgeStyle={setExifBadgeStyle}
++                exifShowCamera={exifShowCamera}
++                setExifShowCamera={setExifShowCamera}
++                exifShowLens={exifShowLens}
++                setExifShowLens={setExifShowLens}
++                exifShowSettings={exifShowSettings}
++                setExifShowSettings={setExifShowSettings}
++                exifShowDate={exifShowDate}
++                setExifShowDate={setExifShowDate}
++                exifCustomText={exifCustomText}
++                setExifCustomText={setExifCustomText}
++                exifBadgeBgColor={exifBadgeBgColor}
++                setExifBadgeBgColor={setExifBadgeBgColor}
++                exifBadgeTextColor={exifBadgeTextColor}
++                setExifBadgeTextColor={setExifBadgeTextColor}
++              />
++            )}
++          </div>
++
++          {/* 🏁 Sticky Bottom Export Actions Area */}
++          <div className="p-4 border-t border-surface bg-surface-lowest/70 backdrop-blur-md shrink-0 space-y-3">
++            {/* Output and Estimate summary */}
++            <div className="flex items-center justify-between text-xs">
++              <span className="text-text-secondary">
++                {exportOutputCount} {exportOutputCount === 1 ? 'output item' : 'output items'}
++                {isCollageActive && ' (Collage)'}
++                {isTileSplitActive && ' (Split Grid)'}
++              </span>
++              <span className="font-mono font-medium text-text-primary">
++                {isEstimating ? (
++                  <span className="text-text-secondary animate-pulse">Calculating size...</span>
++                ) : estimatedSize !== null ? (
++                  `~${formatBytes(estimatedSize)}`
++                ) : (
++                  '--'
++                )}
++              </span>
++            </div>
++
++            {/* Progress indicator during batch export */}
++            {isExporting && progress && (
++              <div className="space-y-1">
++                <div className="flex justify-between text-xs text-text-secondary">
++                  <span>Exporting...</span>
++                  <span className="font-mono">
++                    {progress.current} / {progress.total}
++                  </span>
++                </div>
++                <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
++                  <div
++                    className="h-full bg-accent transition-all duration-200"
++                    style={{
++                      width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
++                    }}
++                  />
++                </div>
++              </div>
++            )}
++
++            {/* Error Message if export failed */}
++            {status === Status.Error && errorMessage && (
++              <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
++                {errorMessage}
++              </div>
++            )}
++
++            {/* Action Buttons */}
++            <div className="flex items-center gap-2.5 pt-1">
++              {isExporting ? (
++                <button
++                  type="button"
++                  onClick={handleCancel}
++                  disabled={isCancelling}
++                  className="w-full py-2.5 px-4 rounded-lg bg-surface text-text-primary hover:bg-surface-hover font-semibold text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
++                >
++                  <Ban size={15} />
++                  <span>{isCancelling ? 'Cancelling...' : 'Cancel Export'}</span>
++                </button>
++              ) : (
++                <>
++                  <button
++                    type="button"
++                    onClick={onClose}
++                    className="py-2.5 px-4 rounded-lg bg-surface text-text-secondary hover:text-text-primary hover:bg-surface-hover font-medium text-xs transition-colors"
++                  >
++                    Cancel
++                  </button>
++                  <button
++                    type="button"
++                    onClick={handleExport}
++                    disabled={numImages === 0}
++                    className="flex-1 py-2.5 px-4 rounded-lg bg-accent text-button-text hover:bg-accent-hover font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
++                  >
++                    <FileInput size={15} />
++                    <span>
++                      {numImages > 1
++                        ? `Export ${numImages} Images`
++                        : isCollageActive
++                        ? 'Export Collage'
++                        : 'Export Image'}
++                    </span>
++                  </button>
++                </>
++              )}
++            </div>
++          </div>
++        </div>
++      </div>
++
++      {/* 🎞️ Bottom Photo Roll (Filmstrip) */}
++      <div className="shrink-0 border-t border-surface bg-surface-lowest/95 backdrop-blur-md transition-all duration-200 z-10 flex flex-col">
++        {/* Roll Bar Header */}
++        <div className="h-8 px-4 flex items-center justify-between border-b border-surface/40 text-xs text-text-secondary select-none">
++          <div className="flex items-center gap-2">
++            <Film size={14} className="text-accent" />
++            <span className="font-semibold text-text-primary text-xs">
++              {t('export.photoRoll.title', 'Photo Roll')}
++            </span>
++            <span className="px-1.5 py-0.2 rounded text-[11px] bg-surface text-text-secondary border border-surface/60 font-mono">
++              {multiSelectedPaths.length} of {sortedImageList.length} selected
++            </span>
++          </div>
++
++          <div className="flex items-center gap-3">
++            {isExportPhotoRollVisible && sortedImageList.length > 0 && (
++              <div className="flex items-center gap-1">
++                <button
++                  type="button"
++                  onClick={handleSelectAll}
++                  className="px-2 py-0.5 rounded text-[11px] hover:bg-surface hover:text-text-primary transition-colors"
++                >
++                  Select All
++                </button>
++                <span className="text-surface">•</span>
++                <button
++                  type="button"
++                  onClick={handleClearAll}
++                  className="px-2 py-0.5 rounded text-[11px] hover:bg-surface hover:text-text-primary transition-colors"
++                >
++                  Clear
++                </button>
++                <span className="text-surface">•</span>
++                <button
++                  type="button"
++                  onClick={handleInvertSelection}
++                  className="px-2 py-0.5 rounded text-[11px] hover:bg-surface hover:text-text-primary transition-colors"
++                >
++                  Invert
++                </button>
++              </div>
++            )}
++
++            <button
++              type="button"
++              onClick={() => setUI({ isExportPhotoRollVisible: !isExportPhotoRollVisible })}
++              className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-surface hover:text-text-primary transition-colors text-[11px]"
++              title={isExportPhotoRollVisible ? 'Collapse Photo Roll' : 'Expand Photo Roll'}
++            >
++              <span>{isExportPhotoRollVisible ? 'Hide Roll' : 'Show Roll'}</span>
++              {isExportPhotoRollVisible ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
++            </button>
++          </div>
++        </div>
++
++        {/* Horizontal Photo Roll Track */}
++        {isExportPhotoRollVisible && (
++          <div className="h-28 w-full overflow-x-auto overflow-y-hidden custom-scrollbar px-3 py-2 flex items-center gap-2.5">
++            {sortedImageList.length === 0 ? (
++              <div className="w-full flex items-center justify-center text-xs text-text-secondary/70 italic">
++                No images available in this folder or filter.
++              </div>
++            ) : (
++              sortedImageList.map((img) => {
++                const isSelectedForExport = multiSelectedPaths.includes(img.path);
++                const isActiveInCanvas = activePreviewPath === img.path;
++                const thumbSrc = thumbnails[img.path] || convertFileSrc(img.path);
++                const fname = img.path.split(/[\\/]/).pop() || '';
++
++                return (
++                  <div
++                    key={img.path}
++                    onClick={() => handleImageSelect(img.path)}
++                    className={clsx(
++                      'relative h-24 w-24 shrink-0 rounded-lg overflow-hidden border cursor-pointer group transition-all duration-150',
++                      isActiveInCanvas
++                        ? 'ring-2 ring-accent border-accent shadow-lg scale-[1.02]'
++                        : isSelectedForExport
++                        ? 'border-accent/80 ring-1 ring-accent/40 shadow-sm'
++                        : 'border-surface/80 hover:border-text-secondary/60 hover:shadow-md',
++                    )}
++                    title={`${fname} (Click to preview in studio canvas)`}
++                  >
++                    {/* Thumbnail Image */}
++                    <img
++                      src={thumbSrc}
++                      alt={fname}
++                      className="w-full h-full object-cover select-none pointer-events-none"
++                      loading="lazy"
++                    />
++
++                    {/* Batch Selection Checkbox Toggle (Top Left) */}
++                    <button
++                      type="button"
++                      onClick={(e) => handleTogglePhotoInExport(img.path, e)}
++                      className={clsx(
++                        'absolute top-1 left-1 p-0.5 rounded transition-all z-10',
++                        isSelectedForExport
++                          ? 'bg-accent text-button-text shadow-md opacity-100'
++                          : 'bg-black/60 text-white/80 hover:bg-black/90 opacity-0 group-hover:opacity-100',
++                      )}
++                      title={isSelectedForExport ? 'Deselect from export' : 'Select for export'}
++                    >
++                      {isSelectedForExport ? <CheckSquare size={14} /> : <Square size={14} />}
++                    </button>
++
++                    {/* Rating badge if present */}
++                    {img.rating > 0 && (
++                      <div className="absolute top-1 right-1 px-1 py-0.2 rounded bg-black/60 backdrop-blur-xs flex items-center gap-0.5 text-[9px] text-amber-400 font-mono">
++                        <Star size={9} className="fill-amber-400" />
++                        <span>{img.rating}</span>
++                      </div>
++                    )}
++
++                    {/* Active Canvas Preview Indicator Dot */}
++                    {isActiveInCanvas && (
++                      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 px-1.5 py-0.2 rounded-full bg-accent text-button-text text-[9px] font-semibold tracking-wider uppercase shadow-md pointer-events-none">
++                        Previewing
++                      </div>
++                    )}
++
++                    {/* Bottom Filename Overlay */}
++                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-1 pt-2 pointer-events-none">
++                      <p className="text-[10px] text-white/90 truncate font-mono select-none leading-tight">
++                        {fname}
++                      </p>
++                    </div>
++                  </div>
++                );
++              })
++            )}
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
+diff --git a/src/components/views/LibraryView.tsx b/src/components/views/LibraryView.tsx
+index cd925b8..ee8a534 100644
+--- a/src/components/views/LibraryView.tsx
++++ b/src/components/views/LibraryView.tsx
+@@ -183,7 +183,7 @@ export default function LibraryView({
+             multiSelectedPaths={multiSelectedPaths}
+             onCopy={handleCopyAdjustments}
+             onExportClick={() =>
+-              setUI((state) => ({ isLibraryExportPanelVisible: !state.isLibraryExportPanelVisible }))
++              setUI((state) => ({ previousView: 'library', activeView: 'export' }))
+             }
+             onOpenCopyPasteSettings={() => setUI({ isCopyPasteSettingsModalOpen: true })}
+             onPaste={() => handlePasteAdjustments()}
+diff --git a/src/hooks/useAppContextMenus.ts b/src/hooks/useAppContextMenus.ts
+index ce8b3c4..4f0a89c 100644
+--- a/src/hooks/useAppContextMenus.ts
++++ b/src/hooks/useAppContextMenus.ts
+@@ -184,7 +184,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
+         {
+           label: t('contextMenus.editor.exportImage'),
+           icon: FileInput,
+-          onClick: () => setPanel(Panel.Export),
++          onClick: () => setUI((s) => ({ previousView: s.activeView, activeView: 'export' })),
+         },
+         { type: OPTION_SEPARATOR },
+         { label: t('contextMenus.editor.undo'), icon: Undo, onClick: undo, disabled: !canUndo },
+@@ -496,7 +496,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
+         if (activeView === 'editor' && selectedImage && selectedImage.path !== path) {
+           props.handleImageSelect(path);
+         }
+-        setPanel(Panel.Export);
++        setUI((s) => ({ previousView: s.activeView, activeView: 'export' }));
+       };
+ 
+       const handleRemoveFromAlbum = async () => {
+diff --git a/src/hooks/useKeyboardShortcuts.ts b/src/hooks/useKeyboardShortcuts.ts
+index 609b36c..6ec530d 100644
+--- a/src/hooks/useKeyboardShortcuts.ts
++++ b/src/hooks/useKeyboardShortcuts.ts
+@@ -370,7 +370,11 @@ export const useKeyboardShortcuts = ({
+         shouldFire: () => true,
+         execute: (e: any, s: any) => {
+           e.preventDefault();
+-          s.ui.setPanel(Panel.Export);
++          if (s.ui.activeView === 'export') {
++            s.ui.setUI({ activeView: s.ui.previousView || 'library' });
++          } else {
++            s.ui.setUI((state: any) => ({ previousView: state.activeView, activeView: 'export' }));
++          }
+         },
+       },
+       toggle_left_panel: {
+@@ -570,6 +574,7 @@ export const useKeyboardShortcuts = ({
+           else if (s.editor.activeMaskContainerId) s.editor.setEditor({ activeMaskContainerId: null });
+           else if (s.ui.activePanel === Panel.Crop) s.ui.setPanel(Panel.Adjustments);
+           else if (s.ui.isFullScreen) s.ui.toggleFullScreen();
++          else if (s.ui.activeView === 'export') s.ui.setUI({ activeView: s.ui.previousView || 'library' });
+           else if (s.ui.activeView === 'editor') handleBackToLibrary();
+           else if (s.ui.activeView === 'library' && s.library.rootPaths?.length > 0) handleGoHome();
+         },
+diff --git a/src/store/useUIStore.ts b/src/store/useUIStore.ts
+index cec17f9..502bc41 100644
+--- a/src/store/useUIStore.ts
++++ b/src/store/useUIStore.ts
+@@ -211,12 +211,14 @@ export function reconcileWorkspace(
+ 
+ export interface UIState {
+   activeView: string;
++  previousView: string;
+   isFullScreen: boolean;
+   isWindowFullScreen: boolean;
+   isInstantTransition: boolean;
+   isLayoutReady: boolean;
+   uiVisibility: UiVisibility;
+   isLibraryExportPanelVisible: boolean;
++  isExportPhotoRollVisible: boolean;
+   isSettingsOpen: boolean;
+ 
+   leftPanelWidth: number;
+@@ -279,12 +281,14 @@ export interface UIState {
+ 
+ export const useUIStore = create<UIState>((set, get) => ({
+   activeView: 'library',
++  previousView: 'library',
+   isFullScreen: false,
+   isWindowFullScreen: false,
+   isInstantTransition: false,
+   isLayoutReady: false,
+   uiVisibility: { filmstrip: true, leftPanel: true, rightPanel: true, quickFilter: false },
+   isLibraryExportPanelVisible: false,
++  isExportPhotoRollVisible: true,
+   isSettingsOpen: false,
+ 
+   leftPanelWidth: DEFAULT_PANEL_WIDTH,
