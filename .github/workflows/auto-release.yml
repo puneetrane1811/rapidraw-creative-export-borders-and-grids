@@ -159,7 +159,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist_artifacts
-          find rapidraw-src/src-tauri/target -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -exec cp {} dist_artifacts/ \;
+          find rapidraw-src/src-tauri/target -path "*/bundle/*" -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) -exec cp {} dist_artifacts/ \;
           echo "Collected artifacts:"
           ls -lh dist_artifacts/
 
@@ -194,17 +194,20 @@ jobs:
           tag_name: ${{ needs.check-upstream.outputs.release_tag }}
           name: ${{ needs.check-upstream.outputs.release_name }}
           body: |
-            ## RapidRAW with Export Image Borders
+            ## RapidRAW with Creative Export — Borders, Grids, Collages & Watermarks
 
-            Automated cross-platform build of **RapidRAW** with custom export border support.
+            Automated cross-platform production build of **RapidRAW** featuring native creative framing, collages, tile splitting, interactive watermarks, and real-time live preview.
 
             ### ✨ What's Included
-            - **Configurable border thickness**: Slider from 0.1% to 20% of image dimensions.
-            - **Custom border color**: Native RGB color picker (default white `#ffffff`).
-            - **Preset persistence**: Saved border configurations in export presets.
+            - **🗂️ Dual-Tab Architecture**: Seamless separation between Standard Export and Creative Export with persistent tab memory.
+            - **🖼️ Real-Time Live Export Preview**: Interactive sticky preview canvas with 60fps rendering and full-screen darkroom inspection modal.
+            - **🔤 Interactive Watermarking**: Real-time text and logo watermarks with drop-shadow, opacity slider, zero-dependency font engine, and interactive canvas drag positioning.
+            - **📐 Multi-Photo Collages**: Contact sheets with custom gutters and high-contrast Fit vs. Fill sizing modes.
+            - **📱 Multi-Tile Grid Splitting**: Slices panoramas and photos into Instagram swipeable carousels and profile grid mosaics.
+            - **🎨 Fine-Art Keylines & Grids**: Inset keyline fillets and composition proofing grid overlays.
 
             ### 📦 Available Downloads
-            - **macOS (Apple Silicon)**: `.dmg` installer
+            - **macOS (Apple Silicon)**: `.dmg` disk image installer
             - **Windows**: `.exe` setup installer
             - **Linux**: `.AppImage` (universal portable) and `.deb` package (Ubuntu/Debian)
 
