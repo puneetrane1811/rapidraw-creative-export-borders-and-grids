@@ -18,6 +18,199 @@ index 6bf6930..17c487b 100644
   "mozjpeg-rs",
   "nalgebra",
   "ndarray",
+diff --git a/src-tauri/src/export_processing.rs b/src-tauri/src/export_processing.rs
+index 4f6fe26..54f587a 100644
+--- a/src-tauri/src/export_processing.rs
++++ b/src-tauri/src/export_processing.rs
+@@ -95,6 +95,8 @@ pub struct ExifBadgeSettings {
+     #[serde(default)]
+     pub style: Option<String>,
+     #[serde(default)]
++    pub alignment: Option<String>,
++    #[serde(default)]
+     pub show_camera: bool,
+     #[serde(default)]
+     pub show_lens: bool,
+@@ -958,7 +960,7 @@ fn apply_exif_badge(
+         let strip_top = height as i32;
+ 
+         let left_title = if !camera.is_empty() {
+-            camera
++            camera.clone()
+         } else if !custom_credit.is_empty() {
+             custom_credit.to_string()
+         } else {
+@@ -972,11 +974,11 @@ fn apply_exif_badge(
+                 custom_credit.to_string()
+             }
+         } else {
+-            lens
++            lens.clone()
+         };
+ 
+-        let right_title = settings;
+-        let right_sub = date_str;
++        let right_title = settings.clone();
++        let right_sub = date_str.clone();
+ 
+         let y_line1 = strip_top + ((strip_h as f32 * 0.22).round() as i32);
+         let y_line2 = strip_top + ((strip_h as f32 * 0.58).round() as i32);
+@@ -988,54 +990,108 @@ fn apply_exif_badge(
+             255,
+         ]);
+ 
+-        if !left_title.is_empty() {
+-            imageproc::drawing::draw_text_mut(
+-                &mut output_buf,
+-                text_color,
+-                margin_x,
+-                y_line1,
+-                scale_title,
+-                &font,
+-                &left_title,
+-            );
+-        }
+-        if !left_sub.is_empty() {
+-            imageproc::drawing::draw_text_mut(
+-                &mut output_buf,
+-                secondary_text_color,
+-                margin_x,
+-                y_line2,
+-                scale_sub,
+-                &font,
+-                &left_sub,
+-            );
+-        }
++        let is_center_aligned = badge_settings.alignment.as_deref() == Some("center")
++            || (badge_settings.alignment.as_deref() != Some("split") && (width as f32 / height as f32) > 1.4);
+ 
+-        if !right_title.is_empty() {
+-            let (rw, _) = imageproc::drawing::text_size(scale_title, &font, &right_title);
+-            let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
+-            imageproc::drawing::draw_text_mut(
+-                &mut output_buf,
+-                text_color,
+-                rx,
+-                y_line1,
+-                scale_title,
+-                &font,
+-                &right_title,
+-            );
+-        }
+-        if !right_sub.is_empty() {
+-            let (rw, _) = imageproc::drawing::text_size(scale_sub, &font, &right_sub);
+-            let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
+-            imageproc::drawing::draw_text_mut(
+-                &mut output_buf,
+-                secondary_text_color,
+-                rx,
+-                y_line2,
+-                scale_sub,
+-                &font,
+-                &right_sub,
+-            );
++        if is_center_aligned {
++            let mut line1_parts = Vec::new();
++            if !camera.is_empty() {
++                line1_parts.push(camera.clone());
++            }
++            if !lens.is_empty() {
++                line1_parts.push(lens.clone());
++            }
++            if !custom_credit.is_empty() && !line1_parts.contains(&custom_credit.to_string()) {
++                line1_parts.push(custom_credit.to_string());
++            }
++            let line1 = line1_parts.join("  •  ");
++
++            let mut line2_parts = Vec::new();
++            if !settings.is_empty() {
++                line2_parts.push(settings.clone());
++            }
++            if !date_str.is_empty() {
++                line2_parts.push(date_str.clone());
++            }
++            let line2 = line2_parts.join("  •  ");
++
++            if !line1.is_empty() {
++                let (l1_w, _) = imageproc::drawing::text_size(scale_title, &font, &line1);
++                let l1_x = ((width as i32 - l1_w as i32) / 2).max(margin_x);
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    text_color,
++                    l1_x,
++                    y_line1,
++                    scale_title,
++                    &font,
++                    &line1,
++                );
++            }
++
++            if !line2.is_empty() {
++                let (l2_w, _) = imageproc::drawing::text_size(scale_sub, &font, &line2);
++                let l2_x = ((width as i32 - l2_w as i32) / 2).max(margin_x);
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    secondary_text_color,
++                    l2_x,
++                    y_line2,
++                    scale_sub,
++                    &font,
++                    &line2,
++                );
++            }
++        } else {
++            if !left_title.is_empty() {
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    text_color,
++                    margin_x,
++                    y_line1,
++                    scale_title,
++                    &font,
++                    &left_title,
++                );
++            }
++            if !left_sub.is_empty() {
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    secondary_text_color,
++                    margin_x,
++                    y_line2,
++                    scale_sub,
++                    &font,
++                    &left_sub,
++                );
++            }
++
++            if !right_title.is_empty() {
++                let (rw, _) = imageproc::drawing::text_size(scale_title, &font, &right_title);
++                let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    text_color,
++                    rx,
++                    y_line1,
++                    scale_title,
++                    &font,
++                    &right_title,
++                );
++            }
++            if !right_sub.is_empty() {
++                let (rw, _) = imageproc::drawing::text_size(scale_sub, &font, &right_sub);
++                let rx = (width as i32 - margin_x - rw as i32).max(margin_x);
++                imageproc::drawing::draw_text_mut(
++                    &mut output_buf,
++                    secondary_text_color,
++                    rx,
++                    y_line2,
++                    scale_sub,
++                    &font,
++                    &right_sub,
++                );
++            }
+         }
+ 
+         DynamicImage::ImageRgba8(output_buf)
 diff --git a/src/App.tsx b/src/App.tsx
 index c04e33f..fd9c1c3 100644
 --- a/src/App.tsx
@@ -239,7 +432,7 @@ index c04e33f..fd9c1c3 100644
                    side="right"
                    width={effectiveRightWidth}
 diff --git a/src/components/panel/BottomBar.tsx b/src/components/panel/BottomBar.tsx
-index 0645d3c..8dab7c3 100644
+index 0645d3c..2784ba1 100644
 --- a/src/components/panel/BottomBar.tsx
 +++ b/src/components/panel/BottomBar.tsx
 @@ -1,5 +1,5 @@
@@ -269,10 +462,10 @@ index 0645d3c..8dab7c3 100644
 +                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-surface hover:bg-surface-hover text-text-primary hover:text-accent border border-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 +                onClick={onExportClick}
 +                disabled={isExportDisabled}
-+                data-tooltip={t('editor.switcher.tooltips.export', 'Export')}
++                data-tooltip={t('editor.switcher.tooltips.export', 'Export Studio')}
 +              >
 +                <FileInput size={14} className="text-accent" />
-+                <span>Export</span>
++                <span>{t('editor.switcher.tooltips.export', 'Export Studio')}</span>
 +                {numSelected > 0 && (
 +                  <span className="px-1.5 py-0.2 rounded-full bg-accent/20 text-accent text-[10px] font-mono font-medium">
 +                    {numSelected}
@@ -323,7 +516,7 @@ index 4978036..a4a9824 100644
                'p-2 rounded-md shrink-0 transition-colors',
                isActive
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
-index d1789b3..2c60429 100644
+index d1789b3..72117f3 100644
 --- a/src/components/panel/right/CreativeExportTab.tsx
 +++ b/src/components/panel/right/CreativeExportTab.tsx
 @@ -13,6 +13,7 @@ import ExportLivePreview from './ExportLivePreview';
@@ -334,15 +527,33 @@ index d1789b3..2c60429 100644
    selectedImage: SelectedImage | null;
    finalPreviewUrl: string | null;
    pathsToExport: string[];
-@@ -122,6 +123,7 @@ export interface CreativeExportTabProps {
+@@ -105,6 +106,8 @@ export interface CreativeExportTabProps {
+   setEnableExifBadge: (enabled: boolean) => void;
+   exifBadgeStyle: 'bottom_strip' | 'overlay_badge';
+   setExifBadgeStyle: (style: 'bottom_strip' | 'overlay_badge') => void;
++  exifBadgeAlignment?: 'center' | 'columns' | 'split';
++  setExifBadgeAlignment?: (alignment: 'center' | 'columns' | 'split') => void;
+   exifShowCamera: boolean;
+   setExifShowCamera: (show: boolean) => void;
+   exifShowLens: boolean;
+@@ -122,6 +125,7 @@ export interface CreativeExportTabProps {
  }
  
  export default function CreativeExportTab({
-+  hideEmbeddedPreview = false,
++  hideEmbeddedPreview = true,
    selectedImage,
    finalPreviewUrl,
    pathsToExport,
-@@ -220,60 +222,62 @@ export default function CreativeExportTab({
+@@ -200,6 +204,8 @@ export default function CreativeExportTab({
+   setEnableExifBadge,
+   exifBadgeStyle,
+   setExifBadgeStyle,
++  exifBadgeAlignment = 'center',
++  setExifBadgeAlignment,
+   exifShowCamera,
+   setExifShowCamera,
+   exifShowLens,
+@@ -220,60 +226,62 @@ export default function CreativeExportTab({
    return (
      <div className="space-y-6">
        {/* 🖼️ Hero Live Interactive Preview */}
@@ -459,11 +670,290 @@ index d1789b3..2c60429 100644
  
        {/* 📐 Card 1: Outer Border & Fine-Art Keyline */}
        <Section title={t('export.sections.border', 'Framing & Keylines')}>
+@@ -607,6 +615,53 @@ export default function CreativeExportTab({
+               </div>
+             </div>
+ 
++            {/* Alignment for Bottom Strip */}
++            {exifBadgeStyle === 'bottom_strip' && setExifBadgeAlignment && (
++              <div>
++                <Text variant={TextVariants.label} className="mb-1.5">
++                  {t('export.exifBadge.alignmentTitle', 'Framing Alignment')}
++                </Text>
++                <div className="grid grid-cols-3 gap-1.5 bg-surface p-1 rounded-md text-xs">
++                  <button
++                    type="button"
++                    disabled={isExporting}
++                    onClick={() => setExifBadgeAlignment('center')}
++                    className={`py-1.5 px-2 rounded font-medium transition-colors text-center ${
++                      exifBadgeAlignment === 'center'
++                        ? 'bg-accent text-button-text font-semibold shadow-xs'
++                        : 'text-text-secondary hover:text-text-primary'
++                    }`}
++                  >
++                    {t('export.exifBadge.alignCenter', 'Center (Gallery)')}
++                  </button>
++                  <button
++                    type="button"
++                    disabled={isExporting}
++                    onClick={() => setExifBadgeAlignment('columns')}
++                    className={`py-1.5 px-2 rounded font-medium transition-colors text-center ${
++                      exifBadgeAlignment === 'columns'
++                        ? 'bg-accent text-button-text font-semibold shadow-xs'
++                        : 'text-text-secondary hover:text-text-primary'
++                    }`}
++                  >
++                    {t('export.exifBadge.alignColumns', 'Per Photo Column')}
++                  </button>
++                  <button
++                    type="button"
++                    disabled={isExporting}
++                    onClick={() => setExifBadgeAlignment('split')}
++                    className={`py-1.5 px-2 rounded font-medium transition-colors text-center ${
++                      exifBadgeAlignment === 'split'
++                        ? 'bg-accent text-button-text font-semibold shadow-xs'
++                        : 'text-text-secondary hover:text-text-primary'
++                    }`}
++                  >
++                    {t('export.exifBadge.alignSplit', 'Split Corners')}
++                  </button>
++                </div>
++              </div>
++            )}
++
+             {/* Metadata Elements to Include */}
+             <div>
+               <Text variant={TextVariants.label} className="mb-2">
+@@ -793,114 +848,119 @@ export default function CreativeExportTab({
+         )}
+       </Section>
+ 
+-      {/* 📱 Card 3: Multi-Tile Splitter (Instagram / Panorama) */}
+-      <Section title={t('export.grid.tileSplitTitle', 'Multi-Tile Splitter (Instagram / Panorama)')}>
+-        <Switch
+-          label={t('export.grid.enableTileSplit')}
+-          checked={enableTileSplit}
+-          onChange={setEnableTileSplit}
+-          disabled={isExporting}
+-          trackClassName="bg-surface"
+-        />
+-        {enableTileSplit && (
+-          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
+-            <div className="grid grid-cols-2 gap-3">
+-              <div>
+-                <Text variant={TextVariants.label} className="mb-1">
+-                  {t('export.grid.tileCols')}
+-                </Text>
+-                <GridNumberInput
+-                  min={1}
+-                  max={10}
+-                  value={tileSplitColumns}
+-                  disabled={isExporting}
+-                  onChange={setTileSplitColumns}
+-                />
+-              </div>
+-              <div>
+-                <Text variant={TextVariants.label} className="mb-1">
+-                  {t('export.grid.tileRows')}
+-                </Text>
+-                <GridNumberInput
+-                  min={1}
+-                  max={10}
+-                  value={tileSplitRows}
+-                  disabled={isExporting}
+-                  onChange={setTileSplitRows}
+-                />
+-              </div>
+-            </div>
++      {/* 📐 Card 5: Grid Tools & Overlays */}
++      <Section title={t('export.grid.toolsAndOverlaysTitle', 'Grid Tools & Overlays')}>
++        <div className="space-y-4">
++          {/* Sub-tool 1: Multi-Tile Splitter */}
++          <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
+             <Switch
+-              label={t('export.grid.borderEachTile')}
+-              checked={tileBorderEachTile}
+-              onChange={setTileBorderEachTile}
++              label={t('export.grid.tileSplitTitle', 'Multi-Tile Splitter (Instagram / Panorama)')}
++              checked={enableTileSplit}
++              onChange={setEnableTileSplit}
+               disabled={isExporting}
+               trackClassName="bg-surface"
+             />
+-          </div>
+-        )}
+-      </Section>
+-
+-      {/* 📏 Card 4: Composition Grid Overlay */}
+-      <Section title={t('export.border.addGridOverlay', 'Composition Grid Overlay')}>
+-        <Switch
+-          label={t('export.border.addGridOverlay')}
+-          checked={enableGridOverlay}
+-          onChange={setEnableGridOverlay}
+-          disabled={isExporting}
+-          trackClassName="bg-surface"
+-        />
+-        {enableGridOverlay && (
+-          <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
+-            <div className="grid grid-cols-2 gap-3">
+-              <div>
+-                <Text variant={TextVariants.label} className="mb-1">
+-                  {t('export.border.gridOverlayCols')}
+-                </Text>
+-                <GridNumberInput
+-                  min={2}
+-                  max={12}
+-                  value={gridOverlayCols}
++            {enableTileSplit && (
++              <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
++                <div className="grid grid-cols-2 gap-3">
++                  <div>
++                    <Text variant={TextVariants.label} className="mb-1">
++                      {t('export.grid.tileCols')}
++                    </Text>
++                    <GridNumberInput
++                      min={1}
++                      max={10}
++                      value={tileSplitColumns}
++                      disabled={isExporting}
++                      onChange={setTileSplitColumns}
++                    />
++                  </div>
++                  <div>
++                    <Text variant={TextVariants.label} className="mb-1">
++                      {t('export.grid.tileRows')}
++                    </Text>
++                    <GridNumberInput
++                      min={1}
++                      max={10}
++                      value={tileSplitRows}
++                      disabled={isExporting}
++                      onChange={setTileSplitRows}
++                    />
++                  </div>
++                </div>
++                <Switch
++                  label={t('export.grid.borderEachTile')}
++                  checked={tileBorderEachTile}
++                  onChange={setTileBorderEachTile}
+                   disabled={isExporting}
+-                  onChange={setGridOverlayCols}
++                  trackClassName="bg-surface"
+                 />
+               </div>
+-              <div>
+-                <Text variant={TextVariants.label} className="mb-1">
+-                  {t('export.border.gridOverlayRows')}
+-                </Text>
+-                <GridNumberInput
+-                  min={2}
+-                  max={12}
+-                  value={gridOverlayRows}
++            )}
++          </div>
++
++          {/* Sub-tool 2: Composition Grid Overlay */}
++          <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
++            <Switch
++              label={t('export.border.addGridOverlay', 'Composition Grid Overlay')}
++              checked={enableGridOverlay}
++              onChange={setEnableGridOverlay}
++              disabled={isExporting}
++              trackClassName="bg-surface"
++            />
++            {enableGridOverlay && (
++              <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
++                <div className="grid grid-cols-2 gap-3">
++                  <div>
++                    <Text variant={TextVariants.label} className="mb-1">
++                      {t('export.border.gridOverlayCols')}
++                    </Text>
++                    <GridNumberInput
++                      min={2}
++                      max={12}
++                      value={gridOverlayCols}
++                      disabled={isExporting}
++                      onChange={setGridOverlayCols}
++                    />
++                  </div>
++                  <div>
++                    <Text variant={TextVariants.label} className="mb-1">
++                      {t('export.border.gridOverlayRows')}
++                    </Text>
++                    <GridNumberInput
++                      min={2}
++                      max={12}
++                      value={gridOverlayRows}
++                      disabled={isExporting}
++                      onChange={setGridOverlayRows}
++                    />
++                  </div>
++                </div>
++                <Slider
++                  label={t('export.border.gridOverlayOpacity')}
++                  min={5}
++                  max={100}
++                  step={1}
++                  value={gridOverlayOpacity}
++                  onChange={(e) => setGridOverlayOpacity(Number(e.target.value))}
+                   disabled={isExporting}
+-                  onChange={setGridOverlayRows}
++                  defaultValue={50}
+                 />
++                <div className="flex items-center justify-between gap-3">
++                  <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor')}</Text>
++                  <input
++                    aria-label={t('export.border.gridOverlayColor')}
++                    className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                    disabled={isExporting}
++                    onChange={(e) => setGridOverlayColor(e.target.value)}
++                    type="color"
++                    value={gridOverlayColor}
++                  />
++                </div>
+               </div>
+-            </div>
+-            <Slider
+-              label={t('export.border.gridOverlayOpacity')}
+-              min={5}
+-              max={100}
+-              step={1}
+-              value={gridOverlayOpacity}
+-              onChange={(e) => setGridOverlayOpacity(Number(e.target.value))}
+-              disabled={isExporting}
+-              defaultValue={50}
+-            />
+-            <div className="flex items-center justify-between gap-3">
+-              <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor')}</Text>
+-              <input
+-                aria-label={t('export.border.gridOverlayColor')}
+-                className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
+-                disabled={isExporting}
+-                onChange={(e) => setGridOverlayColor(e.target.value)}
+-                type="color"
+-                value={gridOverlayColor}
+-              />
+-            </div>
++            )}
+           </div>
+-        )}
++        </div>
+       </Section>
+     </div>
+   );
 diff --git a/src/components/panel/right/ExportLivePreview.tsx b/src/components/panel/right/ExportLivePreview.tsx
-index 49a75fc..bdcd3a9 100644
+index 49a75fc..ffc27d7 100644
 --- a/src/components/panel/right/ExportLivePreview.tsx
 +++ b/src/components/panel/right/ExportLivePreview.tsx
-@@ -122,9 +122,15 @@ interface ExportLivePreviewProps {
+@@ -115,6 +115,7 @@ interface ExportLivePreviewProps {
+   // EXIF Badge options
+   enableExifBadge?: boolean;
+   exifBadgeStyle?: 'bottom_strip' | 'overlay_badge';
++  exifBadgeAlignment?: 'center' | 'columns' | 'split';
+   exifShowCamera?: boolean;
+   exifShowLens?: boolean;
+   exifShowSettings?: boolean;
+@@ -122,9 +123,15 @@ interface ExportLivePreviewProps {
    exifCustomText?: string;
    exifBadgeBgColor?: string;
    exifBadgeTextColor?: string;
@@ -479,7 +969,249 @@ index 49a75fc..bdcd3a9 100644
    selectedImage,
    finalPreviewUrl,
    multiSelectedPaths,
-@@ -815,10 +821,12 @@ export default function ExportLivePreview({
+@@ -166,6 +173,7 @@ export default function ExportLivePreview({
+   onCustomPlacementChange,
+   enableExifBadge = false,
+   exifBadgeStyle = 'bottom_strip',
++  exifBadgeAlignment = 'center',
+   exifShowCamera = true,
+   exifShowLens = true,
+   exifShowSettings = true,
+@@ -271,14 +279,28 @@ export default function ExportLivePreview({
+ 
+   // Collect image URLs to display:
+   const activeImageUrls = React.useMemo(() => {
+-    if (enableCollageGrid && multiSelectedPaths.length > 1) {
+-      return multiSelectedPaths.map(
+-        (p) => thumbnailMap[p] || (p === selectedImage?.path ? finalPreviewUrl || selectedImage?.thumbnailUrl : '') || ''
+-      ).filter(Boolean);
++    if (multiSelectedPaths.length > 1) {
++      return multiSelectedPaths
++        .map(
++          (p) =>
++            thumbnailMap[p] ||
++            (p === selectedImage?.path ? finalPreviewUrl || selectedImage?.thumbnailUrl : '') ||
++            convertFileSrc(p),
++        )
++        .filter(Boolean);
++    }
++    if (multiSelectedPaths.length === 1) {
++      const p = multiSelectedPaths[0];
++      const single =
++        (p === selectedImage?.path ? finalPreviewUrl : null) ||
++        thumbnailMap[p] ||
++        (p === selectedImage?.path ? selectedImage?.thumbnailUrl : null) ||
++        convertFileSrc(p);
++      return single ? [single] : [];
+     }
+     const single = finalPreviewUrl || selectedImage?.thumbnailUrl;
+     return single ? [single] : [];
+-  }, [enableCollageGrid, multiSelectedPaths, thumbnailMap, selectedImage, finalPreviewUrl]);
++  }, [multiSelectedPaths, thumbnailMap, selectedImage, finalPreviewUrl]);
+ 
+   // Preload images into HTMLImageElement objects
+   useEffect(() => {
+@@ -332,14 +354,64 @@ export default function ExportLivePreview({
+         return;
+       }
+ 
+-      const isCollage = enableCollageGrid && loadedImages.length > 1;
+-      const cols = isCollage ? Math.max(1, collageColumns) : 1;
+-      const rows = isCollage ? Math.max(1, collageRows) : 1;
++      const numImagesCount = loadedImages.length;
++      const isCollage = enableCollageGrid && numImagesCount > 1;
++      const isProofingGrid = !enableCollageGrid && numImagesCount > 1;
++
++      let cols = 1;
++      let rows = 1;
++      if (isCollage) {
++        cols = Math.max(1, collageColumns);
++        rows = Math.max(1, collageRows);
++      } else if (isProofingGrid) {
++        if (numImagesCount === 2) {
++          cols = imageRatio > 0 && imageRatio < 1 ? 1 : 2;
++          rows = imageRatio > 0 && imageRatio < 1 ? 2 : 1;
++        } else if (numImagesCount === 3) {
++          cols = 3;
++          rows = 1;
++        } else if (numImagesCount === 4) {
++          cols = 2;
++          rows = 2;
++        } else if (numImagesCount <= 6) {
++          cols = 3;
++          rows = 2;
++        } else if (numImagesCount <= 8) {
++          cols = 4;
++          rows = 2;
++        } else if (numImagesCount <= 9) {
++          cols = 3;
++          rows = 3;
++        } else if (numImagesCount <= 12) {
++          cols = 4;
++          rows = 3;
++        } else {
++          cols = Math.ceil(Math.sqrt(numImagesCount * 1.3));
++          rows = Math.ceil(numImagesCount / cols);
++        }
++      }
+ 
+-      // Base cell dimensions:
+-      const cellW = 400;
+-      const cellH = Math.round(cellW / (imageRatio > 0 ? imageRatio : 1.5));
+-      const gutterPx = isCollage ? Math.round((cellW * collageGutter) / 100) : 0;
++      // Responsive stage calculation: scale cells dynamically to fill stage
++      const targetStageW = Math.max(800, maxDim);
++      const targetStageH = Math.round(targetStageW * 0.62);
++
++      const gutterPx = isCollage
++        ? Math.round((400 * collageGutter) / 100)
++        : isProofingGrid
++        ? Math.max(8, Math.round(targetStageW * 0.015))
++        : 0;
++
++      // Base cell dimensions: dynamically scaled based on cols and rows
++      const baseCellW = Math.round((targetStageW - (cols - 1) * gutterPx) / cols);
++      const baseCellH = Math.round(baseCellW / (imageRatio > 0 ? imageRatio : 1.5));
++
++      const maxAllowedCellH = Math.round((targetStageH - (rows - 1) * gutterPx) / rows);
++      let cellW = baseCellW;
++      let cellH = baseCellH;
++      if (cellH > maxAllowedCellH && maxAllowedCellH > 60) {
++        cellH = maxAllowedCellH;
++        cellW = Math.round(cellH * (imageRatio > 0 ? imageRatio : 1.5));
++      }
+ 
+       const innerContentW = cols * cellW + (cols - 1) * gutterPx;
+       const innerContentH = rows * cellH + (rows - 1) * gutterPx;
+@@ -352,7 +424,7 @@ export default function ExportLivePreview({
+       // EXIF Badge strip calculation:
+       const isExifActive = enableExifBadge;
+       const isExifStrip = isExifActive && exifBadgeStyle === 'bottom_strip';
+-      const exifStripHeight = isExifStrip ? Math.max(42, Math.round(innerContentH * 0.11)) : 0;
++      const exifStripHeight = isExifStrip ? Math.max(48, Math.round(innerContentH * 0.12)) : 0;
+ 
+       const totalCanvasW = innerContentW + borderXPx * 2;
+       const totalCanvasH = innerContentH + borderYPx * 2 + exifStripHeight;
+@@ -728,35 +800,82 @@ export default function ExportLivePreview({
+ 
+           const mainTextColor = exifBadgeTextColor || '#111827';
+ 
+-          // Left section
+-          ctx.textAlign = 'left';
+-          ctx.textBaseline = 'middle';
+-          if (leftTitle) {
+-            ctx.font = `bold ${fontTitlePx}px sans-serif`;
+-            ctx.fillStyle = mainTextColor;
+-            ctx.fillText(leftTitle, marginX, y1);
+-          }
+-          if (leftSub) {
+-            ctx.font = `normal ${fontSubPx}px sans-serif`;
+-            ctx.fillStyle = mainTextColor;
+-            ctx.globalAlpha = 0.75;
+-            ctx.fillText(leftSub, marginX, y2);
+-            ctx.globalAlpha = 1.0;
+-          }
++          const isMultiPhoto = loadedImages.length > 1;
++          const effectiveAlignment = exifBadgeAlignment || (isMultiPhoto ? 'center' : 'split');
+ 
+-          // Right section
+-          ctx.textAlign = 'right';
+-          if (rightTitle) {
+-            ctx.font = `600 ${fontTitlePx}px sans-serif`;
+-            ctx.fillStyle = mainTextColor;
+-            ctx.fillText(rightTitle, rightX, y1);
+-          }
+-          if (rightSub) {
+-            ctx.font = `normal ${fontSubPx}px sans-serif`;
+-            ctx.fillStyle = mainTextColor;
+-            ctx.globalAlpha = 0.75;
+-            ctx.fillText(rightSub, rightX, y2);
+-            ctx.globalAlpha = 1.0;
++          if (effectiveAlignment === 'center') {
++            const centerX = totalCanvasW / 2;
++            ctx.textAlign = 'center';
++            ctx.textBaseline = 'middle';
++
++            const line1Parts = [cameraText, lensText, customText].filter(Boolean);
++            const line1 = line1Parts.join('  •  ');
++            const line2Parts = [settingsText, dateText].filter(Boolean);
++            const line2 = line2Parts.join('  •  ');
++
++            if (line1) {
++              ctx.font = `bold ${fontTitlePx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.fillText(line1, centerX, y1);
++            }
++            if (line2) {
++              ctx.font = `normal ${fontSubPx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.globalAlpha = 0.75;
++              ctx.fillText(line2, centerX, y2);
++              ctx.globalAlpha = 1.0;
++            }
++          } else if (effectiveAlignment === 'columns' && isMultiPhoto) {
++            ctx.textAlign = 'center';
++            ctx.textBaseline = 'middle';
++            for (let c = 0; c < cols; c++) {
++              const colCenterX = startX + c * (cellW + gutterPx) + cellW / 2;
++              const colTitle = cameraText || customText || '';
++              const colSub = settingsText || lensText || '';
++              if (colTitle) {
++                ctx.font = `bold ${Math.round(fontTitlePx * 0.85)}px sans-serif`;
++                ctx.fillStyle = mainTextColor;
++                ctx.fillText(colTitle, colCenterX, y1);
++              }
++              if (colSub) {
++                ctx.font = `normal ${Math.round(fontSubPx * 0.85)}px sans-serif`;
++                ctx.fillStyle = mainTextColor;
++                ctx.globalAlpha = 0.75;
++                ctx.fillText(colSub, colCenterX, y2);
++                ctx.globalAlpha = 1.0;
++              }
++            }
++          } else {
++            // Left section
++            ctx.textAlign = 'left';
++            ctx.textBaseline = 'middle';
++            if (leftTitle) {
++              ctx.font = `bold ${fontTitlePx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.fillText(leftTitle, marginX, y1);
++            }
++            if (leftSub) {
++              ctx.font = `normal ${fontSubPx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.globalAlpha = 0.75;
++              ctx.fillText(leftSub, marginX, y2);
++              ctx.globalAlpha = 1.0;
++            }
++
++            // Right section
++            ctx.textAlign = 'right';
++            if (rightTitle) {
++              ctx.font = `600 ${fontTitlePx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.fillText(rightTitle, rightX, y1);
++            }
++            if (rightSub) {
++              ctx.font = `normal ${fontSubPx}px sans-serif`;
++              ctx.fillStyle = mainTextColor;
++              ctx.globalAlpha = 0.75;
++              ctx.fillText(rightSub, rightX, y2);
++              ctx.globalAlpha = 1.0;
++            }
+           }
+         }
+         ctx.restore();
+@@ -803,6 +922,7 @@ export default function ExportLivePreview({
+       watermarkCustomY,
+       enableExifBadge,
+       exifBadgeStyle,
++      exifBadgeAlignment,
+       exifShowCamera,
+       exifShowLens,
+       exifShowSettings,
+@@ -815,10 +935,12 @@ export default function ExportLivePreview({
      ]
    );
  
@@ -494,7 +1226,7 @@ index 49a75fc..bdcd3a9 100644
  
    // Render on modal canvas if modal open
    useEffect(() => {
-@@ -837,6 +845,147 @@ export default function ExportLivePreview({
+@@ -837,6 +959,147 @@ export default function ExportLivePreview({
      return Math.max(1, multiSelectedPaths.length);
    }, [enableTileSplit, tileSplitColumns, tileSplitRows, enableCollageGrid, multiSelectedPaths]);
  
@@ -642,6 +1374,109 @@ index 49a75fc..bdcd3a9 100644
    return (
      <div className="sticky top-0 z-10 w-full bg-surface-lowest/95 backdrop-blur-md rounded-lg border border-surface p-3 mb-4 space-y-2 shadow-lg">
        {/* Header with Title and Expand button */}
+diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
+index 8f30585..84f43cd 100644
+--- a/src/components/panel/right/ExportPanel.tsx
++++ b/src/components/panel/right/ExportPanel.tsx
+@@ -1,7 +1,7 @@
+ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+ import { save, open } from '@tauri-apps/plugin-dialog';
+ import { invoke } from '@tauri-apps/api/core';
+-import { FileInput, CheckCircle, XCircle, Loader, Ban, X } from 'lucide-react';
++import { FileInput, CheckCircle, XCircle, Loader, Ban, X, Maximize2 } from 'lucide-react';
+ import { motion } from 'framer-motion';
+ import { useTranslation } from 'react-i18next';
+ import debounce from 'lodash.debounce';
+@@ -195,6 +195,8 @@ export default function ExportPanel({
+     setEnableExifBadge,
+     exifBadgeStyle,
+     setExifBadgeStyle,
++    exifBadgeAlignment,
++    setExifBadgeAlignment,
+     exifShowCamera,
+     setExifShowCamera,
+     exifShowLens,
+@@ -254,6 +256,7 @@ export default function ExportPanel({
+   const osPlatform = useOsPlatform();
+   const isAndroid = osPlatform === 'android';
+   const activePanels = useUIStore((state) => state.activePanels);
++  const setUI = useUIStore((state) => state.setUI);
+   const isPanelReallyActive = Object.values(activePanels).includes(Panel.Export);
+ 
+   const { status, progress, errorMessage } = exportState;
+@@ -440,6 +443,7 @@ export default function ExportPanel({
+         ? {
+             enabled: true,
+             style: exifBadgeStyle,
++            alignment: exifBadgeAlignment,
+             showCamera: exifShowCamera,
+             showLens: exifShowLens,
+             showSettings: exifShowSettings,
+@@ -636,6 +640,7 @@ export default function ExportPanel({
+         ? {
+             enabled: true,
+             style: exifBadgeStyle,
++            alignment: exifBadgeAlignment,
+             showCamera: exifShowCamera,
+             showLens: exifShowLens,
+             showSettings: exifShowSettings,
+@@ -781,7 +786,18 @@ export default function ExportPanel({
+     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
+       {/* Header */}
+       <div className="p-3 flex justify-between items-center shrink-0 border-b border-surface">
+-        <Text variant={TextVariants.title}>{t('export.title')}</Text>
++        <div className="flex items-center gap-2 min-w-0">
++          <Text variant={TextVariants.title}>{t('export.title')}</Text>
++          <button
++            type="button"
++            onClick={() => setUI((s) => ({ previousView: s.activeView, activeView: 'export' }))}
++            className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors cursor-pointer"
++            title="Open Export Studio with darkroom live preview canvas and bottom photo roll"
++          >
++            <Maximize2 size={12} />
++            <span>Open Studio</span>
++          </button>
++        </div>
+         {onClose && (
+           <button
+             onClick={onClose}
+@@ -900,6 +916,7 @@ export default function ExportPanel({
+           ) : (
+             <ErrorBoundary fallbackTitle="Creative Export Error">
+               <CreativeExportTab
++                hideEmbeddedPreview={true}
+                 selectedImage={selectedImage}
+                 finalPreviewUrl={finalPreviewUrl}
+                 pathsToExport={pathsToExport}
+@@ -978,6 +995,8 @@ export default function ExportPanel({
+                 setEnableExifBadge={setEnableExifBadge}
+                 exifBadgeStyle={exifBadgeStyle}
+                 setExifBadgeStyle={setExifBadgeStyle}
++                exifBadgeAlignment={exifBadgeAlignment}
++                setExifBadgeAlignment={setExifBadgeAlignment}
+                 exifShowCamera={exifShowCamera}
+                 setExifShowCamera={setExifShowCamera}
+                 exifShowLens={exifShowLens}
+diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
+index 3fbf554..35d8072 100644
+--- a/src/components/ui/ExportImportProperties.tsx
++++ b/src/components/ui/ExportImportProperties.tsx
+@@ -62,6 +62,7 @@ export type TiffBitDepth = 8 | 16;
+ export interface ExifBadgeSettings {
+   enabled: boolean;
+   style: 'bottom_strip' | 'overlay_badge';
++  alignment?: 'center' | 'columns' | 'split';
+   showCamera: boolean;
+   showLens: boolean;
+   showSettings: boolean;
+@@ -242,6 +243,7 @@ export interface ExportPreset {
+   tileBorderEachTile?: boolean;
+   enableExifBadge?: boolean;
+   exifBadgeStyle?: 'bottom_strip' | 'overlay_badge';
++  exifBadgeAlignment?: 'center' | 'columns' | 'split';
+   exifShowCamera?: boolean;
+   exifShowLens?: boolean;
+   exifShowSettings?: boolean;
 diff --git a/src/components/views/EditorView.tsx b/src/components/views/EditorView.tsx
 index 9310f14..95051f3 100644
 --- a/src/components/views/EditorView.tsx
@@ -658,10 +1493,10 @@ index 9310f14..95051f3 100644
        rating={imageRatings[selectedImage?.path || ''] || 0}
 diff --git a/src/components/views/ExportView.tsx b/src/components/views/ExportView.tsx
 new file mode 100644
-index 0000000..171fdb7
+index 0000000..2abaad0
 --- /dev/null
 +++ b/src/components/views/ExportView.tsx
-@@ -0,0 +1,1440 @@
+@@ -0,0 +1,1497 @@
 +import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 +import { motion, AnimatePresence } from 'framer-motion';
 +import { useTranslation } from 'react-i18next';
@@ -863,6 +1698,8 @@ index 0000000..171fdb7
 +    setEnableExifBadge,
 +    exifBadgeStyle,
 +    setExifBadgeStyle,
++    exifBadgeAlignment,
++    setExifBadgeAlignment,
 +    exifShowCamera,
 +    setExifShowCamera,
 +    exifShowLens,
@@ -1188,6 +2025,7 @@ index 0000000..171fdb7
 +        ? {
 +            enabled: true,
 +            style: exifBadgeStyle,
++            alignment: exifBadgeAlignment,
 +            showCamera: exifShowCamera,
 +            showLens: exifShowLens,
 +            showSettings: exifShowSettings,
@@ -1261,6 +2099,7 @@ index 0000000..171fdb7
 +    tileBorderEachTile,
 +    enableExifBadge,
 +    exifBadgeStyle,
++    exifBadgeAlignment,
 +    exifShowCamera,
 +    exifShowLens,
 +    exifShowSettings,
@@ -1376,6 +2215,7 @@ index 0000000..171fdb7
 +        ? {
 +            enabled: true,
 +            style: exifBadgeStyle,
++            alignment: exifBadgeAlignment,
 +            showCamera: exifShowCamera,
 +            showLens: exifShowLens,
 +            showSettings: exifShowSettings,
@@ -1516,12 +2356,61 @@ index 0000000..171fdb7
 +    handleSetMultiSelect(inverted);
 +  };
 +
++  const selectionAnchorRef = useRef<string | null>(null);
++
 +  const handleTogglePhotoInExport = (path: string, e?: React.MouseEvent) => {
 +    e?.stopPropagation();
 +    if (multiSelectedPaths.includes(path)) {
 +      handleSetMultiSelect(multiSelectedPaths.filter((p) => p !== path));
 +    } else {
 +      handleSetMultiSelect([...multiSelectedPaths, path]);
++      handleImageSelect(path);
++    }
++    selectionAnchorRef.current = path;
++  };
++
++  const handleCardClick = (path: string, e: React.MouseEvent) => {
++    const isModifier = e.metaKey || e.ctrlKey;
++    const isShift = e.shiftKey;
++    const isAlreadySelected = multiSelectedPaths.includes(path);
++
++    if (isModifier) {
++      if (isAlreadySelected) {
++        const next = multiSelectedPaths.filter((p) => p !== path);
++        handleSetMultiSelect(next);
++        if (next.length > 0) {
++          handleImageSelect(next[next.length - 1]);
++        }
++      } else {
++        handleSetMultiSelect([...multiSelectedPaths, path]);
++        handleImageSelect(path);
++      }
++      selectionAnchorRef.current = path;
++    } else if (isShift && sortedImageList.length > 0) {
++      const anchor =
++        selectionAnchorRef.current ||
++        (multiSelectedPaths.length > 0
++          ? multiSelectedPaths[multiSelectedPaths.length - 1]
++          : activePreviewPath || sortedImageList[0].path);
++      const anchorIdx = sortedImageList.findIndex((img) => img.path === anchor);
++      const targetIdx = sortedImageList.findIndex((img) => img.path === path);
++
++      if (anchorIdx !== -1 && targetIdx !== -1) {
++        const start = Math.min(anchorIdx, targetIdx);
++        const end = Math.max(anchorIdx, targetIdx);
++        const range = sortedImageList.slice(start, end + 1).map((img) => img.path);
++        const next = Array.from(new Set([...multiSelectedPaths, ...range]));
++        handleSetMultiSelect(next);
++      } else {
++        handleSetMultiSelect([path]);
++      }
++      handleImageSelect(path);
++    } else {
++      if (!isAlreadySelected) {
++        handleSetMultiSelect([path]);
++      }
++      handleImageSelect(path);
++      selectionAnchorRef.current = path;
 +    }
 +  };
 +
@@ -1667,6 +2556,7 @@ index 0000000..171fdb7
 +              }}
 +              enableExifBadge={enableExifBadge}
 +              exifBadgeStyle={exifBadgeStyle}
++              exifBadgeAlignment={exifBadgeAlignment}
 +              exifShowCamera={exifShowCamera}
 +              exifShowLens={exifShowLens}
 +              exifShowSettings={exifShowSettings}
@@ -1857,6 +2747,8 @@ index 0000000..171fdb7
 +                setEnableExifBadge={setEnableExifBadge}
 +                exifBadgeStyle={exifBadgeStyle}
 +                setExifBadgeStyle={setExifBadgeStyle}
++                exifBadgeAlignment={exifBadgeAlignment}
++                setExifBadgeAlignment={setExifBadgeAlignment}
 +                exifShowCamera={exifShowCamera}
 +                setExifShowCamera={setExifShowCamera}
 +                exifShowLens={exifShowLens}
@@ -2037,7 +2929,7 @@ index 0000000..171fdb7
 +                return (
 +                  <div
 +                    key={img.path}
-+                    onClick={() => handleImageSelect(img.path)}
++                    onClick={(e) => handleCardClick(img.path, e)}
 +                    className={clsx(
 +                      'relative h-24 w-24 shrink-0 rounded-lg overflow-hidden border cursor-pointer group transition-all duration-150',
 +                      isActiveInCanvas
@@ -2046,7 +2938,7 @@ index 0000000..171fdb7
 +                        ? 'border-accent/80 ring-1 ring-accent/40 shadow-sm'
 +                        : 'border-surface/80 hover:border-text-secondary/60 hover:shadow-md',
 +                    )}
-+                    title={`${fname} (Click to preview in studio canvas)`}
++                    title={`${fname} (Click to preview, ⌘/Ctrl+Click to multi-select)`}
 +                  >
 +                    {/* Thumbnail Image */}
 +                    <img
@@ -2137,6 +3029,51 @@ index ce8b3c4..4f0a89c 100644
        };
  
        const handleRemoveFromAlbum = async () => {
+diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
+index 0c3d20e..1cf2675 100644
+--- a/src/hooks/useExportSettings.ts
++++ b/src/hooks/useExportSettings.ts
+@@ -51,6 +51,7 @@ export function useExportSettings() {
+   const [tileBorderEachTile, setTileBorderEachTile] = useState(false);
+   const [enableExifBadge, setEnableExifBadge] = useState(false);
+   const [exifBadgeStyle, setExifBadgeStyle] = useState<'bottom_strip' | 'overlay_badge'>('bottom_strip');
++  const [exifBadgeAlignment, setExifBadgeAlignment] = useState<'center' | 'columns' | 'split'>('center');
+   const [exifShowCamera, setExifShowCamera] = useState(true);
+   const [exifShowLens, setExifShowLens] = useState(true);
+   const [exifShowSettings, setExifShowSettings] = useState(true);
+@@ -111,6 +112,7 @@ export function useExportSettings() {
+     setTileBorderEachTile(preset.tileBorderEachTile ?? false);
+     setEnableExifBadge(preset.enableExifBadge ?? false);
+     setExifBadgeStyle(preset.exifBadgeStyle ?? 'bottom_strip');
++    if (preset.exifBadgeAlignment) setExifBadgeAlignment(preset.exifBadgeAlignment);
+     setExifShowCamera(preset.exifShowCamera ?? true);
+     setExifShowLens(preset.exifShowLens ?? true);
+     setExifShowSettings(preset.exifShowSettings ?? true);
+@@ -172,6 +174,7 @@ export function useExportSettings() {
+       tileBorderEachTile,
+       enableExifBadge,
+       exifBadgeStyle,
++      exifBadgeAlignment,
+       exifShowCamera,
+       exifShowLens,
+       exifShowSettings,
+@@ -234,6 +237,7 @@ export function useExportSettings() {
+       exifShowCamera,
+       exifShowLens,
+       exifShowSettings,
++      exifBadgeAlignment,
+       exifShowDate,
+       exifCustomText,
+       exifBadgeBgColor,
+@@ -342,6 +346,8 @@ export function useExportSettings() {
+     setEnableExifBadge,
+     exifBadgeStyle,
+     setExifBadgeStyle,
++    exifBadgeAlignment,
++    setExifBadgeAlignment,
+     exifShowCamera,
+     setExifShowCamera,
+     exifShowLens,
 diff --git a/src/hooks/useKeyboardShortcuts.ts b/src/hooks/useKeyboardShortcuts.ts
 index 609b36c..6ec530d 100644
 --- a/src/hooks/useKeyboardShortcuts.ts
@@ -2162,6 +3099,19 @@ index 609b36c..6ec530d 100644
            else if (s.ui.activeView === 'editor') handleBackToLibrary();
            else if (s.ui.activeView === 'library' && s.library.rootPaths?.length > 0) handleGoHome();
          },
+diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
+index d475352..867baa2 100644
+--- a/src/i18n/locales/en.json
++++ b/src/i18n/locales/en.json
+@@ -747,7 +747,7 @@
+       "tooltips": {
+         "adjust": "Adjust",
+         "crop": "Crop",
+-        "export": "Export",
++        "export": "Export Studio",
+         "info": "Info",
+         "inpaint": "Inpaint",
+         "masks": "Masks",
 diff --git a/src/store/useUIStore.ts b/src/store/useUIStore.ts
 index cec17f9..502bc41 100644
 --- a/src/store/useUIStore.ts
