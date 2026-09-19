@@ -14,6 +14,12 @@
 
 ### *RAW development is only half the photograph. Creative Export finishes the print.*
 
+<br/>
+
+<img src="docs/images/hero-canvas-proofing.png" alt="RapidRAW Creative Export Studio Live Canvas Proofing" width="100%" />
+
+*Live canvas proofing of a fine-art Polaroid mat, museum inset keyline, and EXIF badge directly inside the RapidRAW editor.*
+
 </div>
 
 Most RAW editors stop at pixel adjustments, leaving photographers to wrestle with Photoshop, Lightroom Print, or command-line scripts just to add exhibition mats, camera badges, or Instagram slice carousels.
@@ -35,6 +41,15 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
 
 ## 🎨 Creative Superpowers
 
+<p align="center">
+  <img src="docs/images/polaroid-exif-badge.png" width="48%" alt="Fine-Art Mat with Inset Keyline and EXIF Badge" />
+  &nbsp;
+  <img src="docs/images/export-studio-panel.png" width="48%" alt="Export Studio Controls Drawer" />
+</p>
+<p align="center">
+  <em>Left: Live canvas proof with custom fine-art mat, contrasting inset keyline, Polaroid chin, and EXIF metadata. Right: The integrated Export Studio inspector controls drawer.</em>
+</p>
+
 ### 🖼️ Fine-Art Mats & Museum Inset Keylines
 - **Outer Mat**: Proportional border framing (0.5% to 50%) in any custom color.
 - **Museum Inset Keyline (Fillet)**: Contrasting hairline inner border inset at any distance inside the outer mat with customizable stroke thickness (1px–10px) and dedicated color selection.
@@ -54,6 +69,17 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
 ### 🏷️ Dynamic Filename Templates & Watermarks
 - **Token Engine**: Name exports automatically using `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`, `{shutter}`, `{date}`, `{time}`, and `{seq}`.
 - **Branding**: Text watermarks with automatic legibility drop-shadows or high-res PNG logo overlays with interactive canvas positioning.
+
+---
+
+## 🔄 Seamless Workflow
+
+<p align="center">
+  <img src="docs/images/export-workflow.png" width="46%" alt="Standard Export with Seamless Creative Studio Link" />
+</p>
+<p align="center">
+  <em>Switch between standard batch exporting and creative fine-art styling with one click.</em>
+</p>
 
 ---
 
