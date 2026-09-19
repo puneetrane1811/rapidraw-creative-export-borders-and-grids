@@ -2,7 +2,7 @@
 
 Welcome to the comprehensive reference and user manual for **RapidRAW: Export Studio & Creative Export**.
 
-This guide covers the full architecture, user interface layout, keyboard/mouse controls, configuration parameters, and Rust processing pipelines introduced in RapidRAW's Center Stage Export Studio.
+This guide covers the architecture, user interface layout, keyboard/mouse controls, configuration parameters, per-image retention, preset management, and Rust processing pipelines powering RapidRAW's unified Creative Export Studio.
 
 ---
 
@@ -10,27 +10,33 @@ This guide covers the full architecture, user interface layout, keyboard/mouse c
 
 1. [Overview & Philosophy](#1-overview--philosophy)
 2. [Interface Anatomy](#2-interface-anatomy)
-   - [Top Navigation Bar](#top-navigation-bar)
-   - [Center Stage Live Preview Canvas](#center-stage-live-preview-canvas)
-   - [Floating Darkroom Zoom Toolbar](#floating-darkroom-zoom-toolbar)
-   - [Bottom Filmroll Photo Roll](#bottom-filmroll-photo-roll)
-   - [Creative Settings Sidebar Drawer](#creative-settings-sidebar-drawer)
-   - [Standard Export Sidebar (Library / Editor Mode)](#standard-export-sidebar)
-3. [Interactive Zoom & Viewport Controls](#3-interactive-zoom--viewport-controls)
-4. [Filmroll Multi-Selection & Curation](#4-filmroll-multi-selection--curation)
+   - [Panel Switcher & Navigation](#panel-switcher--navigation)
+   - [Single-Canvas Live Proofing Engine](#single-canvas-live-proofing-engine)
+   - [Proof Export Frame Toolbar Button (`F`)](#proof-export-frame-toolbar-button-f)
+   - [Creative Export Tab](#creative-export-tab)
+   - [Standard Export Tab & Collages / Splitters](#standard-export-tab--collages--splitters)
+   - [Filmstrip & Multi-Selection](#filmstrip--multi-selection)
+3. [Per-Image Retention & Granular Reverts](#3-per-image-retention--granular-reverts)
+   - [Per-Photo Persistent Retention](#per-photo-persistent-retention)
+   - [Section-Level & Master Reverts](#section-level--master-reverts)
+4. [Creative Presets & Batch Processing](#4-creative-presets--batch-processing)
+   - [Built-In Gallery Presets](#built-in-gallery-presets)
+   - [Custom User Presets](#custom-user-presets)
+   - [Batch Apply to All Selected Photos](#batch-apply-to-all-selected-photos)
 5. [Feature Reference](#5-feature-reference)
-   - [Fine-Art Mats & Inset Keylines](#fine-art-mats--inset-keylines)
-   - [EXIF Camera Badge & Technical Framing](#exif-camera-badge--technical-framing)
+   - [Fine-Art Mats & Polaroids](#fine-art-mats--polaroids)
+   - [Museum Inset Keylines (Fillets)](#museum-inset-keylines-fillets)
+   - [EXIF Camera Badges & Technical Framing](#exif-camera-badges--technical-framing)
+   - [Text & Logo Watermarks](#text--logo-watermarks)
+   - [Standard Export & Sizing](#standard-export--sizing)
+   - [Grid Export (Collages / Contact Sheets)](#grid-export-collages--contact-sheets)
+   - [Multi-Tile Grid Splitter (Instagram Slicing)](#multi-tile-grid-splitter-instagram-slicing)
+   - [Composition Grid Overlays](#composition-grid-overlays)
    - [Dynamic Filename Template Engine](#dynamic-filename-template-engine)
-   - [Composition & Slicing Tools](#composition--slicing-tools)
-     - [Composition Grid Overlay](#composition-grid-overlay)
-     - [Multi-Tile Grid Splitter](#multi-tile-grid-splitter)
-   - [Multi-Photo Contact Sheet / Grid Collage](#multi-photo-contact-sheet--grid-collage)
-   - [Text & Image Watermarks](#text--image-watermarks)
 6. [Architecture & Implementation](#6-architecture--implementation)
-   - [Frontend Component Hierarchy](#frontend-component-hierarchy)
-   - [State Management & Custom Hooks](#state-management--custom-hooks)
-   - [Backend Rust Pipelines](#backend-rust-pipelines)
+   - [Single-Canvas Component Hierarchy](#single-canvas-component-hierarchy)
+   - [Reactive State & Storage Architecture](#reactive-state--storage-architecture)
+   - [Backend Rust Processing Pipelines](#backend-rust-processing-pipelines)
 7. [Dual-Patch Modular Maintenance](#7-dual-patch-modular-maintenance)
 8. [Keyboard & Mouse Shortcuts Reference](#8-keyboard--mouse-shortcuts-reference)
 9. [Dynamic Token Reference](#9-dynamic-token-reference)
@@ -39,16 +45,16 @@ This guide covers the full architecture, user interface layout, keyboard/mouse c
 
 ## 1. Overview & Philosophy
 
-Traditional RAW editors often treat file export as a modal dialog or narrow sidebar tab. Photographers who want to add fine-art mats, technical camera badges, watermarks, Instagram slice grids, or contact-sheet collages are forced to either guess parameters blindly or jump into external tools like Photoshop, Lightroom Print, or terminal scripts.
+Traditional RAW editors often isolate export into rigid modal dialogs or small sidebar panes with tiny preview thumbnails. Photographers preparing fine-art prints, social carousels, or client proof sheets are forced into blind guesswork or secondary applications like Photoshop, Lightroom Print, or command-line scripts.
 
-**RapidRAW Export Studio** reimagines exporting as a dedicated, distraction-free creative darkroom:
+In earlier development iterations, export was moved to a separate standalone view. However, running a duplicate canvas introduced unnecessary memory overhead, view-switching friction, and state divergence.
 
-- **Expansive Center Stage Canvas**: Live 60fps HTML5 visual proofing occupying the primary screen real estate.
-- **Integrated Bottom Film Roll**: Select, curate, and multi-select photos for batch or collage processing without context-switching back to the Library.
-- **Strict Separation of Concerns**:
-  - **Sidebar Standard Export**: Focused exclusively on compression, color profile, output dimensions, and destination folders.
-  - **Center Stage Export Studio**: A dedicated workspace for creative framing, composition, slicing, branding, and interactive proofing.
-- **Zero-Generation Quality Loss**: All borders, text badges, keylines, and slices are rendered directly from 16-bit raster buffers during the final export pass.
+**RapidRAW Creative Export Studio** solves this with a **Single-Canvas Architecture** integrated directly into the core Image Editor:
+- **Zero Redundant Canvases**: The active developed image is rendered once by the editor's high-performance pipeline. The creative framing layer (`CreativeExportOverlay.tsx`) mounts directly inside the editor canvas, panning and zooming in 100% synchrony with `TransformWrapper`.
+- **Non-Destructive Proofing Toggle (`F`)**: Toggle framing, mats, badges, and watermarks on or off at any moment without leaving your editing flow.
+- **Per-Image Retention**: Just like RAW exposure and tone curve adjustments, creative framing parameters are preserved on a per-photo basis across sessions.
+- **One-Click Presets & Batch Styling**: Apply professional museum mats or instant film aesthetics in 1 click, or batch-apply them across dozens of selected photos simultaneously.
+- **Zero Generation Loss**: Slices, borders, badges, and mats are rasterized directly from 16-bit buffers during the final export pass.
 
 ---
 
@@ -56,192 +62,225 @@ Traditional RAW editors often treat file export as a modal dialog or narrow side
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ RapidRAW  [Library]  [Editor]  [Export Studio]                 [ - □ ✕ ]    │
+│ RapidRAW  [Library]  [Editor]                                  [ - □ ✕ ]    │
 ├─────────────────────────────────────────────────┬───────────────────────────┤
-│                                                 │ Creative Export Settings  │
-│                                                 │ ───────────────────────── │
-│                   CENTER STAGE                  │ 📁 Presets                │
-│                LIVE PREVIEW CANVAS              │ 🖼️ Framing & Borders       │
-│                                                 │    • Mat Size & Color     │
-│             [ - ] [ 100% ] [ + ] [ ↺ Fit ]      │    • Inset Keyline        │
-│                                                 │ 📷 EXIF Camera Badge      │
-│                                                 │    • Gallery Bottom Strip │
-│                                                 │    • Floating Glass Pill  │
-│                                                 │ 🔲 Composition & Slicing  │
-│                                                 │    • Grid Overlay         │
-│                                                 │    • Multi-Tile Splitter  │
-│                                                 │ 🏷️ Dynamic Filename       │
-│                                                 │ 🔤 Watermark (Text/Logo)  │
-│                                                 │ ───────────────────────── │
-│                                                 │ [ Export 1 Photo ]        │
+│ TOOLBAR: [Undo] [Redo] [Zoom] [ ✨ Proof (F) ]   │ PANEL SWITCHER:           │
+├─────────────────────────────────────────────────┤ [Adjust][Crop][Presets]   │
+│                                                 │ [Export Studio] [Export]  │
+│                   IMAGE EDITOR                  ├───────────────────────────┤
+│                   SINGLE CANVAS                 │ Creative Export Settings  │
+│              (Pan / Zoom Synchronous)           │ ───────────────────────── │
+│                                                 │ 📁 Presets [Save] [Apply] │
+│      ┌───────────────────────────────────┐      │ 🖼️ Framing & Polaroid [↺] │
+│      │  Outer Mat Border                 │      │ 📏 Inset Keyline       [↺] │
+│      │   ┌───────────────────────────┐   │      │ 📷 EXIF Camera Badge   [↺] │
+│      │   │                           │   │      │ 🔤 Watermark (Text/Img)[↺] │
+│      │   │      DEVELOPED PHOTO      │   │      │ ───────────────────────── │
+│      │   │                           │   │      │ [ Reset All Filters ]     │
+│      │   └───────────────────────────┘   │      │ [ Proceed to Export → ]   │
+│      │  📷 SONY A7IV • 50mm f/1.8 • ISO100│     │                           │
+│      └───────────────────────────────────┘      │                           │
 ├─────────────────────────────────────────────────┴───────────────────────────┤
-│ BOTTOM FILM ROLL: [✓ Photo 1] [  Photo 2] [✓ Photo 3] [  Photo 4] ...       │
+│ BOTTOM FILMSTRIP: [✓ Photo 1] [  Photo 2] [✓ Photo 3] [  Photo 4] ...        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Top Navigation Bar
-- **Export Studio Button**: Located in the top header and bottom status bar. Clicking it transitions RapidRAW into the full-screen Export Studio workspace (`activeView: 'export'`).
+### Panel Switcher & Navigation
+The right-hand panel switcher hosts:
+- **`Adjust`**: Core RAW exposure, color balance, tone curves, and detail.
+- **`Crop`**: Geometry, rotation, perspective, and aspect ratio cropping.
+- **`Masks` & `Inpaint`**: Local adjustments and AI inpainting.
+- **`Presets`**: Color grading and film simulation presets.
+- **`Export Studio`**: Framing mats, polaroid formats, inset keylines, EXIF badges, and watermarks.
+- **`Export`**: Standard export formats, quality, sizing, filename templates, collages, and tile splitters.
 
-### Center Stage Live Preview Canvas
-- Occupies the central viewport with darkroom-styled checkerboard canvas backing.
-- Renders real-time visual proofing of all active mats, keylines, EXIF badges, grid lines, watermarks, and collage layouts.
-- Auto-scales dynamically to fit the viewport based on single vs. multi-image aspect ratios.
+### Single-Canvas Live Proofing Engine
+- The creative overlay (`CreativeExportOverlay.tsx`) mounts directly inside `ImageCanvas.tsx`.
+- Runs at 60fps with zero flicker or latency.
+- Scales, pans, and magnifies in perfect hardware-accelerated lockstep with the editor's `TransformWrapper`.
 
-### Floating Darkroom Zoom Toolbar
-Positioned at the top-right of the preview stage:
-- **Zoom Out (`-`)**: Decrements scale by 10% (minimum 25%).
-- **Zoom Indicator (`100%`)**: Displays current magnification percentage.
-- **Zoom In (`+`)**: Increments scale by 10% (maximum 300%).
-- **Fit View (`↺ Fit`)**: Resets zoom to automatically fit the canvas within the viewport bounds.
+### Proof Export Frame Toolbar Button (`F`)
+- Located in `EditorToolbar.tsx` with a sparkles icon (`✨`).
+- Press <kbd>F</kbd> on your keyboard or click the toolbar icon to toggle the creative framing overlay on/off at any time.
 
-### Bottom Filmroll Photo Roll
-- Displays horizontal thumbnails of all imported photos with file names and multi-select checkboxes.
-- Clicking any photo selects it for previewing adjustments and EXIF details **without** exiting the Export Studio.
-- Supports batch multi-selection via `Cmd` / `Ctrl` + click and `Shift` + click.
+### Creative Export Tab
+- Hosts dedicated accordions for **Presets**, **Framing & Polaroid**, **Inset Keyline**, **EXIF Camera Badge**, and **Watermarks**.
+- Every accordion includes an independent section revert button (`RotateCcw`).
+- Includes a master **Reset All Creative Filters** button and a **Proceed to Export →** button that automatically navigates to the Export tab.
 
-### Creative Settings Sidebar Drawer
-- Right-hand control drawer hosting collapsible accordions for all creative finishing tools.
-- Real-time parameter changes immediately update the center stage canvas.
-- Features a persistent bottom export footer with dynamic button text (e.g., `Export 1 Photo`, `Export 4 Selected Photos`, `Export 4-Photo Collage`).
+### Standard Export Tab & Collages / Splitters
+- Dedicated to final output generation:
+  - File formats (JPEG, PNG, TIFF, WebP) and quality controls.
+  - Sizing constraints and output dimensions.
+  - Dynamic token-based filename templates.
+  - **Grid Export (Collages)**: Combine selected photos into $N \times M$ contact sheets.
+  - **Multi-Tile Grid Splitter**: Slice images into $N \times M$ tiles for Instagram carousels.
+  - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom guides.
 
-### Standard Export Sidebar
-- Available inside Library and Editor views via the right-hand panel.
-- Dedicated strictly to standard export settings:
-  - File format (JPEG, PNG, TIFF, WebP).
-  - Quality, color space (sRGB, Display P3, Adobe RGB, ProPhoto RGB).
-  - Output sizing, sharpening, and destination directory.
-  - Features an **Open Export Studio** banner for quick one-click navigation to the full studio.
-
----
-
-## 3. Interactive Zoom & Viewport Controls
-
-| Action | Control | Description |
-| :--- | :--- | :--- |
-| **Zoom In** | `+` Button or `Cmd` + `Wheel Up` | Zooms in up to 300% for fine-detail proofing of keylines, watermarks, and EXIF typography. |
-| **Zoom Out** | `-` Button or `Cmd` + `Wheel Down` | Zooms out down to 25% for broad layout overview. |
-| **Fit to Screen** | `↺ Fit` Button | Instantly scales canvas to the maximum possible size within the stage without clipping. |
-| **Pan / Scroll** | Mouse Drag / Scrollbar | When zoomed past 100%, smooth custom scrollbars allow natural darkroom panning. |
-| **Auto-Fit on Change** | Automatic | Switching between single photos and multi-photo selections automatically triggers a recalculation to `'fit'` mode. |
+### Filmstrip & Multi-Selection
+- The persistent horizontal filmstrip at the bottom allows instant photo switching.
+- <kbd>Cmd</kbd> / <kbd>Ctrl</kbd> + click adds/removes individual photos into multi-selection.
+- <kbd>Shift</kbd> + click selects contiguous ranges.
+- Selecting photos retains each image's custom creative configuration without view redirects.
 
 ---
 
-## 4. Filmroll Multi-Selection & Curation
+## 3. Per-Image Retention & Granular Reverts
 
-The bottom film roll eliminates repetitive back-and-forth navigation between the Library and Export views:
+### Per-Photo Persistent Retention
+Every photo's creative parameters are automatically preserved in `useExportStore` and synchronized with browser `localStorage` under `rapidraw_creative_settings_by_path`:
+- When you customize the mat border or EXIF badge for `photo_A.raw`, those settings remain assigned specifically to `photo_A.raw`.
+- Navigating to `photo_B.raw` loads `photo_B`'s unique setup.
+- When you return to `photo_A.raw`, its framing, colors, badges, and watermarks are restored instantly.
+- State persists reliably across application restarts.
 
-1. **Single Click**:
-   - Updates the live preview to display the clicked image.
-   - Pre-loads image adjustments and extracts camera EXIF metadata into the technical badge.
-   - **Crucial**: Does *not* redirect you to the Editor; keeps you securely in the Export Studio.
-2. **`Cmd` / `Ctrl` + Click**:
-   - Toggles selection for individual photos into `multiSelectedPaths`.
-   - Automatically checks or unchecks the thumbnail badge.
-   - Preserves all existing selections without clearing them.
-3. **`Shift` + Click**:
-   - Selects a contiguous range of photos from the last clicked item to the current item.
-4. **Card Checkbox Click**:
-   - Directly toggles multi-select inclusion for that specific photo.
+### Section-Level & Master Reverts
+- **Section Reset Buttons (`RotateCcw`)**: Click the revert icon in the header of any tool section (Framing, Polaroid, Inset Keyline, EXIF Badge, or Watermark) to restore only that section back to factory defaults.
+- **Individual Slider Defaults**: Double-click or reset individual numeric values.
+- **Master Reset**: Click **Reset All Creative Filters** at the bottom of the drawer to reset all creative parameters for the active photo to a clean slate.
+
+---
+
+## 4. Creative Presets & Batch Processing
+
+### Built-In Gallery Presets
+Quickly apply curated finishing styles with 1 click:
+1. **Fine-Art Gallery Mat**: Exhibition-grade 5% white mat with balanced borders.
+2. **Museum Dark Framing**: Archival dark-grey mat with an inset hairline keyline.
+3. **Classic Polaroid 600**: Vintage instant-film aesthetic with a $2.8\times$ bottom chin.
+4. **Technical Exposure Strip**: Integrated camera model, lens metadata, and exposure strip.
+5. **Minimalist Social Pill**: Floating translucent glass badge in the bottom-right corner.
+
+### Custom User Presets
+- Create your own look by tweaking borders, badges, and watermarks.
+- Enter a name in the **Save Preset** field and click **Save**.
+- Your custom preset appears in the presets bar with a delete button for easy management.
+
+### Batch Apply to All Selected Photos
+- Select multiple photos in the bottom filmstrip using <kbd>Cmd</kbd>/<kbd>Ctrl</kbd> + click or <kbd>Shift</kbd> + click.
+- Dial in your preferred creative look or select a preset.
+- Click **Apply to All Selected Photos**.
+- The active creative configuration is immediately propagated to every selected photo and saved to persistent storage!
 
 ---
 
 ## 5. Feature Reference
 
-### Fine-Art Mats & Inset Keylines
-- **Outer Mat Border**:
-  - Adds an outer border around the image, specified as a percentage of the image dimensions (0.5% to 50%).
-  - Fully customizable mat color via hex code or visual color picker.
-- **Inset Keyline (Fillet)**:
-  - Museum-grade fine hairline border positioned inside the outer mat.
-  - Inset distance slider controls distance from the photo edge into the mat.
-  - Independent color picker (e.g., crisp black keyline on white mat).
-  - Thickness controls (1px to 10px).
+### Fine-Art Mats & Polaroids
+- **Outer Mat Border**: Uniform border framing (0.5% to 50% of image dimensions) with full hex color customization.
+- **Polaroid Format**: Elongated bottom chin multiplier ($1.0\times$ to $5.0\times$) recreating authentic instant film proportions.
 
-### EXIF Camera Badge & Technical Framing
+### Museum Inset Keylines (Fillets)
+- Contrasting hairline inner border inset at any distance inside the outer mat.
+- **Inset Distance**: Slider controls distance from the photo edge into the mat.
+- **Stroke Width**: 1px to 10px.
+- **Independent Color**: Pair a dark mat with an off-white keyline or a white mat with a black hairline.
+
+### EXIF Camera Badges & Technical Framing
 - **Matte Bottom Strip ("Gallery Frame")**:
-  - Extends the bottom border with a gallery matte strip.
-  - Left column: Camera model, lens metadata, and custom photographer credit.
-  - Right column: Exposure parameters (ƒ-number, shutter speed, ISO, focal length) and capture date.
-  - Centered alignment across multi-image collages.
+  - Extends the bottom border with an elegant 2-line technical strip.
+  - **Left**: Camera Make & Model, Lens, and Photographer Signature / Credit.
+  - **Right**: Optical Exposure Settings (ƒ-number, Shutter Speed, ISO, Focal Length) and Capture Date.
+  - Centered alignment dynamically adjusted across single or multi-photo layouts.
 - **Floating Glass Pill ("Social Badge")**:
   - Translucent pill overlay with rounded corners positioned in the bottom-right corner.
   - Granular metadata toggles for Camera, Lens, Exposure, and Date.
-  - Custom background opacity, blur, and font palette colors.
+  - Customizable opacity, blur, and color palette.
 
-### Dynamic Filename Template Engine
-- Available for both single-image and batch exports.
-- Supported tokens:
-  - `{original_filename}`: Base name of the input RAW/image file.
-  - `{camera}`: Camera make and model (e.g. `Sony-ILCE-7M4`).
-  - `{lens}`: Mounted optical lens (e.g. `FE-24-70mm-F2.8-GM-II`).
-  - `{iso}`, `{aperture}`, `{shutter}`, `{focal}`: Exposure values.
-  - `{date}`, `{time}`, `{YYYY}`, `{MM}`, `{DD}`: Timestamp tokens.
-  - `{seq}` or `{sequence}`: 2-digit zero-padded index (`01`, `02`, ...).
-- Automatic filesystem sanitization replacing illegal characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`) with hyphens.
+### Text & Logo Watermarks
+- **Text Watermark**: Custom text rendered via embedded DejaVuSans TrueType font with drop-shadow for legibility over bright or dark areas.
+- **Logo Watermark**: PNG/JPG/WebP image overlay with alpha transparency.
+- **Interactive Drag Placement**: Click and drag directly on the preview canvas to position watermarks, or choose from 9 preset anchor points.
+- **Opacity Slider**: Smooth 1% to 100% alpha blending.
 
-### Composition & Slicing Tools
-Unified under a single **Composition & Slicing** accordion:
-1. **Composition Grid Overlay**:
-   - Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines.
-   - Proof composition, horizon alignment, and visual balance.
-   - Adjustable grid color, opacity slider, and line thickness.
-2. **Multi-Tile Grid Splitter**:
-   - Slices the processed photo into an $N \times M$ grid of separate files.
-   - Ideal for panoramic Instagram carousels and $3 \times 3$ grid profile mosaics.
-   - Optional border padding applied per individual tile.
+### Standard Export & Sizing
+- Formats: JPEG (quality 1–100), PNG, TIFF (8-bit or 16-bit), WebP (lossy / lossless).
+- Sizing constraints: Original, Fit to Width, Fit to Height, Long Edge, Short Edge, or Custom Megapixels.
+- Sharpening on export: None, Low, Standard, High.
 
-### Multi-Photo Contact Sheet / Grid Collage
-- Assembles multiple selected photos into a unified contact sheet or collage.
+### Grid Export (Collages / Contact Sheets)
+- Assembles multiple selected photos into a unified contact sheet or collage on a single canvas.
 - Configurable grid columns and rows.
 - **Cell Sizing Modes**:
   - **Fit (Letterbox)**: Preserves original aspect ratio without cropping.
   - **Fill (Center-Crop)**: Fills each cell entirely for uniform layout.
 - Customizable cell gutters (inner spacing) and outer mat borders.
 
-### Text & Image Watermarks
-- **Text Watermark**: Custom text rendered via embedded DejaVuSans TrueType font with drop-shadow for legibility over bright or dark areas.
-- **Logo Watermark**: PNG/JPG/WebP image overlay with alpha transparency.
-- **Interactive Drag Placement**: Click and drag directly on the preview canvas to position watermarks, or choose from 9 preset anchor points.
-- **Opacity Slider**: Smooth 1% to 100% alpha blending.
+### Multi-Tile Grid Splitter (Instagram Slicing)
+- Slices the processed photo into an $N \times M$ grid of separate files.
+- Ideal for panoramic Instagram carousels and $3 \times 3$ grid profile mosaics.
+- Optional border padding applied per individual tile.
+
+### Composition Grid Overlays
+- Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines.
+- Proof composition, horizon alignment, and visual balance.
+- Adjustable grid color, opacity slider, and line thickness.
+
+### Dynamic Filename Template Engine
+- Robust token-based output file naming for single and batch exports:
+  - `{original_filename}`, `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`, `{shutter}`, `{date}`, `{time}`, `{seq}`.
+- **Live Resolved Preview**: Dynamically previews the generated filename under the template input.
+- **Filesystem Sanitization**: Automatically cleans illegal characters (`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`).
 
 ---
 
 ## 6. Architecture & Implementation
 
-### Frontend Component Hierarchy
+### Single-Canvas Component Hierarchy
 
 ```
 src/
-├── App.tsx                        <-- Global router; mounts ExportView when activeView === 'export'
+├── App.tsx                        <-- Global router & panel registrar
 ├── components/
-│   ├── views/
-│   │   └── ExportView.tsx         <-- Center Stage Studio: stage, zoom bar, film roll, settings drawer
-│   ├── panel/right/
-│   │   ├── ExportPanel.tsx        <-- Sidebar Standard Export + "Launch Export Studio" banner
-│   │   ├── StandardExportTab.tsx  <-- Formats, quality, dimensions, filename templates
-│   │   ├── CreativeExportTab.tsx  <-- Mats, keylines, EXIF badges, collages, watermarks
-│   │   ├── ExportLivePreview.tsx  <-- 60fps HTML5 Canvas preview, zoom engine, pan viewport
-│   │   └── ExportCommons.tsx      <-- Section accordions, segmented buttons, GridNumberInput
+│   ├── panel/
+│   │   ├── PanelSwitcher.tsx      <-- 'creativeExport' & 'export' tab registration
+│   │   ├── BottomBar.tsx          <-- Status bar with 1-click Export Studio switcher
+│   │   ├── editor/
+│   │   │   ├── ImageCanvas.tsx    <-- Editor canvas mounting <CreativeExportOverlay />
+│   │   │   ├── EditorToolbar.tsx  <-- Proof Export Frame ('F') toggle button
+│   │   │   └── overlays/
+│   │   │       └── CreativeExportOverlay.tsx <-- 60fps real-time framing/badge/watermark overlay
+│   │   └── right/
+│   │       ├── CreativeExportTab.tsx  <-- Mats, polaroids, keylines, EXIF badges, watermarks, presets & resets
+│   │       ├── StandardExportTab.tsx  <-- Formats, quality, dimensions, filename templates, collages & splitters
+│   │       ├── ExportPanel.tsx        <-- Unified export runner delegating to useExportStore
+│   │       └── ExportCommons.tsx      <-- Shared Section accordions, formatExifSummary & helpers
 │   └── ui/
-│       ├── ErrorBoundary.tsx      <-- Crash-resilient error boundary protecting export views
-│       └── ExportImportProperties.tsx <-- Complete TypeScript interfaces
+│       ├── ExportImportProperties.tsx <-- Complete TypeScript interface definitions
+│       └── ErrorBoundary.tsx          <-- Defensive React error boundary for export panels
+├── store/
+│   ├── useExportStore.ts     <-- Unified store with localStorage per-image retention & preset manager
+│   └── useUIStore.ts         <-- Panel states, proofExportFrame toggle, and active photo selection
 └── hooks/
-    ├── useAppNavigation.ts        <-- Navigation router; handleImageSelect with openInEditor flag
-    └── useExportSettings.ts       <-- Export settings store, defaults, and preset sync
+    ├── useExportSettings.ts  <-- Reactive facade delegating to useExportStore
+    ├── useKeyboardShortcuts.ts <-- 'F' proof toggle and export shortcut handlers
+    └── useLibraryStore.ts    <-- Image list and multiSelectedPaths store
 ```
 
-### Key Navigation Fix
-`src/hooks/useAppNavigation.ts` defines:
-```typescript
-handleImageSelect: (path: string, openInEditor: boolean = true) => void
-```
-When called from `ExportView.tsx`, `openInEditor` is set to `false`. This prevents switching `activeView` to `'editor'` and preserves `multiSelectedPaths` in the Zustand store.
+### Reactive State & Storage Architecture
+1. **`useExportStore`**:
+   - Manages all standard export options and creative export options in a single reactive Zustand store.
+   - `imageCreativeSettings`: Dictionary keyed by file path (`Record<string, CreativeExportOptions>`).
+   - `activeImagePath`: Synchronized with `useUIStore.activePhotoIndex`.
+   - On image switch, `loadImageCreativeSettings(path)` loads saved settings or creates defaults.
+   - Persisted to `localStorage` under `rapidraw_creative_settings_by_path`.
+2. **`CreativeExportOverlay`**:
+   - Mounts inside `ImageCanvas.tsx` at the exact render size of the developed photo.
+   - Positioned with `zIndex: 25` and `overflow: visible` to render outer mats beyond the photo bounds.
+   - Inherits `TransformWrapper` zoom and pan coordinates automatically with zero lag.
+
+### Backend Rust Processing Pipelines
+Located in `src-tauri/src/export_processing.rs`:
+- **`process_creative_export`**: High-performance pipeline applying mats, keylines, badges, and watermarks to developed 16-bit RGB buffers.
+- **`render_grid_collage`**: Multi-image contact sheet assembler supporting fit and fill modes with cell gutters.
+- **`slice_grid_tiles`**: Multi-tile splitter slicing images into individual raster files with optional tile borders.
+- **`file_management.rs`**: Dynamic token parser resolving camera EXIF metadata and timestamp values into sanitized filenames.
 
 ---
 
 ## 7. Dual-Patch Modular Maintenance
 
-This repository provides two modular patches against upstream RapidRAW:
+This repository provides two clean modular patches against upstream RapidRAW:
 
 ```
 Upstream RapidRAW (v1.6.4 / main)
@@ -250,7 +289,7 @@ Upstream RapidRAW (v1.6.4 / main)
    │             (Core Rust backend, borders, EXIF badges, filename templates, watermarks)
    │
    └── [Patch 2] center-stage-creative-export-studio.patch
-                 (Center Stage Export Studio, bottom film roll, zoom controls, isolated sidebar)
+                 (Direct Editor integration, single-canvas overlay, per-image retention, preset manager)
 ```
 
 ### Applying Both Patches Manually
@@ -259,10 +298,10 @@ git clone https://github.com/CyberTimon/RapidRAW.git
 cd RapidRAW
 
 # Step 1: Apply baseline creative export engine
-git apply --ignore-whitespace ../creative-export-borders-and-grids.patch
+git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
 
-# Step 2: Apply Center Stage Export Studio
-git apply --ignore-whitespace ../center-stage-creative-export-studio.patch
+# Step 2: Apply Editor-integrated Creative Export Studio
+git apply --ignore-whitespace /path/to/center-stage-creative-export-studio.patch
 
 # Step 3: Build macOS DMG
 npm ci
@@ -275,13 +314,13 @@ npm run tauri -- build --bundles dmg --no-sign
 
 | Shortcut / Gesture | Context | Action |
 | :--- | :--- | :--- |
-| `Cmd` / `Ctrl` + Click | Bottom Filmroll | Toggle photo in multi-selection |
-| `Shift` + Click | Bottom Filmroll | Contiguous range selection |
-| Click | Bottom Filmroll | Select and preview photo |
-| `Cmd` / `Ctrl` + Scroll Wheel | Center Stage Canvas | Smooth Zoom In / Zoom Out |
+| `F` | Editor View | Toggle **Proof Export Frame** on/off |
+| `Cmd` / `Ctrl` + `E` | Any View | Open / Toggle Export Panel |
+| `Cmd` / `Ctrl` + Click | Filmstrip / Grid | Toggle photo in multi-selection |
+| `Shift` + Click | Filmstrip / Grid | Select contiguous range of photos |
+| Click | Filmstrip / Grid | Select and edit photo |
+| Trackpad Pinch / Wheel | Editor Canvas | Smooth zoom in / zoom out |
 | Click & Drag | Watermark on Canvas | Reposition watermark interactively |
-| Click `↺ Fit` | Zoom Toolbar | Reset zoom to fit screen |
-| Click `+` / `-` | Zoom Toolbar | Step zoom by ±10% |
 
 ---
 
