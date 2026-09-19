@@ -145,13 +145,56 @@ Every photo's creative parameters are automatically preserved in `useExportStore
 
 ## 4. Creative Presets & Batch Processing
 
-### Built-In Gallery Presets
-Quickly apply curated finishing styles with 1 click:
-1. **Fine-Art Gallery Mat**: Exhibition-grade 5% white mat with balanced borders.
-2. **Museum Dark Framing**: Archival dark-grey mat with an inset hairline keyline.
-3. **Classic Polaroid 600**: Vintage instant-film aesthetic with a $2.8\times$ bottom chin.
-4. **Technical Exposure Strip**: Integrated camera model, lens metadata, and exposure strip.
-5. **Minimalist Social Pill**: Floating translucent glass badge in the bottom-right corner.
+### Built-In Curated Photographic Preset Families
+Quickly apply professional darkroom and gallery styles across 7 dedicated families:
+
+1. **Instant Family**:
+   - **Classic Polaroid 600**: Iconic instant film look with an off-white mat and $2.8\times$ bottom chin.
+   - **SX-70 Warm Chin**: Warm ivory instant frame with extended $3.2\times$ bottom chin for nostalgic warmth.
+   - **Instax Mini Frame**: Portrait-oriented instant border with slim side margins and tall bottom chin ($3.0\times$).
+   - **Instax Square Modern**: Neutral clean white square instant border with balanced $2.2\times$ bottom chin.
+   - **Wide Format Peel-Apart**: Archival grey-white instant mat with $2.4\times$ bottom margin for landscape prints.
+
+2. **Film Family**:
+   - **35mm Contact Frame**: Classic dark matte border with subtle margins reminiscent of darkroom contact sheets.
+   - **35mm Sprocket Holes**: Authentic dark frame with regular sprocket perforation cutouts and vintage edge markings (`▲ 36 EXP • 35MM`, `ISO 400`, `FRAME 01 • ▶▶`).
+   - **Medium Format 6x6 Rebate**: Deep black square rebate framing with prominent side borders.
+   - **Medium Format 6x7 Border**: Standard professional 6x7 studio frame with balanced black rebates.
+   - **Large Format 4x5 Sheet Film**: Wide pitch-black film holder borders for architectural and portrait compositions.
+
+3. **Editorial Family**:
+   - **Fine-Art Gallery Mat**: Exhibition-grade 5% balanced white mat.
+   - **Museum Dark Framing**: Archival graphite-black mat with a contrasting white inset hairline keyline.
+   - **Minimalist Keyline Float**: Ultra-thin 1.5% white floating mat with a delicate inner keyline.
+   - **Magazine Spread Margin**: Asymmetrical editorial layout with generous bottom margin and elegant typography.
+   - **Exhibition Wide Mat**: Luxurious 12% gallery mat providing dramatic breathing room for solo exhibition pieces.
+
+4. **Cinematic Family** (Presentation-Only Non-Destructive Framing):
+   - **2.39:1 Anamorphic Scope**: Classic Hollywood widescreen letterbox presentation bars.
+   - **2.35:1 Widescreen Letterbox**: Panavision theatrical letterboxing bars.
+   - **2.00:1 Univisium Frame**: Modern streaming and prestige television presentation aspect.
+   - **16:9 Broadcast Matte**: Contemporary digital broadcast standard letterbox.
+
+5. **Analog Family**:
+   - **Darkroom Print Border**: Deep black mat with an authentic high-contrast white hairline margin.
+   - **Vintage Light Leak Edge**: Warm amber/tangerine light leak wash along the top-left margin.
+   - **Cyanotype Deep Margin**: Deep Prussian blue mat with crisp white margins.
+   - **Silver Gelatin Border**: Neutral mid-grey mat evoking classic fiber-based silver gelatin darkroom papers.
+
+6. **Camera & Data Family**:
+   - **Technical Exposure Strip**: Integrated camera model, mounted lens, optical exposure settings, and capture date.
+   - **Minimalist Social Pill**: Floating translucent glass badge in the bottom-right corner.
+   - **Vintage Quartz Date Stamp**: Retro compact camera timestamp rendered in glowing amber LED font from EXIF date.
+   - **Field Journal Data Margin**: Wide bottom margin featuring clean monospace metadata records.
+
+7. **Archive Family**:
+   - **Contact Sheet Single Frame**: Minimal black border with frame index numbering.
+   - **Catalog Card Mat**: Archival beige museum card mat with technical metadata.
+   - **Specimen Archive Border**: Clean high-contrast border with formal archival layout.
+
+### Category Filter Chips
+The preset drawer includes an interactive horizontal chip bar (`All`, `Instant`, `Film`, `Editorial`, `Cinematic`, `Analog`, `Camera & Data`, `Archive`, `Custom`) allowing photographers to instantly isolate their desired category without scrolling through long dropdown menus.
+
 
 ### Custom User Presets
 - Create your own look by tweaking borders, badges, and watermarks.

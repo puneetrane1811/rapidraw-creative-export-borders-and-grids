@@ -3222,7 +3222,7 @@ index 0000000..2b5cc3a
 +    }).clone()
 +}
 diff --git a/src-tauri/src/export_processing.rs b/src-tauri/src/export_processing.rs
-index b0e31f5..54f587a 100644
+index b0e31f5..655a46f 100644
 --- a/src-tauri/src/export_processing.rs
 +++ b/src-tauri/src/export_processing.rs
 @@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -3289,7 +3289,7 @@ index b0e31f5..54f587a 100644
  #[serde(rename_all = "camelCase")]
  pub enum WatermarkAnchor {
      TopLeft,
-@@ -132,66 +164,455 @@ pub enum WatermarkAnchor {
+@@ -132,66 +164,667 @@ pub enum WatermarkAnchor {
      BottomLeft,
      BottomCenter,
      BottomRight,
@@ -3360,6 +3360,32 @@ index b0e31f5..54f587a 100644
 +
 +#[derive(Serialize, Deserialize, Debug, Clone)]
 +#[serde(rename_all = "camelCase")]
++pub struct FilmStripSettings {
++    pub enabled: bool,
++    #[serde(default)]
++    pub format: Option<String>,
++    #[serde(default)]
++    pub show_sprockets: Option<bool>,
++    #[serde(default)]
++    pub show_frame_number: Option<bool>,
++    #[serde(default)]
++    pub frame_number: Option<String>,
++    #[serde(default)]
++    pub edge_markings: Option<String>,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
++pub struct TimestampSettings {
++    pub enabled: bool,
++    #[serde(default)]
++    pub style: Option<String>,
++    #[serde(default)]
++    pub text: Option<String>,
++}
++
++#[derive(Serialize, Deserialize, Debug, Clone)]
++#[serde(rename_all = "camelCase")]
 +pub struct BorderSettings {
 +    /// Border thickness as a percentage of each corresponding image dimension.
 +    pub size: f32,
@@ -3368,6 +3394,20 @@ index b0e31f5..54f587a 100644
 +    pub keyline: Option<KeylineSettings>,
 +    #[serde(default)]
 +    pub grid_overlay: Option<GridOverlaySettings>,
++    #[serde(default)]
++    pub top_size: Option<f32>,
++    #[serde(default)]
++    pub bottom_size: Option<f32>,
++    #[serde(default)]
++    pub left_size: Option<f32>,
++    #[serde(default)]
++    pub right_size: Option<f32>,
++    #[serde(default)]
++    pub target_aspect_ratio: Option<f32>,
++    #[serde(default)]
++    pub film_strip: Option<FilmStripSettings>,
++    #[serde(default)]
++    pub timestamp: Option<TimestampSettings>,
 +}
 +
 +fn parse_border_color(color: &str) -> Result<Rgba<u8>, String> {
@@ -3385,6 +3425,7 @@ index b0e31f5..54f587a 100644
 +    Ok(Rgba([channel(0)?, channel(2)?, channel(4)?, 255]))
 +}
 +
++#[allow(dead_code)]
 +fn border_dimensions(width: u32, height: u32, size: f32) -> Result<(u32, u32, u32, u32), String> {
 +    if !size.is_finite() || size < 0.0 {
 +        return Err("Border size must be a non-negative number.".to_string());
@@ -3398,6 +3439,71 @@ index b0e31f5..54f587a 100644
 +    let output_height = height.checked_add(vertical.saturating_mul(2)).ok_or("Border makes image too tall.")?;
 +    Ok((horizontal, vertical, output_width, output_height))
 +}
++
++fn calculate_border_margins(
++    width: u32,
++    height: u32,
++    border_settings: &BorderSettings,
++) -> Result<(u32, u32, u32, u32, u32, u32), String> {
++    let left_pct = border_settings.left_size.unwrap_or(border_settings.size);
++    let right_pct = border_settings.right_size.unwrap_or(border_settings.size);
++    let top_pct = border_settings.top_size.unwrap_or(border_settings.size);
++    let bottom_pct = border_settings.bottom_size.unwrap_or(border_settings.size);
++
++    for (name, val) in [("Left", left_pct), ("Right", right_pct), ("Top", top_pct), ("Bottom", bottom_pct)] {
++        if !val.is_finite() || val < 0.0 {
++            return Err(format!("{name} border size must be a non-negative number."));
++        }
++    }
++
++    let mut pad_left = if left_pct > 0.0 { ((width as f32 * left_pct / 100.0).round() as u32).max(1) } else { 0 };
++    let mut pad_right = if right_pct > 0.0 { ((width as f32 * right_pct / 100.0).round() as u32).max(1) } else { 0 };
++    let mut pad_top = if top_pct > 0.0 { ((height as f32 * top_pct / 100.0).round() as u32).max(1) } else { 0 };
++    let mut pad_bottom = if bottom_pct > 0.0 { ((height as f32 * bottom_pct / 100.0).round() as u32).max(1) } else { 0 };
++
++    if let Some(film) = &border_settings.film_strip {
++        if film.enabled {
++            let film_tb = ((height as f32 * top_pct.max(5.0) / 100.0).round() as u32).max(28);
++            let film_lr = ((width as f32 * left_pct.max(2.5) / 100.0).round() as u32).max(12);
++            pad_top = pad_top.max(film_tb);
++            pad_bottom = pad_bottom.max(film_tb);
++            pad_left = pad_left.max(film_lr);
++            pad_right = pad_right.max(film_lr);
++        }
++    }
++
++    if let Some(target_ratio) = border_settings.target_aspect_ratio {
++        if target_ratio > 0.0 {
++            let base_w = width + pad_left + pad_right;
++            let base_h = height + pad_top + pad_bottom;
++            let current_ratio = base_w as f32 / base_h as f32;
++
++            if current_ratio < target_ratio {
++                let needed_total_h = (base_w as f32 / target_ratio).round() as u32;
++                if needed_total_h > base_h {
++                    let add_y = needed_total_h - base_h;
++                    pad_top += add_y / 2;
++                    pad_bottom += add_y - (add_y / 2);
++                } else {
++                    let needed_total_w = (base_h as f32 * target_ratio).round() as u32;
++                    let add_x = needed_total_w.saturating_sub(base_w);
++                    pad_left += add_x / 2;
++                    pad_right += add_x - (add_x / 2);
++                }
++            }
++        }
++    }
++
++    let output_width = width
++        .checked_add(pad_left.saturating_add(pad_right))
++        .ok_or("Border makes image too wide.")?;
++    let output_height = height
++        .checked_add(pad_top.saturating_add(pad_bottom))
++        .ok_or("Border makes image too tall.")?;
++
++    Ok((pad_left, pad_right, pad_top, pad_bottom, output_width, output_height))
++}
++
 +
 +fn draw_filled_rect(
 +    buffer: &mut ImageBuffer<Rgba<u8>, Vec<u8>>,
@@ -3458,12 +3564,12 @@ index b0e31f5..54f587a 100644
 +
 +fn apply_border(image: DynamicImage, border_settings: &BorderSettings) -> Result<DynamicImage, String> {
 +    let (width, height) = image.dimensions();
-+    let (horizontal, vertical, output_width, output_height) =
-+        border_dimensions(width, height, border_settings.size)?;
++    let (pad_left, pad_right, pad_top, pad_bottom, output_width, output_height) =
++        calculate_border_margins(width, height, border_settings)?;
 +
-+    let mut bordered = if border_settings.size > 0.0 {
++    let mut bordered = if pad_left > 0 || pad_right > 0 || pad_top > 0 || pad_bottom > 0 {
 +        let mut buf = ImageBuffer::from_pixel(output_width, output_height, parse_border_color(&border_settings.color)?);
-+        imageops::overlay(&mut buf, &image.to_rgba8(), horizontal as i64, vertical as i64);
++        imageops::overlay(&mut buf, &image.to_rgba8(), pad_left as i64, pad_top as i64);
 +        buf
 +    } else {
 +        image.to_rgba8()
@@ -3476,10 +3582,10 @@ index b0e31f5..54f587a 100644
 +            let thickness = ((width.min(height) as f32 * keyline.size / 100.0).round() as u32).max(1);
 +            let inset = ((width.min(height) as f32 * keyline.inset / 100.0).round() as i32).max(0);
 +
-+            let kx0 = (horizontal as i32) - inset;
-+            let ky0 = (vertical as i32) - inset;
-+            let kx1 = (horizontal + width) as i32 + inset;
-+            let ky1 = (vertical + height) as i32 + inset;
++            let kx0 = (pad_left as i32) - inset;
++            let ky0 = (pad_top as i32) - inset;
++            let kx1 = (pad_left + width) as i32 + inset;
++            let ky1 = (pad_top + height) as i32 + inset;
 +
 +            draw_rect_outline(&mut bordered, kx0, ky0, kx1, ky1, thickness, keyline_color, 1.0);
 +        }
@@ -3492,10 +3598,10 @@ index b0e31f5..54f587a 100644
 +            let opacity = (grid.opacity / 100.0).clamp(0.0, 1.0);
 +            let thickness = ((width.min(height) as f32 * grid.size / 100.0).round() as u32).max(1);
 +
-+            let img_x0 = horizontal as i32;
-+            let img_y0 = vertical as i32;
-+            let img_x1 = (horizontal + width) as i32;
-+            let img_y1 = (vertical + height) as i32;
++            let img_x0 = pad_left as i32;
++            let img_y0 = pad_top as i32;
++            let img_x1 = (pad_left + width) as i32;
++            let img_y1 = (pad_top + height) as i32;
 +
 +            for col in 1..grid.columns {
 +                let gx = img_x0 + ((width as f32 * col as f32 / grid.columns as f32).round() as i32);
@@ -3507,6 +3613,112 @@ index b0e31f5..54f587a 100644
 +                let gy = img_y0 + ((height as f32 * row as f32 / grid.rows as f32).round() as i32);
 +                let half_t = (thickness / 2) as i32;
 +                draw_filled_rect(&mut bordered, img_x0, gy - half_t, img_x1, gy - half_t + (thickness as i32), grid_color, opacity);
++            }
++        }
++    }
++
++    // 3. Film Strip Sprocket Holes & Markings
++    if let Some(film) = &border_settings.film_strip {
++        if film.enabled {
++            let show_sprockets = film.show_sprockets.unwrap_or(true);
++            let is_35mm = film.format.as_deref().unwrap_or("35mm") == "35mm";
++
++            if is_35mm && show_sprockets && pad_top >= 8 && pad_bottom >= 8 {
++                let count = (output_width / 36).max(4);
++                let step = output_width as f32 / count as f32;
++                let sw = (step * 0.5).round().max(4.0) as i32;
++                let sh = ((pad_top as f32 * 0.42).round() as i32).max(6);
++                let sy_top = ((pad_top as i32 - sh) / 2).max(2);
++                let sy_bot = (output_height as i32 - pad_bottom as i32) + ((pad_bottom as i32 - sh) / 2);
++                let sprocket_color = Rgba([0, 0, 0, 255]);
++                let border_color = Rgba([39, 39, 42, 255]);
++
++                for i in 0..count {
++                    let sx = (i as f32 * step + step * 0.25).round() as i32;
++                    draw_filled_rect(&mut bordered, sx, sy_top, sx + sw, sy_top + sh, sprocket_color, 1.0);
++                    draw_rect_outline(&mut bordered, sx, sy_top, sx + sw, sy_top + sh, 1, border_color, 0.6);
++
++                    draw_filled_rect(&mut bordered, sx, sy_bot, sx + sw, sy_bot + sh, sprocket_color, 1.0);
++                    draw_rect_outline(&mut bordered, sx, sy_bot, sx + sw, sy_bot + sh, 1, border_color, 0.6);
++                }
++            }
++
++            if let Some(font) = crate::default_font::get_default_font() {
++                let font_px = ((output_width as f32 / 75.0).clamp(10.0, 36.0)).round();
++                let scale = ab_glyph::PxScale::from(font_px);
++                let text_color = Rgba([161, 161, 170, 255]);
++
++                let top_left = film.edge_markings.as_deref().unwrap_or("36 EXP  •  35MM");
++                let top_str = format!("▲ {}", top_left);
++                let text_y_top = (pad_top as f32 * 0.75).round() as i32;
++                imageproc::drawing::draw_text_mut(
++                    &mut bordered,
++                    text_color,
++                    (pad_left as i32 + 8).max(4),
++                    text_y_top,
++                    scale,
++                    &font,
++                    &top_str,
++                );
++
++                let iso_text = "ISO 400";
++                let (iso_w, _) = imageproc::drawing::text_size(scale, &font, iso_text);
++                let iso_x = (output_width as i32 - pad_right as i32 - iso_w as i32 - 8).max(0);
++                imageproc::drawing::draw_text_mut(
++                    &mut bordered,
++                    text_color,
++                    iso_x,
++                    text_y_top,
++                    scale,
++                    &font,
++                    iso_text,
++                );
++
++                let frame_num = film.frame_number.as_deref().unwrap_or("01");
++                let bot_str = format!("FRAME {}  •  ▶▶", frame_num);
++                let text_y_bot = (output_height as i32 - (pad_bottom as f32 * 0.35).round() as i32)
++                    .min(output_height as i32 - font_px as i32 - 2);
++                imageproc::drawing::draw_text_mut(
++                    &mut bordered,
++                    text_color,
++                    (pad_left as i32 + 8).max(4),
++                    text_y_bot,
++                    scale,
++                    &font,
++                    &bot_str,
++                );
++            }
++        }
++    }
++
++    // 4. Retro Digital Timestamp
++    if let Some(ts) = &border_settings.timestamp {
++        if ts.enabled {
++            if let Some(font) = crate::default_font::get_default_font() {
++                let is_green = ts.style.as_deref() == Some("digital_green");
++                let ts_color = if is_green {
++                    Rgba([34, 197, 94, 255])
++                } else {
++                    Rgba([255, 140, 0, 255])
++                };
++                let shadow_color = if is_green {
++                    Rgba([0, 40, 0, 200])
++                } else {
++                    Rgba([40, 15, 0, 200])
++                };
++
++                let font_px = ((width as f32 / 52.0).clamp(13.0, 48.0)).round();
++                let scale = ab_glyph::PxScale::from(font_px);
++                let date_text = ts.text.as_deref().unwrap_or("'26 09 19");
++                let (tw, th) = imageproc::drawing::text_size(scale, &font, date_text);
++
++                let margin_r = (font_px * 0.8).round() as i32;
++                let margin_b = (font_px * 0.5).round() as i32;
++                let tx = ((pad_left + width) as i32 - tw as i32 - margin_r).max(pad_left as i32);
++                let ty = ((pad_top + height) as i32 - th as i32 - margin_b).max(pad_top as i32);
++
++                imageproc::drawing::draw_text_mut(&mut bordered, shadow_color, tx + 1, ty + 1, scale, &font, date_text);
++                imageproc::drawing::draw_text_mut(&mut bordered, ts_color, tx, ty, scale, &font, date_text);
 +            }
 +        }
 +    }
@@ -3779,7 +3991,7 @@ index b0e31f5..54f587a 100644
      };
  
      if matches!(
-@@ -325,9 +746,362 @@ fn relative_export_dir_for_preserved_folders(
+@@ -325,9 +958,362 @@ fn relative_export_dir_for_preserved_folders(
          })
  }
  
@@ -4142,7 +4354,7 @@ index b0e31f5..54f587a 100644
  ) -> Result<DynamicImage, String> {
      if let Some(resize_opts) = &export_settings.resize {
          let (current_w, current_h) = image.dimensions();
-@@ -341,6 +1115,15 @@ fn apply_export_resize_and_watermark(
+@@ -341,6 +1327,15 @@ fn apply_export_resize_and_watermark(
      if let Some(watermark_settings) = &export_settings.watermark {
          apply_watermark(&mut image, watermark_settings)?;
      }
@@ -4158,7 +4370,7 @@ index b0e31f5..54f587a 100644
      Ok(image)
  }
  
-@@ -642,7 +1425,7 @@ fn process_image_for_export(
+@@ -642,7 +1637,7 @@ fn process_image_for_export(
          render_output_precision(output_format, export_settings),
      )?;
  
@@ -4167,7 +4379,7 @@ index b0e31f5..54f587a 100644
  }
  
  fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
-@@ -836,7 +1619,7 @@ fn export_masks_for_image(
+@@ -836,7 +1831,7 @@ fn export_masks_for_image(
              )?;
              ensure_export_not_cancelled(cancellation_token)?;
  
@@ -4176,7 +4388,7 @@ index b0e31f5..54f587a 100644
              let (out_w, out_h) = with_options.dimensions();
  
              let alpha_resized = imageops::resize(
-@@ -1008,6 +1791,7 @@ pub(crate) async fn export_images_impl(
+@@ -1008,6 +2003,7 @@ pub(crate) async fn export_images_impl(
          let total_paths = paths.len();
          let settings = load_settings(app_handle.clone()).unwrap_or_default();
  
@@ -4184,7 +4396,7 @@ index b0e31f5..54f587a 100644
          let mut base_path_counts: HashMap<String, usize> = HashMap::new();
          let mut export_items = Vec::with_capacity(total_paths);
  
-@@ -1039,6 +1823,13 @@ pub(crate) async fn export_images_impl(
+@@ -1039,6 +2035,13 @@ pub(crate) async fn export_images_impl(
              export_items.push((i, path_str, *count, explicit_vc));
          }
  
@@ -4198,7 +4410,7 @@ index b0e31f5..54f587a 100644
          let used_paths = Arc::new(Mutex::new(std::collections::HashSet::new()));
          let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
          let mut join_handles = Vec::new();
-@@ -1060,6 +1851,7 @@ pub(crate) async fn export_images_impl(
+@@ -1060,6 +2063,7 @@ pub(crate) async fn export_images_impl(
              let base_origin_folders = base_origin_folders.clone();
              let export_settings = export_settings.clone();
              let output_format = output_format.clone();
@@ -4206,7 +4418,7 @@ index b0e31f5..54f587a 100644
              let settings = settings.clone();
              let cancellation_token_clone = Arc::clone(&cancellation_token);
              let adjustments_mode = adjustments_mode.clone();
-@@ -1292,12 +2084,41 @@ pub(crate) async fn export_images_impl(
+@@ -1292,12 +2296,41 @@ pub(crate) async fn export_images_impl(
                          actual_output_format,
                      )?;
                      ensure_export_not_cancelled(&cancellation_token_clone)?;
@@ -4254,7 +4466,7 @@ index b0e31f5..54f587a 100644
                      ensure_export_not_cancelled(&cancellation_token_clone)?;
  
                      if export_settings.preserve_timestamps {
-@@ -1355,6 +2176,54 @@ pub(crate) async fn export_images_impl(
+@@ -1355,6 +2388,54 @@ pub(crate) async fn export_images_impl(
              }
          }
  
@@ -4309,7 +4521,7 @@ index b0e31f5..54f587a 100644
          let errors: Vec<String> = results.into_iter().filter_map(Result::err).collect();
          let error_count = errors.len();
          let export_state = app_handle.state::<AppState>();
-@@ -1490,6 +2359,10 @@ pub async fn run_headless_export(
+@@ -1490,6 +2571,10 @@ pub async fn run_headless_export(
          strip_gps: false,
          filename_template: None,
          watermark: None,
@@ -4320,7 +4532,7 @@ index b0e31f5..54f587a 100644
          export_masks: false,
          preserve_folders: true,
          destination_type: None,
-@@ -1693,12 +2566,19 @@ pub async fn estimate_export_sizes(
+@@ -1693,12 +2778,19 @@ pub async fn estimate_export_sizes(
              apply_all_transformations(&loaded_image.image, &adjustments_clone);
          let (full_w, full_h) = transformed_full_res.dimensions();
  
@@ -4332,8 +4544,8 @@ index b0e31f5..54f587a 100644
          };
  
 +        if let Some(border_settings) = &export_settings.border {
-+            let (_, _, bordered_w, bordered_h) =
-+                border_dimensions(final_full_w, final_full_h, border_settings.size)?;
++            let (_, _, _, _, bordered_w, bordered_h) =
++                calculate_border_margins(final_full_w, final_full_h, border_settings)?;
 +            final_full_w = bordered_w;
 +            final_full_h = bordered_h;
 +        }
@@ -4969,10 +5181,10 @@ index 8469a86..bcb6ea8 100644
              <div className="absolute inset-0 pointer-events-none z-50">
 diff --git a/src/components/panel/editor/overlays/CreativeExportOverlay.tsx b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
 new file mode 100644
-index 0000000..bea8fef
+index 0000000..d750531
 --- /dev/null
 +++ b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
-@@ -0,0 +1,594 @@
+@@ -0,0 +1,859 @@
 +import React, { useMemo, useCallback, useEffect } from 'react';
 +import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 +import { useExportStore } from '../../../../store/useExportStore';
@@ -5048,6 +5260,26 @@ index 0000000..bea8fef
 +    collageRows,
 +    collageGutter,
 +    collageCellFit,
++    borderTopSize,
++    borderBottomSize,
++    borderLeftSize,
++    borderRightSize,
++    borderRadius,
++    borderShadow,
++    enableFilmStrip,
++    filmFormat,
++    filmShowSprockets,
++    filmShowFrameNumber,
++    filmFrameNumber,
++    filmEdgeMarkings,
++    enableCinematicBars,
++    cinematicRatio,
++    cinematicBarColor,
++    analogEffect,
++    lightLeakIntensity,
++    fontFamily,
++    timestampStyle,
++    archiveCatalogLayout,
 +  } = useExportStore();
 +
 +  const isTileSplitActive = enableGridTools && enableTileSplit;
@@ -5082,7 +5314,7 @@ index 0000000..bea8fef
 +  useEffect(() => {
 +    if (!isCollageActive) return;
 +    const missing = effectiveCollagePaths.filter(
-+      (p) => !thumbnails[p] && !mediumThumbnails[p] && !previews[p]?.url
++      (p) => !thumbnails[p] && !mediumThumbnails[p] && !previews[p]?.url,
 +    );
 +    if (missing.length > 0) {
 +      invoke('update_thumbnail_queue', { paths: missing }).catch(() => {});
@@ -5091,42 +5323,109 @@ index 0000000..bea8fef
 +
 +  const exifData = useMemo(() => formatExifSummary(selectedImage?.exif), [selectedImage?.exif]);
 +
-+  if (
-+    imageWidth <= 0 ||
-+    imageHeight <= 0 ||
-+    (!enableBorder &&
-+      !enableKeyline &&
-+      !enableExifBadge &&
-+      !enableWatermark &&
-+      !isGridOverlayActive &&
-+      !isTileSplitActive &&
-+      !isCollageActive)
-+  ) {
++  const isAnyFramingActive =
++    enableBorder ||
++    enablePolaroid ||
++    enableFilmStrip ||
++    enableCinematicBars ||
++    (analogEffect && analogEffect !== 'none') ||
++    enableKeyline ||
++    enableExifBadge ||
++    (timestampStyle && timestampStyle !== 'none') ||
++    enableWatermark ||
++    isGridOverlayActive ||
++    isTileSplitActive ||
++    isCollageActive;
++
++  if (imageWidth <= 0 || imageHeight <= 0 || !isAnyFramingActive) {
 +    return null;
 +  }
 +
-+  // Border & Mat padding calculations
-+  const padX = enableBorder ? Math.max(1, Math.round(imageWidth * (borderSize / 100))) : 0;
-+  const padYTop = enableBorder ? Math.max(1, Math.round(imageHeight * (borderSize / 100))) : 0;
++  // 1. Normalized Border & Asymmetrical Mat Margins
++  const leftPct = borderLeftSize !== undefined ? borderLeftSize : borderSize;
++  const rightPct = borderRightSize !== undefined ? borderRightSize : borderSize;
++  const topPct = borderTopSize !== undefined ? borderTopSize : borderSize;
++  const bottomPct = borderBottomSize !== undefined ? borderBottomSize : borderSize;
 +
-+  let extraBottom = 0;
++  let padLeft = enableBorder ? Math.max(0, Math.round(imageWidth * (leftPct / 100))) : 0;
++  let padRight = enableBorder ? Math.max(0, Math.round(imageWidth * (rightPct / 100))) : 0;
++  let padTop = enableBorder ? Math.max(0, Math.round(imageHeight * (topPct / 100))) : 0;
++  let padBottom = enableBorder ? Math.max(0, Math.round(imageHeight * (bottomPct / 100))) : 0;
++
++  // Polaroid / Instant Photography Asymmetrical Bottom Chin
 +  if (enablePolaroid) {
-+    extraBottom = Math.round(padYTop * Math.max(1, polaroidBottomMultiplier - 1));
-+  } else if (enableExifBadge && exifBadgeStyle === 'bottom_strip') {
-+    extraBottom = Math.max(38, Math.round(padYTop * 1.5));
++    const baseTop = padTop > 0 ? padTop : Math.max(12, Math.round(imageHeight * 0.04));
++    padTop = baseTop;
++    padLeft = padLeft > 0 ? padLeft : Math.max(12, Math.round(imageWidth * 0.04));
++    padRight = padRight > 0 ? padRight : Math.max(12, Math.round(imageWidth * 0.04));
++    padBottom = Math.round(baseTop * Math.max(1.2, polaroidBottomMultiplier));
 +  }
 +
-+  const padYBottom = padYTop + extraBottom;
++  // Film Strip Format Margins
++  if (enableFilmStrip) {
++    const filmTopBottomPad = Math.max(28, Math.round(imageHeight * (Math.max(5, topPct) / 100)));
++    const filmSidePad = Math.max(12, Math.round(imageWidth * (Math.max(2.5, leftPct) / 100)));
++    padTop = Math.max(padTop, filmTopBottomPad);
++    padBottom = Math.max(padBottom, filmTopBottomPad);
++    padLeft = Math.max(padLeft, filmSidePad);
++    padRight = Math.max(padRight, filmSidePad);
++  }
++
++  // EXIF Gallery Bottom Strip Expansion
++  let extraBottomForExif = 0;
++  if (enableExifBadge && exifBadgeStyle === 'bottom_strip') {
++    extraBottomForExif = Math.max(40, Math.round(imageHeight * 0.09));
++    padBottom = Math.max(padBottom, extraBottomForExif);
++  }
++
++  // Cinematic Non-Destructive Letterboxing
++  if (enableCinematicBars) {
++    const targetRatio =
++      cinematicRatio === '2.35:1'
++        ? 2.35
++        : cinematicRatio === '2.00:1'
++        ? 2.0
++        : cinematicRatio === '16:9'
++        ? 16 / 9
++        : 2.39;
++
++    const baseInnerW = imageWidth + padLeft + padRight;
++    const baseInnerH = imageHeight + padTop + padBottom;
++    const currentRatio = baseInnerW / baseInnerH;
++
++    if (currentRatio < targetRatio) {
++      // Image is taller than target cinematic ratio -> add letterbox bars top & bottom
++      const neededTotalHeight = Math.round(baseInnerW / targetRatio);
++      if (neededTotalHeight > baseInnerH) {
++        const addY = neededTotalHeight - baseInnerH;
++        padTop += Math.round(addY / 2);
++        padBottom += Math.round(addY / 2);
++      } else {
++        // Alternatively expand width to enclose full height
++        const neededTotalWidth = Math.round(baseInnerH * targetRatio);
++        const addX = Math.max(0, neededTotalWidth - baseInnerW);
++        padLeft += Math.round(addX / 2);
++        padRight += Math.round(addX / 2);
++      }
++    }
++  }
++
++  const outerX = -padLeft;
++  const outerY = -padTop;
++  const outerW = imageWidth + padLeft + padRight;
++  const outerH = imageHeight + padTop + padBottom;
 +
 +  // Keyline calculations
 +  const keylinePx = Math.max(1, Math.round((keylineSize / 100) * Math.min(imageWidth, imageHeight)));
 +  const keylineInsetPx = Math.round((keylineInset / 100) * Math.min(imageWidth, imageHeight));
 +
-+  // Frame outer dimensions
-+  const outerX = -padX;
-+  const outerY = -padYTop;
-+  const outerW = imageWidth + padX * 2;
-+  const outerH = imageHeight + padYTop + padYBottom;
++  // Resolved font family
++  const resolvedFontFamily =
++    fontFamily === 'serif'
++      ? "Georgia, Cambria, 'Times New Roman', Times, serif"
++      : fontFamily === 'mono'
++      ? "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
++      : "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 +
 +  // Watermark position calculation
 +  const getWatermarkStyle = () => {
@@ -5184,19 +5483,19 @@ index 0000000..bea8fef
 +        ? yPercent > 66
 +          ? 'translate(-100%, -100%)'
 +          : yPercent < 33
-+            ? 'translate(-100%, 0)'
-+            : 'translate(-100%, -50%)'
++          ? 'translate(-100%, 0)'
++          : 'translate(-100%, -50%)'
 +        : xPercent < 33
-+          ? yPercent > 66
-+            ? 'translate(0, -100%)'
-+            : yPercent < 33
-+              ? 'translate(0, 0)'
-+              : 'translate(0, -50%)'
-+          : yPercent > 66
-+            ? 'translate(-50%, -100%)'
-+            : yPercent < 33
-+              ? 'translate(-50%, 0)'
-+              : 'translate(-50%, -50%)';
++        ? yPercent > 66
++          ? 'translate(0, -100%)'
++          : yPercent < 33
++          ? 'translate(0, 0)'
++          : 'translate(0, -50%)'
++        : yPercent > 66
++        ? 'translate(-50%, -100%)'
++        : yPercent < 33
++        ? 'translate(-50%, 0)'
++        : 'translate(-50%, -50%)';
 +
 +    return {
 +      position: 'absolute' as const,
@@ -5271,8 +5570,12 @@ index 0000000..bea8fef
 +        </div>
 +      )}
 +
-+      {/* 1. Outer Frame / Border / Mat */}
-+      {(enableBorder || (enableExifBadge && exifBadgeStyle === 'bottom_strip')) && (
++      {/* 1. Outer Frame / Border / Mat / Film Strip / Cinematic Bars */}
++      {(enableBorder ||
++        enablePolaroid ||
++        enableFilmStrip ||
++        enableCinematicBars ||
++        (enableExifBadge && exifBadgeStyle === 'bottom_strip')) && (
 +        <svg
 +          className="absolute pointer-events-none"
 +          style={{
@@ -5281,11 +5584,23 @@ index 0000000..bea8fef
 +            width: `${outerW}px`,
 +            height: `${outerH}px`,
 +            overflow: 'visible',
++            filter: borderShadow ? 'drop-shadow(0 6px 18px rgba(0, 0, 0, 0.4))' : undefined,
 +          }}
 +        >
++          <defs>
++            {analogEffect === 'light_leak' && (
++              <linearGradient id="lightLeakGrad" x1="0%" y1="0%" x2="50%" y2="100%">
++                <stop offset="0%" stopColor="#ff7a00" stopOpacity="0.85" />
++                <stop offset="35%" stopColor="#ff4500" stopOpacity="0.45" />
++                <stop offset="70%" stopColor="#ffaa00" stopOpacity="0.15" />
++                <stop offset="100%" stopColor="#000000" stopOpacity="0" />
++              </linearGradient>
++            )}
++          </defs>
++
 +          {/* Mat background: fills outer frame except the transparent inner hole for the photo */}
 +          <path
-+            fill={borderColor || '#ffffff'}
++            fill={enableCinematicBars ? cinematicBarColor || '#000000' : borderColor || '#ffffff'}
 +            fillRule="evenodd"
 +            d={`
 +              M 0,0
@@ -5293,19 +5608,121 @@ index 0000000..bea8fef
 +              V ${outerH}
 +              H 0
 +              Z
-+              M ${padX},${padYTop}
-+              V ${padYTop + imageHeight}
-+              H ${padX + imageWidth}
-+              V ${padYTop}
++              M ${padLeft},${padTop}
++              V ${padTop + imageHeight}
++              H ${padLeft + imageWidth}
++              V ${padTop}
 +              Z
 +            `}
 +          />
 +
++          {/* Film Strip Sprocket Holes & Markings */}
++          {enableFilmStrip && (
++            <g>
++              {filmFormat === '35mm' && filmShowSprockets !== false && (
++                <>
++                  {Array.from({ length: Math.max(4, Math.round(outerW / 36)) }).map((_, i) => {
++                    const count = Math.max(4, Math.round(outerW / 36));
++                    const step = outerW / count;
++                    const sx = i * step + step * 0.25;
++                    const sw = step * 0.5;
++                    const sh = Math.max(8, Math.round(padTop * 0.42));
++                    const syTop = Math.round((padTop - sh) / 2);
++                    const syBottom = outerH - padBottom + Math.round((padBottom - sh) / 2);
++                    return (
++                      <React.Fragment key={`sprocket-${i}`}>
++                        <rect
++                          x={sx}
++                          y={syTop}
++                          width={sw}
++                          height={sh}
++                          rx={2.5}
++                          fill="#000000"
++                          stroke="#27272a"
++                          strokeWidth={0.5}
++                        />
++                        <rect
++                          x={sx}
++                          y={syBottom}
++                          width={sw}
++                          height={sh}
++                          rx={2.5}
++                          fill="#000000"
++                          stroke="#27272a"
++                          strokeWidth={0.5}
++                        />
++                      </React.Fragment>
++                    );
++                  })}
++                </>
++              )}
++
++              {/* Film Edge Text Markings */}
++              <g
++                fill="#a1a1aa"
++                style={{
++                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
++                  fontSize: `${Math.max(8, Math.min(12, Math.round(outerW / 75)))}px`,
++                  letterSpacing: '0.05em',
++                }}
++              >
++                {/* Top edge text */}
++                <text x={padLeft + 6} y={Math.max(10, Math.round(padTop * 0.85))} fontWeight={600}>
++                  ▲ {filmEdgeMarkings || '36 EXP  •  35MM'}
++                </text>
++                <text
++                  x={outerW - padRight - 6}
++                  y={Math.max(10, Math.round(padTop * 0.85))}
++                  textAnchor="end"
++                  fontWeight={500}
++                >
++                  ISO 400
++                </text>
++
++                {/* Bottom edge text */}
++                <text
++                  x={padLeft + 6}
++                  y={outerH - Math.max(4, Math.round(padBottom * 0.15))}
++                  fontWeight={600}
++                >
++                  FRAME {filmFrameNumber || '01'}  •  ▶▶
++                </text>
++              </g>
++            </g>
++          )}
++
++          {/* Darkroom Print Hairline Border */}
++          {analogEffect === 'darkroom' && (
++            <rect
++              x={padLeft}
++              y={padTop}
++              width={imageWidth}
++              height={imageHeight}
++              fill="none"
++              stroke="#ffffff"
++              strokeWidth={1}
++              strokeOpacity={0.8}
++            />
++          )}
++
++          {/* Subtle Light Leak Overlay */}
++          {analogEffect === 'light_leak' && (
++            <rect
++              x={padLeft}
++              y={padTop}
++              width={imageWidth}
++              height={imageHeight}
++              fill="url(#lightLeakGrad)"
++              opacity={(lightLeakIntensity || 65) / 100}
++              style={{ mixBlendMode: 'screen' }}
++            />
++          )}
++
 +          {/* 2. Inset Keyline */}
 +          {enableKeyline && (
 +            <rect
-+              x={padX - keylineInsetPx}
-+              y={padYTop - keylineInsetPx}
++              x={padLeft - keylineInsetPx}
++              y={padTop - keylineInsetPx}
 +              width={imageWidth + keylineInsetPx * 2}
 +              height={imageHeight + keylineInsetPx * 2}
 +              fill="none"
@@ -5318,7 +5735,7 @@ index 0000000..bea8fef
 +          {/* 3. EXIF Gallery Bottom Strip Text */}
 +          {enableExifBadge && exifBadgeStyle === 'bottom_strip' && (
 +            <g
-+              transform={`translate(0, ${padYTop + imageHeight})`}
++              transform={`translate(0, ${padTop + imageHeight})`}
 +              fill={exifBadgeTextColor || '#111827'}
 +            >
 +              {/* Bottom strip background */}
@@ -5326,18 +5743,52 @@ index 0000000..bea8fef
 +                x={0}
 +                y={0}
 +                width={outerW}
-+                height={padYBottom - padYTop}
++                height={padBottom}
 +                fill={exifBadgeBgColor || borderColor || '#ffffff'}
 +              />
 +
-+              {exifBadgeAlignment === 'center' ? (
++              {archiveCatalogLayout ? (
++                // Archive Catalog Card Layout
++                <g style={{ fontFamily: resolvedFontFamily, fontVariantNumeric: 'tabular-nums' }}>
++                  <text
++                    x={padLeft + 4}
++                    y={Math.round(padBottom * 0.38)}
++                    style={{
++                      fontSize: `${Math.max(9, Math.min(12, Math.round(outerW / 70)))}px`,
++                      fontWeight: 700,
++                      letterSpacing: '0.08em',
++                    }}
++                  >
++                    RAPIDRAW ARCHIVAL COLLECTION
++                  </text>
++                  <text
++                    x={padLeft + 4}
++                    y={Math.round(padBottom * 0.72)}
++                    style={{
++                      fontSize: `${Math.max(8, Math.min(11, Math.round(outerW / 76)))}px`,
++                      fontWeight: 500,
++                      opacity: 0.8,
++                    }}
++                  >
++                    {[
++                      exifCustomText ? `REF: ${exifCustomText}` : '',
++                      exifShowCamera ? `CAM: ${exifData.camera}` : '',
++                      exifShowLens && exifData.lens ? `LENS: ${exifData.lens}` : '',
++                      exifShowSettings ? exifData.settings : '',
++                      exifShowDate ? exifData.date : '',
++                    ]
++                      .filter(Boolean)
++                      .join('  |  ')}
++                  </text>
++                </g>
++              ) : exifBadgeAlignment === 'center' ? (
 +                // Centered Gallery Layout
 +                <g textAnchor="middle" style={{ fontVariantNumeric: 'tabular-nums' }}>
 +                  <text
 +                    x={outerW / 2}
-+                    y={Math.round(extraBottom * 0.44)}
++                    y={Math.round(padBottom * 0.42)}
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(10, Math.min(14, Math.round(outerW / 55)))}px`,
 +                      fontWeight: 600,
 +                      letterSpacing: '0.04em',
@@ -5353,9 +5804,9 @@ index 0000000..bea8fef
 +                  </text>
 +                  <text
 +                    x={outerW / 2}
-+                    y={Math.round(extraBottom * 0.78)}
++                    y={Math.round(padBottom * 0.76)}
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(9, Math.min(12, Math.round(outerW / 68)))}px`,
 +                      fontWeight: 400,
 +                      opacity: 0.75,
@@ -5375,10 +5826,10 @@ index 0000000..bea8fef
 +                <g style={{ fontVariantNumeric: 'tabular-nums' }}>
 +                  {/* Left Column */}
 +                  <text
-+                    x={Math.max(16, padX)}
-+                    y={Math.round(extraBottom * 0.44)}
++                    x={Math.max(16, padLeft)}
++                    y={Math.round(padBottom * 0.42)}
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(10, Math.min(14, Math.round(outerW / 55)))}px`,
 +                      fontWeight: 600,
 +                    }}
@@ -5386,10 +5837,10 @@ index 0000000..bea8fef
 +                    {exifShowCamera ? exifData.camera : ''}
 +                  </text>
 +                  <text
-+                    x={Math.max(16, padX)}
-+                    y={Math.round(extraBottom * 0.78)}
++                    x={Math.max(16, padLeft)}
++                    y={Math.round(padBottom * 0.76)}
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(9, Math.min(12, Math.round(outerW / 68)))}px`,
 +                      opacity: 0.75,
 +                    }}
@@ -5401,11 +5852,11 @@ index 0000000..bea8fef
 +
 +                  {/* Right Column */}
 +                  <text
-+                    x={outerW - Math.max(16, padX)}
-+                    y={Math.round(extraBottom * 0.44)}
++                    x={outerW - Math.max(16, padRight)}
++                    y={Math.round(padBottom * 0.42)}
 +                    textAnchor="end"
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(10, Math.min(13, Math.round(outerW / 60)))}px`,
 +                      fontWeight: 500,
 +                    }}
@@ -5413,11 +5864,11 @@ index 0000000..bea8fef
 +                    {exifShowSettings ? exifData.settings : ''}
 +                  </text>
 +                  <text
-+                    x={outerW - Math.max(16, padX)}
-+                    y={Math.round(extraBottom * 0.78)}
++                    x={outerW - Math.max(16, padRight)}
++                    y={Math.round(padBottom * 0.76)}
 +                    textAnchor="end"
 +                    style={{
-+                      fontFamily: 'system-ui, -apple-system, sans-serif',
++                      fontFamily: resolvedFontFamily,
 +                      fontSize: `${Math.max(9, Math.min(11, Math.round(outerW / 70)))}px`,
 +                      opacity: 0.7,
 +                    }}
@@ -5440,7 +5891,7 @@ index 0000000..bea8fef
 +            color: exifBadgeTextColor || '#ffffff',
 +            border: '1px solid rgba(255, 255, 255, 0.15)',
 +            fontSize: `${Math.max(10, Math.min(13, Math.round(imageWidth / 65)))}px`,
-+            fontFamily: 'system-ui, -apple-system, sans-serif',
++            fontFamily: resolvedFontFamily,
 +            maxWidth: '90%',
 +          }}
 +        >
@@ -5452,7 +5903,33 @@ index 0000000..bea8fef
 +        </div>
 +      )}
 +
-+      {/* 5. Typography / Watermarks */}
++      {/* 5. Retro Digital Timestamp */}
++      {timestampStyle && timestampStyle !== 'none' && (
++        <div
++          className="absolute bottom-3 right-4 font-mono font-bold tracking-wider select-none pointer-events-none"
++          style={{
++            color: timestampStyle === 'digital_green' ? '#22c55e' : '#ff8c00',
++            textShadow:
++              timestampStyle === 'digital_green'
++                ? '0 0 5px rgba(34, 197, 94, 0.85)'
++                : '0 0 5px rgba(255, 140, 0, 0.85)',
++            fontSize: `${Math.max(11, Math.min(16, Math.round(imageWidth / 52)))}px`,
++            letterSpacing: '0.08em',
++          }}
++        >
++          {exifData.date
++            ? `'${exifData.date.slice(2).replace(/-/g, ' ')}`
++            : new Date()
++                .toLocaleDateString('en-US', {
++                  year: '2-digit',
++                  month: '2-digit',
++                  day: '2-digit',
++                })
++                .replace(/\//g, ' ')}
++        </div>
++      )}
++
++      {/* 6. Typography / Watermarks */}
 +      {enableWatermark && (
 +        <div style={getWatermarkStyle()}>
 +          {watermarkType === 'text' && watermarkText ? (
@@ -5460,7 +5937,7 @@ index 0000000..bea8fef
 +              style={{
 +                color: watermarkColor || '#ffffff',
 +                fontSize: `${watermarkFontSize}px`,
-+                fontFamily: 'system-ui, -apple-system, sans-serif',
++                fontFamily: resolvedFontFamily,
 +                fontWeight: 600,
 +                textShadow: '0 1px 3px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.4)',
 +                whiteSpace: 'nowrap',
@@ -5483,7 +5960,7 @@ index 0000000..bea8fef
 +        </div>
 +      )}
 +
-+      {/* 6. Composition Grid Overlay (Standard Export) */}
++      {/* 7. Composition Grid Overlay (Standard Export) */}
 +      {isGridOverlayActive && (
 +        <svg
 +          className="absolute inset-0 pointer-events-none"
@@ -5524,7 +6001,7 @@ index 0000000..bea8fef
 +        </svg>
 +      )}
 +
-+      {/* 7. Multi-Tile Splitter Slice Guides (Standard Export) */}
++      {/* 8. Multi-Tile Splitter Slice Guides (Standard Export) */}
 +      {isTileSplitActive && (
 +        <svg
 +          className="absolute inset-0 pointer-events-none"
@@ -5569,11 +6046,11 @@ index 0000000..bea8fef
 +}
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
 new file mode 100644
-index 0000000..4660c05
+index 0000000..b64cc99
 --- /dev/null
 +++ b/src/components/panel/right/CreativeExportTab.tsx
-@@ -0,0 +1,808 @@
-+import React, { useState } from 'react';
+@@ -0,0 +1,1343 @@
++import React, { useState, useEffect, useMemo } from 'react';
 +import { useTranslation } from 'react-i18next';
 +import {
 +  RotateCcw,
@@ -5584,30 +6061,42 @@ index 0000000..4660c05
 +  Type,
 +  Image as ImageIconLucide,
 +  ArrowRight,
-+  Sliders,
-+  Camera,
-+  Layers,
-+  Square,
++  Film,
++  Clapperboard,
++  Palette,
++  Clock,
 +} from 'lucide-react';
 +import clsx from 'clsx';
 +import Switch from '../../ui/Switch';
 +import Slider from '../../ui/Slider';
-+import Dropdown from '../../ui/Dropdown';
 +import ImagePicker from '../../ui/ImagePicker';
 +import Button from '../../ui/Button';
 +import Text from '../../ui/Text';
 +import { TextVariants, TextColors } from '../../../types/typography';
-+import { WatermarkAnchor } from '../../ui/ExportImportProperties';
++import { WatermarkAnchor, CreativeExportPreset } from '../../ui/ExportImportProperties';
 +import { Panel } from '../../ui/AppProperties';
 +import { useExportStore } from '../../../store/useExportStore';
 +import { useLibraryStore } from '../../../store/useLibraryStore';
 +import { useUIStore } from '../../../store/useUIStore';
-+import CollapsibleSection from '../../ui/CollapsibleSection';
++import { useEditorStore } from '../../../store/useEditorStore';
++
++const PRESET_CATEGORIES: { id: string; label: string }[] = [
++  { id: 'all', label: 'All' },
++  { id: 'instant', label: 'Instant' },
++  { id: 'film', label: 'Film' },
++  { id: 'editorial', label: 'Editorial' },
++  { id: 'cinematic', label: 'Cinematic' },
++  { id: 'analog', label: 'Analog' },
++  { id: 'camera', label: 'Camera & Data' },
++  { id: 'archive', label: 'Archive' },
++  { id: 'custom', label: 'Custom' },
++];
 +
 +export default function CreativeExportTab() {
 +  const { t } = useTranslation();
 +  const setActivePanel = useUIStore((s) => s.setActivePanel);
 +  const multiSelectedPaths = useLibraryStore((s) => s.multiSelectedPaths);
++  const selectedImage = useEditorStore((s) => s.selectedImage);
 +
 +  const {
 +    enableBorder,
@@ -5642,6 +6131,26 @@ index 0000000..4660c05
 +    watermarkCustomY,
 +    creativePresets,
 +    activeCreativePresetId,
++    borderTopSize,
++    borderBottomSize,
++    borderLeftSize,
++    borderRightSize,
++    borderRadius,
++    borderShadow,
++    enableFilmStrip,
++    filmFormat,
++    filmShowSprockets,
++    filmShowFrameNumber,
++    filmFrameNumber,
++    filmEdgeMarkings,
++    enableCinematicBars,
++    cinematicRatio,
++    cinematicBarColor,
++    analogEffect,
++    lightLeakIntensity,
++    fontFamily,
++    timestampStyle,
++    archiveCatalogLayout,
 +    setCreativeSetting,
 +    setCreativeSettingsBatch,
 +    resetSection,
@@ -5653,15 +6162,26 @@ index 0000000..4660c05
 +    setShowExportProofing,
 +  } = useExportStore();
 +
++  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 +  const [isNewPresetModalOpen, setIsNewPresetModalOpen] = useState(false);
 +  const [newPresetName, setNewPresetName] = useState('');
 +  const [batchApplied, setBatchApplied] = useState(false);
++
++  // Synchronize active photo creative settings on mount and path change
++  useEffect(() => {
++    if (selectedImage?.path) {
++      useExportStore.getState().loadSettingsForImage(selectedImage.path);
++    }
++  }, [selectedImage?.path]);
 +
 +  // Section collapse states
 +  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
 +    framing: true,
 +    polaroid: false,
++    film: false,
++    cinematic: false,
 +    keyline: false,
++    analog: false,
 +    exifBadge: true,
 +    watermark: false,
 +  });
@@ -5677,18 +6197,41 @@ index 0000000..4660c05
 +    setIsNewPresetModalOpen(false);
 +  };
 +
++  const handleSelectPreset = (targetId: string) => {
++    const found = creativePresets.find((p) => p.id === targetId);
++    if (!found) return;
++
++    applyCreativePreset(found);
++
++    // If multiple photos are selected, immediately apply to all selected photos and save to localStorage
++    if (multiSelectedPaths.length > 1) {
++      applyCreativePresetToPaths(found, multiSelectedPaths);
++      setBatchApplied(true);
++      setTimeout(() => setBatchApplied(false), 2500);
++    }
++
++    // Contextually expand relevant section based on preset family
++    if (found.category === 'film' || found.settings.enableFilmStrip) {
++      setOpenSections((prev) => ({ ...prev, film: true }));
++    } else if (found.category === 'cinematic' || found.settings.enableCinematicBars) {
++      setOpenSections((prev) => ({ ...prev, cinematic: true }));
++    } else if (found.category === 'instant' || found.settings.enablePolaroid) {
++      setOpenSections((prev) => ({ ...prev, polaroid: true }));
++    } else if (found.category === 'analog' || (found.settings.analogEffect && found.settings.analogEffect !== 'none')) {
++      setOpenSections((prev) => ({ ...prev, analog: true }));
++    }
++  };
++
 +  const handleApplyToSelected = () => {
 +    if (multiSelectedPaths.length === 0) return;
 +    const activePreset = creativePresets.find((p) => p.id === activeCreativePresetId);
-+    if (activePreset) {
-+      applyCreativePresetToPaths(activePreset, multiSelectedPaths);
-+    } else {
-+      // Apply current settings as ad-hoc preset to all selected
-+      const currentSnapshot = useExportStore.getState();
-+      applyCreativePresetToPaths(
-+        {
-+          id: 'temp',
-+          name: 'Current',
++    const currentSnapshot = useExportStore.getState();
++    const settingsToApply: CreativeExportPreset = activePreset
++      ? activePreset
++      : {
++          id: `custom-${Date.now()}`,
++          name: 'Current Setup',
++          category: 'custom',
 +          settings: {
 +            enableBorder: currentSnapshot.enableBorder,
 +            borderSize: currentSnapshot.borderSize,
@@ -5721,14 +6264,42 @@ index 0000000..4660c05
 +            exifCustomText: currentSnapshot.exifCustomText,
 +            exifBadgeBgColor: currentSnapshot.exifBadgeBgColor,
 +            exifBadgeTextColor: currentSnapshot.exifBadgeTextColor,
++            activeCreativePresetId: currentSnapshot.activeCreativePresetId,
++            borderTopSize: currentSnapshot.borderTopSize,
++            borderBottomSize: currentSnapshot.borderBottomSize,
++            borderLeftSize: currentSnapshot.borderLeftSize,
++            borderRightSize: currentSnapshot.borderRightSize,
++            borderRadius: currentSnapshot.borderRadius,
++            borderShadow: currentSnapshot.borderShadow,
++            enableFilmStrip: currentSnapshot.enableFilmStrip,
++            filmFormat: currentSnapshot.filmFormat,
++            filmShowSprockets: currentSnapshot.filmShowSprockets,
++            filmShowFrameNumber: currentSnapshot.filmShowFrameNumber,
++            filmFrameNumber: currentSnapshot.filmFrameNumber,
++            filmEdgeMarkings: currentSnapshot.filmEdgeMarkings,
++            enableCinematicBars: currentSnapshot.enableCinematicBars,
++            cinematicRatio: currentSnapshot.cinematicRatio,
++            cinematicBarColor: currentSnapshot.cinematicBarColor,
++            analogEffect: currentSnapshot.analogEffect,
++            lightLeakIntensity: currentSnapshot.lightLeakIntensity,
++            fontFamily: currentSnapshot.fontFamily,
++            timestampStyle: currentSnapshot.timestampStyle,
++            archiveCatalogLayout: currentSnapshot.archiveCatalogLayout,
 +          },
-+        },
-+        multiSelectedPaths,
-+      );
-+    }
++        };
++
++    applyCreativePresetToPaths(settingsToApply, multiSelectedPaths);
 +    setBatchApplied(true);
 +    setTimeout(() => setBatchApplied(false), 2500);
 +  };
++
++  const filteredPresets = useMemo(() => {
++    if (selectedCategory === 'all') return creativePresets;
++    if (selectedCategory === 'custom') {
++      return creativePresets.filter((p) => !p.isBuiltIn || p.category === 'custom');
++    }
++    return creativePresets.filter((p) => p.category === selectedCategory);
++  }, [creativePresets, selectedCategory]);
 +
 +  const anchorOptions = [
 +    { label: t('export.watermark.anchors.topLeft', 'Top Left'), value: WatermarkAnchor.TopLeft },
@@ -5784,35 +6355,131 @@ index 0000000..4660c05
 +            </button>
 +          </div>
 +
++          {/* Category Filter Chips */}
++          <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
++            {PRESET_CATEGORIES.map((cat) => (
++              <button
++                key={cat.id}
++                onClick={() => setSelectedCategory(cat.id)}
++                className={clsx(
++                  'px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors shrink-0',
++                  selectedCategory === cat.id
++                    ? 'bg-accent text-button-text font-semibold shadow-xs'
++                    : 'bg-surface hover:bg-card-active text-text-secondary hover:text-text-primary border border-surface/60',
++                )}
++              >
++                {cat.label}
++              </button>
++            ))}
++          </div>
++
++          {/* Preset Selector Dropdown */}
 +          <div className="flex items-center gap-2">
 +            <select
 +              value={activeCreativePresetId || ''}
-+              onChange={(e) => {
-+                const targetId = e.target.value;
-+                const found = creativePresets.find((p) => p.id === targetId);
-+                if (found) applyCreativePreset(found);
-+              }}
++              onChange={(e) => handleSelectPreset(e.target.value)}
 +              className="flex-1 bg-surface border border-surface rounded-md p-1.5 text-xs text-text-primary focus:ring-accent focus:border-accent"
 +            >
 +              <option value="" disabled>
 +                {activeCreativePresetId ? 'Custom Setup' : 'Choose a Preset...'}
 +              </option>
-+              {creativePresets.map((p) => (
-+                <option key={p.id} value={p.id}>
-+                  {p.name} {p.isBuiltIn ? '(Built-in)' : ''}
-+                </option>
-+              ))}
++
++              {selectedCategory === 'all' ? (
++                <>
++                  <optgroup label="Instant Photography">
++                    {creativePresets
++                      .filter((p) => p.category === 'instant')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Film Strips & Rebates">
++                    {creativePresets
++                      .filter((p) => p.category === 'film')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Editorial & Fine Art">
++                    {creativePresets
++                      .filter((p) => p.category === 'editorial')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Cinematic Presentation">
++                    {creativePresets
++                      .filter((p) => p.category === 'cinematic')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Analog & Darkroom">
++                    {creativePresets
++                      .filter((p) => p.category === 'analog')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Camera & Metadata">
++                    {creativePresets
++                      .filter((p) => p.category === 'camera')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  <optgroup label="Archival & Documentary">
++                    {creativePresets
++                      .filter((p) => p.category === 'archive')
++                      .map((p) => (
++                        <option key={p.id} value={p.id}>
++                          {p.name}
++                        </option>
++                      ))}
++                  </optgroup>
++                  {creativePresets.some((p) => !p.isBuiltIn || p.category === 'custom') && (
++                    <optgroup label="Custom User Presets">
++                      {creativePresets
++                        .filter((p) => !p.isBuiltIn || p.category === 'custom')
++                        .map((p) => (
++                          <option key={p.id} value={p.id}>
++                            {p.name}
++                          </option>
++                        ))}
++                    </optgroup>
++                  )}
++                </>
++              ) : (
++                filteredPresets.map((p) => (
++                  <option key={p.id} value={p.id}>
++                    {p.name} {!p.isBuiltIn ? '(Custom)' : ''}
++                  </option>
++                ))
++              )}
 +            </select>
 +
-+            {activeCreativePresetId && !creativePresets.find((p) => p.id === activeCreativePresetId)?.isBuiltIn && (
-+              <button
-+                onClick={() => deleteCreativePreset(activeCreativePresetId)}
-+                className="p-1.5 rounded-md hover:bg-surface text-red-400 hover:text-red-300 transition-colors"
-+                data-tooltip="Delete Custom Preset"
-+              >
-+                <Trash2 size={15} />
-+              </button>
-+            )}
++            {activeCreativePresetId &&
++              !creativePresets.find((p) => p.id === activeCreativePresetId)?.isBuiltIn && (
++                <button
++                  onClick={() => deleteCreativePreset(activeCreativePresetId)}
++                  className="p-1.5 rounded-md hover:bg-surface text-red-400 hover:text-red-300 transition-colors"
++                  data-tooltip="Delete Custom Preset"
++                >
++                  <Trash2 size={15} />
++                </button>
++              )}
 +          </div>
 +
 +          {/* Batch Apply button when multi-selection is active */}
@@ -5821,7 +6488,11 @@ index 0000000..4660c05
 +              onClick={handleApplyToSelected}
 +              className="w-full py-1.5 px-2.5 rounded-md bg-surface hover:bg-card-active border border-surface text-xs font-medium text-text-primary flex items-center justify-center gap-1.5 transition-colors"
 +            >
-+              {batchApplied ? <Check size={14} className="text-emerald-400" /> : <Sparkles size={14} className="text-accent" />}
++              {batchApplied ? (
++                <Check size={14} className="text-emerald-400" />
++              ) : (
++                <Sparkles size={14} className="text-accent" />
++              )}
 +              <span>
 +                {batchApplied
 +                  ? `Applied to ${multiSelectedPaths.length} Photos!`
@@ -5860,7 +6531,10 @@ index 0000000..4660c05
 +
 +        {/* 2. Framing & Outer Mat Section */}
 +        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer" onClick={() => toggleSection('framing')}>
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('framing')}
++          >
 +            <div className="flex items-center gap-2">
 +              <span onClick={(e) => e.stopPropagation()}>
 +                <Switch
@@ -5919,6 +6593,7 @@ index 0000000..4660c05
 +                    {[
 +                      { label: 'White', color: '#ffffff' },
 +                      { label: 'Off-White', color: '#f7f6f2' },
++                      { label: 'Warm Rag', color: '#f5f2eb' },
 +                      { label: 'Black', color: '#111111' },
 +                      { label: 'Charcoal', color: '#2a2a2a' },
 +                    ].map((swatch) => (
@@ -5927,7 +6602,9 @@ index 0000000..4660c05
 +                        onClick={() => setCreativeSetting('borderColor', swatch.color)}
 +                        className={clsx(
 +                          'w-6 h-6 rounded-full border shadow-sm transition-transform hover:scale-110',
-+                          borderColor.toLowerCase() === swatch.color.toLowerCase() ? 'ring-2 ring-accent' : 'border-surface',
++                          borderColor.toLowerCase() === swatch.color.toLowerCase()
++                            ? 'ring-2 ring-accent'
++                            : 'border-surface',
 +                        )}
 +                        style={{ backgroundColor: swatch.color }}
 +                        data-tooltip={swatch.label}
@@ -5936,13 +6613,26 @@ index 0000000..4660c05
 +                  </div>
 +                </div>
 +              </div>
++
++              <div className="flex items-center justify-between pt-1">
++                <span className="text-xs text-text-secondary">Soft Paper Drop Shadow</span>
++                <Switch
++                  id="switch-border-shadow"
++                  label=""
++                  checked={Boolean(borderShadow)}
++                  onChange={(checked) => setCreativeSetting('borderShadow', checked)}
++                />
++              </div>
 +            </div>
 +          )}
 +        </div>
 +
 +        {/* 3. Polaroid Style Section */}
 +        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer" onClick={() => toggleSection('polaroid')}>
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('polaroid')}
++          >
 +            <div className="flex items-center gap-2">
 +              <span onClick={(e) => e.stopPropagation()}>
 +                <Switch
@@ -5959,7 +6649,7 @@ index 0000000..4660c05
 +                />
 +              </span>
 +              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide">
-+                Polaroid Style
++                Polaroid Chin & Instant Proportions
 +              </span>
 +            </div>
 +            <div className="flex items-center gap-1">
@@ -5979,8 +6669,8 @@ index 0000000..4660c05
 +          {openSections.polaroid && enablePolaroid && (
 +            <div className="p-3.5 space-y-4 border-t border-surface">
 +              <Slider
-+                label="Bottom Chin Height"
-+                min={1.5}
++                label="Bottom Chin Height Multiplier"
++                min={1.2}
 +                max={6.0}
 +                step={0.1}
 +                value={polaroidBottomMultiplier}
@@ -5989,15 +6679,194 @@ index 0000000..4660c05
 +                onChange={(e) => setCreativeSetting('polaroidBottomMultiplier', Number(e.target.value))}
 +              />
 +              <p className="text-[11px] text-text-secondary">
-+                Expands the bottom border with iconic instant film proportions.
++                Expands the lower border with iconic instant film proportions (SX-70, Polaroid 600, Instax).
 +              </p>
 +            </div>
 +          )}
 +        </div>
 +
-+        {/* 4. Fine-Art Inset Keyline Section */}
++        {/* 4. Film Strip & Sprockets Section */}
 +        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer" onClick={() => toggleSection('keyline')}>
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('film')}
++          >
++            <div className="flex items-center gap-2">
++              <span onClick={(e) => e.stopPropagation()}>
++                <Switch
++                  id="switch-film-strip"
++                  label=""
++                  checked={Boolean(enableFilmStrip)}
++                  onChange={(checked) => {
++                    setCreativeSetting('enableFilmStrip', checked);
++                    if (checked) {
++                      setCreativeSetting('enableBorder', true);
++                      setCreativeSetting('borderColor', '#0d0d0d');
++                      setShowExportProofing(true);
++                    }
++                  }}
++                />
++              </span>
++              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide flex items-center gap-1.5">
++                <Film size={14} className="text-accent" />
++                <span>Film Rebate & Sprocket Holes</span>
++              </span>
++            </div>
++            <div className="flex items-center gap-1">
++              <button
++                onClick={(e) => {
++                  e.stopPropagation();
++                  resetSection('film');
++                }}
++                className="p-1 rounded hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
++                data-tooltip="Reset Film Strip"
++              >
++                <RotateCcw size={13} />
++              </button>
++            </div>
++          </div>
++
++          {openSections.film && enableFilmStrip && (
++            <div className="p-3.5 space-y-4 border-t border-surface">
++              <div>
++                <span className="text-xs text-text-secondary mb-1.5 block font-medium">Film Format</span>
++                <div className="grid grid-cols-3 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
++                  {[
++                    { id: '35mm', label: '35mm Film' },
++                    { id: 'medium_6x6', label: 'Medium 6×6' },
++                    { id: 'medium_6x7', label: 'Medium 6×7' },
++                  ].map((fmt) => (
++                    <button
++                      key={fmt.id}
++                      onClick={() => setCreativeSetting('filmFormat', fmt.id as any)}
++                      className={clsx(
++                        'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
++                        (filmFormat || '35mm') === fmt.id
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
++                      )}
++                    >
++                      {fmt.label}
++                    </button>
++                  ))}
++                </div>
++              </div>
++
++              {filmFormat === '35mm' && (
++                <div className="flex items-center justify-between">
++                  <span className="text-xs text-text-secondary font-medium">Sprocket Holes</span>
++                  <Switch
++                    id="switch-sprockets"
++                    label=""
++                    checked={filmShowSprockets !== false}
++                    onChange={(checked) => setCreativeSetting('filmShowSprockets', checked)}
++                  />
++                </div>
++              )}
++
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <span className="text-xs text-text-secondary mb-1 block font-medium">Frame Index</span>
++                  <input
++                    type="text"
++                    value={filmFrameNumber || '01'}
++                    onChange={(e) => setCreativeSetting('filmFrameNumber', e.target.value)}
++                    placeholder="01"
++                    className="w-full bg-surface border border-surface rounded-md p-1.5 text-xs text-text-primary font-mono focus:ring-accent"
++                  />
++                </div>
++                <div>
++                  <span className="text-xs text-text-secondary mb-1 block font-medium">Film Edge Markings</span>
++                  <input
++                    type="text"
++                    value={filmEdgeMarkings || '36 EXP  •  35MM'}
++                    onChange={(e) => setCreativeSetting('filmEdgeMarkings', e.target.value)}
++                    placeholder="36 EXP • 35MM"
++                    className="w-full bg-surface border border-surface rounded-md p-1.5 text-xs text-text-primary font-mono focus:ring-accent"
++                  />
++                </div>
++              </div>
++            </div>
++          )}
++        </div>
++
++        {/* 5. Cinematic Presentation Letterbox */}
++        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('cinematic')}
++          >
++            <div className="flex items-center gap-2">
++              <span onClick={(e) => e.stopPropagation()}>
++                <Switch
++                  id="switch-cinematic"
++                  label=""
++                  checked={Boolean(enableCinematicBars)}
++                  onChange={(checked) => {
++                    setCreativeSetting('enableCinematicBars', checked);
++                    if (checked) {
++                      setCreativeSetting('enableBorder', true);
++                      setCreativeSetting('borderColor', '#000000');
++                      setShowExportProofing(true);
++                    }
++                  }}
++                />
++              </span>
++              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide flex items-center gap-1.5">
++                <Clapperboard size={14} className="text-accent" />
++                <span>Cinematic Aspect Letterbox</span>
++              </span>
++            </div>
++            <div className="flex items-center gap-1">
++              <button
++                onClick={(e) => {
++                  e.stopPropagation();
++                  resetSection('cinematic');
++                }}
++                className="p-1 rounded hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
++                data-tooltip="Reset Cinematic"
++              >
++                <RotateCcw size={13} />
++              </button>
++            </div>
++          </div>
++
++          {openSections.cinematic && enableCinematicBars && (
++            <div className="p-3.5 space-y-4 border-t border-surface">
++              <div>
++                <span className="text-xs text-text-secondary mb-1.5 block font-medium">
++                  Aspect Ratio (Non-Destructive)
++                </span>
++                <div className="grid grid-cols-4 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
++                  {['2.39:1', '2.35:1', '2.00:1', '16:9'].map((ratio) => (
++                    <button
++                      key={ratio}
++                      onClick={() => setCreativeSetting('cinematicRatio', ratio as any)}
++                      className={clsx(
++                        'py-1.5 px-1.5 text-xs rounded-md transition-colors font-medium text-center',
++                        (cinematicRatio || '2.39:1') === ratio
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
++                      )}
++                    >
++                      {ratio}
++                    </button>
++                  ))}
++                </div>
++              </div>
++              <p className="text-[11px] text-text-secondary">
++                Framer adds letterbox or pillarbox matte bars without cropping or discarding any image pixels.
++              </p>
++            </div>
++          )}
++        </div>
++
++        {/* 6. Fine-Art Inset Keyline Section */}
++        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('keyline')}
++          >
 +            <div className="flex items-center gap-2">
 +              <span onClick={(e) => e.stopPropagation()}>
 +                <Switch
@@ -6060,13 +6929,15 @@ index 0000000..4660c05
 +                    className="w-8 h-8 rounded border border-surface cursor-pointer bg-transparent"
 +                  />
 +                  <div className="flex items-center gap-1.5 flex-1">
-+                    {['#000000', '#1a1a1a', '#e5e5e5', '#ffffff'].map((hex) => (
++                    {['#000000', '#1a1a1a', '#68645c', '#e5e5e5', '#ffffff'].map((hex) => (
 +                      <button
 +                        key={hex}
 +                        onClick={() => setCreativeSetting('keylineColor', hex)}
 +                        className={clsx(
 +                          'w-6 h-6 rounded-full border shadow-sm transition-transform hover:scale-110',
-+                          keylineColor.toLowerCase() === hex.toLowerCase() ? 'ring-2 ring-accent' : 'border-surface',
++                          keylineColor.toLowerCase() === hex.toLowerCase()
++                            ? 'ring-2 ring-accent'
++                            : 'border-surface',
 +                        )}
 +                        style={{ backgroundColor: hex }}
 +                      />
@@ -6078,23 +6949,110 @@ index 0000000..4660c05
 +          )}
 +        </div>
 +
-+        {/* 5. Dynamic EXIF Badges Section */}
++        {/* 7. Analog & Print Effects Section */}
 +        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer" onClick={() => toggleSection('exifBadge')}>
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('analog')}
++          >
++            <div className="flex items-center gap-2">
++              <span onClick={(e) => e.stopPropagation()}>
++                <Switch
++                  id="switch-analog"
++                  label=""
++                  checked={analogEffect !== 'none'}
++                  onChange={(checked) => {
++                    setCreativeSetting('analogEffect', checked ? 'vintage' : 'none');
++                    if (checked) {
++                      setCreativeSetting('enableBorder', true);
++                      setShowExportProofing(true);
++                    }
++                  }}
++                />
++              </span>
++              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide flex items-center gap-1.5">
++                <Palette size={14} className="text-accent" />
++                <span>Analog & Print Treatments</span>
++              </span>
++            </div>
++            <div className="flex items-center gap-1">
++              <button
++                onClick={(e) => {
++                  e.stopPropagation();
++                  resetSection('analog');
++                }}
++                className="p-1 rounded hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
++                data-tooltip="Reset Analog"
++              >
++                <RotateCcw size={13} />
++              </button>
++            </div>
++          </div>
++
++          {openSections.analog && analogEffect !== 'none' && (
++            <div className="p-3.5 space-y-4 border-t border-surface">
++              <div>
++                <span className="text-xs text-text-secondary mb-1.5 block font-medium">Print Style</span>
++                <div className="grid grid-cols-2 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
++                  {[
++                    { id: 'vintage', label: 'Vintage Print' },
++                    { id: 'darkroom', label: 'Darkroom Print' },
++                    { id: 'torn_edge', label: 'Torn Deckled Edge' },
++                    { id: 'light_leak', label: 'Subtle Light Leak' },
++                  ].map((style) => (
++                    <button
++                      key={style.id}
++                      onClick={() => setCreativeSetting('analogEffect', style.id as any)}
++                      className={clsx(
++                        'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
++                        analogEffect === style.id
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
++                      )}
++                    >
++                      {style.label}
++                    </button>
++                  ))}
++                </div>
++              </div>
++
++              {analogEffect === 'light_leak' && (
++                <Slider
++                  label="Light Leak Warmth & Intensity"
++                  min={10}
++                  max={100}
++                  step={5}
++                  value={lightLeakIntensity || 65}
++                  defaultValue={65}
++                  suffix="%"
++                  onChange={(e) => setCreativeSetting('lightLeakIntensity', Number(e.target.value))}
++                />
++              )}
++            </div>
++          )}
++        </div>
++
++        {/* 8. Dynamic EXIF Badges & Retro Timestamp Section */}
++        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('exifBadge')}
++          >
 +            <div className="flex items-center gap-2">
 +              <span onClick={(e) => e.stopPropagation()}>
 +                <Switch
 +                  id="switch-exif"
 +                  label=""
-+                  checked={enableExifBadge}
++                  checked={enableExifBadge || (timestampStyle && timestampStyle !== 'none')}
 +                  onChange={(checked) => {
 +                    setCreativeSetting('enableExifBadge', checked);
 +                    if (checked) setShowExportProofing(true);
 +                  }}
 +                />
 +              </span>
-+              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide">
-+                EXIF Camera Badge
++              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide flex items-center gap-1.5">
++                <Clock size={14} className="text-accent" />
++                <span>EXIF Badges & Digital Timestamp</span>
 +              </span>
 +            </div>
 +            <div className="flex items-center gap-1">
@@ -6111,26 +7069,36 @@ index 0000000..4660c05
 +            </div>
 +          </div>
 +
-+          {openSections.exifBadge && enableExifBadge && (
++          {openSections.exifBadge && (enableExifBadge || (timestampStyle && timestampStyle !== 'none')) && (
 +            <div className="p-3.5 space-y-4 border-t border-surface">
 +              {/* Badge Style Selector */}
 +              <div>
 +                <span className="text-xs text-text-secondary mb-1.5 block font-medium">Layout Style</span>
 +                <div className="grid grid-cols-2 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
 +                  <button
-+                    onClick={() => setCreativeSetting('exifBadgeStyle', 'bottom_strip')}
++                    onClick={() => {
++                      setCreativeSetting('enableExifBadge', true);
++                      setCreativeSetting('exifBadgeStyle', 'bottom_strip');
++                    }}
 +                    className={clsx(
 +                      'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                      exifBadgeStyle === 'bottom_strip' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                      enableExifBadge && exifBadgeStyle === 'bottom_strip'
++                        ? 'bg-accent text-button-text shadow-sm'
++                        : 'text-text-secondary hover:text-text-primary',
 +                    )}
 +                  >
 +                    Gallery Bottom Strip
 +                  </button>
 +                  <button
-+                    onClick={() => setCreativeSetting('exifBadgeStyle', 'overlay_badge')}
++                    onClick={() => {
++                      setCreativeSetting('enableExifBadge', true);
++                      setCreativeSetting('exifBadgeStyle', 'overlay_badge');
++                    }}
 +                    className={clsx(
 +                      'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                      exifBadgeStyle === 'overlay_badge' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                      enableExifBadge && exifBadgeStyle === 'overlay_badge'
++                        ? 'bg-accent text-button-text shadow-sm'
++                        : 'text-text-secondary hover:text-text-primary',
 +                    )}
 +                  >
 +                    Floating Glass Pill
@@ -6139,7 +7107,7 @@ index 0000000..4660c05
 +              </div>
 +
 +              {/* Alignment Selector (for bottom strip) */}
-+              {exifBadgeStyle === 'bottom_strip' && (
++              {enableExifBadge && exifBadgeStyle === 'bottom_strip' && (
 +                <div>
 +                  <span className="text-xs text-text-secondary mb-1.5 block font-medium">Text Alignment</span>
 +                  <div className="grid grid-cols-2 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
@@ -6147,7 +7115,9 @@ index 0000000..4660c05
 +                      onClick={() => setCreativeSetting('exifBadgeAlignment', 'center')}
 +                      className={clsx(
 +                        'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                        exifBadgeAlignment === 'center' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                        exifBadgeAlignment === 'center'
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
 +                      )}
 +                    >
 +                      Centered Gallery
@@ -6156,7 +7126,9 @@ index 0000000..4660c05
 +                      onClick={() => setCreativeSetting('exifBadgeAlignment', 'split')}
 +                      className={clsx(
 +                        'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                        exifBadgeAlignment === 'split' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                        exifBadgeAlignment === 'split'
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
 +                      )}
 +                    >
 +                      Split Corners
@@ -6165,78 +7137,114 @@ index 0000000..4660c05
 +                </div>
 +              )}
 +
-+              {/* Metadata Fields Toggles */}
-+              <div className="space-y-2">
-+                <span className="text-xs text-text-secondary block font-medium">Included Metadata</span>
-+                <div className="grid grid-cols-2 gap-2">
-+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-+                    <input
-+                      type="checkbox"
-+                      checked={exifShowCamera}
-+                      onChange={(e) => setCreativeSetting('exifShowCamera', e.target.checked)}
-+                      className="rounded border-surface text-accent focus:ring-accent"
-+                    />
-+                    <span>Camera</span>
-+                  </label>
-+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-+                    <input
-+                      type="checkbox"
-+                      checked={exifShowLens}
-+                      onChange={(e) => setCreativeSetting('exifShowLens', e.target.checked)}
-+                      className="rounded border-surface text-accent focus:ring-accent"
-+                    />
-+                    <span>Lens</span>
-+                  </label>
-+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-+                    <input
-+                      type="checkbox"
-+                      checked={exifShowSettings}
-+                      onChange={(e) => setCreativeSetting('exifShowSettings', e.target.checked)}
-+                      className="rounded border-surface text-accent focus:ring-accent"
-+                    />
-+                    <span>Exposure (ƒ/s/ISO)</span>
-+                  </label>
-+                  <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
-+                    <input
-+                      type="checkbox"
-+                      checked={exifShowDate}
-+                      onChange={(e) => setCreativeSetting('exifShowDate', e.target.checked)}
-+                      className="rounded border-surface text-accent focus:ring-accent"
-+                    />
-+                    <span>Capture Date</span>
-+                  </label>
++              {/* Retro Digital Timestamp Selector */}
++              <div>
++                <span className="text-xs text-text-secondary mb-1.5 block font-medium">Digital Date Stamp</span>
++                <div className="grid grid-cols-3 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
++                  {[
++                    { id: 'none', label: 'None' },
++                    { id: 'digital_orange', label: 'Amber LED' },
++                    { id: 'digital_green', label: 'Green LED' },
++                  ].map((ts) => (
++                    <button
++                      key={ts.id}
++                      onClick={() => setCreativeSetting('timestampStyle', ts.id as any)}
++                      className={clsx(
++                        'py-1.5 px-1.5 text-xs rounded-md transition-colors font-medium text-center',
++                        (timestampStyle || 'none') === ts.id
++                          ? 'bg-accent text-button-text shadow-sm'
++                          : 'text-text-secondary hover:text-text-primary',
++                      )}
++                    >
++                      {ts.label}
++                    </button>
++                  ))}
 +                </div>
 +              </div>
 +
++              {/* Metadata Fields Toggles */}
++              {enableExifBadge && (
++                <div className="space-y-2">
++                  <span className="text-xs text-text-secondary block font-medium">Included Metadata</span>
++                  <div className="grid grid-cols-2 gap-2">
++                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
++                      <input
++                        type="checkbox"
++                        checked={exifShowCamera}
++                        onChange={(e) => setCreativeSetting('exifShowCamera', e.target.checked)}
++                        className="rounded border-surface text-accent focus:ring-accent"
++                      />
++                      <span>Camera</span>
++                    </label>
++                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
++                      <input
++                        type="checkbox"
++                        checked={exifShowLens}
++                        onChange={(e) => setCreativeSetting('exifShowLens', e.target.checked)}
++                        className="rounded border-surface text-accent focus:ring-accent"
++                      />
++                      <span>Lens</span>
++                    </label>
++                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
++                      <input
++                        type="checkbox"
++                        checked={exifShowSettings}
++                        onChange={(e) => setCreativeSetting('exifShowSettings', e.target.checked)}
++                        className="rounded border-surface text-accent focus:ring-accent"
++                      />
++                      <span>Exposure (ƒ/s/ISO)</span>
++                    </label>
++                    <label className="flex items-center gap-2 text-xs text-text-primary cursor-pointer">
++                      <input
++                        type="checkbox"
++                        checked={exifShowDate}
++                        onChange={(e) => setCreativeSetting('exifShowDate', e.target.checked)}
++                        className="rounded border-surface text-accent focus:ring-accent"
++                      />
++                      <span>Capture Date</span>
++                    </label>
++                  </div>
++                </div>
++              )}
++
 +              {/* Custom Signature / Credit */}
-+              <div>
-+                <span className="text-xs text-text-secondary mb-1 block font-medium">Photographer Credit / Signature</span>
-+                <input
-+                  type="text"
-+                  value={exifCustomText}
-+                  onChange={(e) => setCreativeSetting('exifCustomText', e.target.value)}
-+                  placeholder="e.g. © Alex Morgan Photography"
-+                  className="w-full bg-surface border border-surface rounded-md p-2 text-xs text-text-primary focus:ring-accent"
-+                />
-+              </div>
++              {enableExifBadge && (
++                <div>
++                  <span className="text-xs text-text-secondary mb-1 block font-medium">
++                    Photographer Credit / Signature
++                  </span>
++                  <input
++                    type="text"
++                    value={exifCustomText}
++                    onChange={(e) => setCreativeSetting('exifCustomText', e.target.value)}
++                    placeholder="e.g. © Alex Morgan Photography"
++                    className="w-full bg-surface border border-surface rounded-md p-2 text-xs text-text-primary focus:ring-accent"
++                  />
++                </div>
++              )}
 +
 +              {/* Text Color Picker */}
-+              <div className="flex items-center justify-between">
-+                <span className="text-xs text-text-secondary font-medium">Text Color</span>
-+                <input
-+                  type="color"
-+                  value={exifBadgeTextColor}
-+                  onChange={(e) => setCreativeSetting('exifBadgeTextColor', e.target.value)}
-+                  className="w-8 h-8 rounded border border-surface cursor-pointer bg-transparent"
-+                />
-+              </div>
++              {enableExifBadge && (
++                <div className="flex items-center justify-between">
++                  <span className="text-xs text-text-secondary font-medium">Text Color</span>
++                  <input
++                    type="color"
++                    value={exifBadgeTextColor}
++                    onChange={(e) => setCreativeSetting('exifBadgeTextColor', e.target.value)}
++                    className="w-8 h-8 rounded border border-surface cursor-pointer bg-transparent"
++                  />
++                </div>
++              )}
 +            </div>
 +          )}
 +        </div>
 +
-+        {/* 6. Typography & Watermarks Section */}
++        {/* 9. Typography & Watermarks Section */}
 +        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer" onClick={() => toggleSection('watermark')}>
++          <div
++            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
++            onClick={() => toggleSection('watermark')}
++          >
 +            <div className="flex items-center gap-2">
 +              <span onClick={(e) => e.stopPropagation()}>
 +                <Switch
@@ -6275,21 +7283,25 @@ index 0000000..4660c05
 +                  onClick={() => setCreativeSetting('watermarkType', 'text')}
 +                  className={clsx(
 +                    'py-1.5 px-2 text-xs rounded-md transition-colors font-medium flex items-center justify-center gap-1.5',
-+                    watermarkType === 'text' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                    watermarkType === 'text'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'text-text-secondary hover:text-text-primary',
 +                  )}
 +                >
 +                  <Type size={14} />
-+                  <span>Text</span>
++                  <span>Text Signature</span>
 +                </button>
 +                <button
 +                  onClick={() => setCreativeSetting('watermarkType', 'image')}
 +                  className={clsx(
 +                    'py-1.5 px-2 text-xs rounded-md transition-colors font-medium flex items-center justify-center gap-1.5',
-+                    watermarkType === 'image' ? 'bg-accent text-button-text shadow-sm' : 'text-text-secondary hover:text-text-primary',
++                    watermarkType === 'image'
++                      ? 'bg-accent text-button-text shadow-sm'
++                      : 'text-text-secondary hover:text-text-primary',
 +                  )}
 +                >
 +                  <ImageIconLucide size={14} />
-+                  <span>Logo Image</span>
++                  <span>Logo Graphic</span>
 +                </button>
 +              </div>
 +
@@ -6537,7 +7549,7 @@ index 0000000..aecf216
 +  return { camera, lens, settings, date };
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..cab0430 100644
+index 267e321..fe647e9 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -1,21 +1,16 @@
@@ -6742,7 +7754,7 @@ index 267e321..cab0430 100644
      watermarkPath,
      setWatermarkPath,
      watermarkAnchor,
-@@ -242,6 +119,58 @@ export default function ExportPanel({
+@@ -242,6 +119,80 @@ export default function ExportPanel({
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -6758,6 +7770,28 @@ index 267e321..cab0430 100644
 +    setBorderSize,
 +    borderColor,
 +    setBorderColor,
++    enablePolaroid,
++    polaroidBottomMultiplier,
++    borderTopSize,
++    borderBottomSize,
++    borderLeftSize,
++    borderRightSize,
++    borderRadius,
++    borderShadow,
++    enableFilmStrip,
++    filmFormat,
++    filmShowSprockets,
++    filmShowFrameNumber,
++    filmFrameNumber,
++    filmEdgeMarkings,
++    enableCinematicBars,
++    cinematicRatio,
++    cinematicBarColor,
++    analogEffect,
++    lightLeakIntensity,
++    fontFamily,
++    timestampStyle,
++    archiveCatalogLayout,
 +    enableKeyline,
 +    setEnableKeyline,
 +    keylineSize,
@@ -6801,7 +7835,7 @@ index 267e321..cab0430 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -250,16 +179,38 @@ export default function ExportPanel({
+@@ -250,16 +201,38 @@ export default function ExportPanel({
      setDestinationType,
      subfolder,
      setSubfolder,
@@ -6843,7 +7877,7 @@ index 267e321..cab0430 100644
      const lastUsed = appSettings.exportPresets?.find((p) => p.id === '__last_used__');
      if (lastUsed) {
        handleApplyPreset(lastUsed);
-@@ -292,6 +243,7 @@ export default function ExportPanel({
+@@ -292,6 +265,7 @@ export default function ExportPanel({
    const osPlatform = useOsPlatform();
    const isAndroid = osPlatform === 'android';
    const activePanels = useUIStore((state) => state.activePanels);
@@ -6851,7 +7885,7 @@ index 267e321..cab0430 100644
    const isPanelReallyActive = Object.values(activePanels).includes(Panel.Export);
  
    const { status, progress, errorMessage } = exportState;
-@@ -370,8 +322,10 @@ export default function ExportPanel({
+@@ -370,8 +344,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -6863,7 +7897,7 @@ index 267e321..cab0430 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -384,7 +338,7 @@ export default function ExportPanel({
+@@ -384,9 +360,111 @@ export default function ExportPanel({
            setIsEstimating(false);
          }
        }, 500),
@@ -6871,8 +7905,112 @@ index 267e321..cab0430 100644
 +    [isVisible, enableCollageGrid],
    );
  
++  const getBorderSettingsObject = useCallback(() => {
++    const hasOuterFrame = enableBorder || enablePolaroid || enableCinematicBars || enableFilmStrip;
++    const hasAnyBorder =
++      hasOuterFrame ||
++      enableKeyline ||
++      enableGridOverlay ||
++      (timestampStyle && timestampStyle !== 'none');
++
++    if (!hasAnyBorder) return null;
++
++    const top = hasOuterFrame ? (borderTopSize ?? borderSize) : 0;
++    const bottom = hasOuterFrame
++      ? enablePolaroid
++        ? (borderTopSize ?? borderSize) * (polaroidBottomMultiplier || 2.4)
++        : (borderBottomSize ?? borderSize)
++      : 0;
++    const left = hasOuterFrame ? (borderLeftSize ?? borderSize) : 0;
++    const right = hasOuterFrame ? (borderRightSize ?? borderSize) : 0;
++
++    return {
++      size: hasOuterFrame ? borderSize : 0,
++      color: enableCinematicBars ? (cinematicBarColor || '#000000') : (borderColor || '#ffffff'),
++      topSize: top,
++      bottomSize: bottom,
++      leftSize: left,
++      rightSize: right,
++      targetAspectRatio: enableCinematicBars
++        ? cinematicRatio === '2.35:1'
++          ? 2.35
++          : cinematicRatio === '2.00:1'
++          ? 2.0
++          : cinematicRatio === '16:9'
++          ? 1.7778
++          : 2.39
++        : null,
++      filmStrip: enableFilmStrip
++        ? {
++            enabled: true,
++            format: filmFormat,
++            showSprockets: filmShowSprockets,
++            showFrameNumber: filmShowFrameNumber,
++            frameNumber: filmFrameNumber,
++            edgeMarkings: filmEdgeMarkings,
++          }
++        : null,
++      timestamp:
++        timestampStyle && timestampStyle !== 'none'
++          ? {
++              enabled: true,
++              style: timestampStyle,
++              text: selectedImage?.exif?.date_time_original
++                ? `'${selectedImage.exif.date_time_original.slice(2, 10).replace(/[:\-]/g, ' ')}`
++                : undefined,
++            }
++          : null,
++      keyline: enableKeyline
++        ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
++        : null,
++      gridOverlay: enableGridOverlay
++        ? {
++            enabled: true,
++            rows: gridOverlayRows,
++            columns: gridOverlayCols,
++            color: gridOverlayColor,
++            opacity: gridOverlayOpacity,
++            size: gridOverlaySize,
++          }
++        : null,
++    };
++  }, [
++    enableBorder,
++    enablePolaroid,
++    enableCinematicBars,
++    enableFilmStrip,
++    enableKeyline,
++    enableGridOverlay,
++    timestampStyle,
++    borderSize,
++    borderTopSize,
++    borderBottomSize,
++    borderLeftSize,
++    borderRightSize,
++    polaroidBottomMultiplier,
++    cinematicBarColor,
++    borderColor,
++    cinematicRatio,
++    filmFormat,
++    filmShowSprockets,
++    filmShowFrameNumber,
++    filmFrameNumber,
++    filmEdgeMarkings,
++    selectedImage?.exif?.date_time_original,
++    keylineSize,
++    keylineColor,
++    keylineInset,
++    gridOverlayRows,
++    gridOverlayCols,
++    gridOverlayColor,
++    gridOverlayOpacity,
++    gridOverlaySize,
++  ]);
++
    useEffect(() => {
-@@ -403,15 +357,89 @@ export default function ExportPanel({
+     if (!isPanelReallyActive) return;
+ 
+@@ -403,15 +481,53 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -6893,43 +8031,7 @@ index 267e321..cab0430 100644
 +              customY: watermarkCustomY,
              }
            : null,
-+      border: enableBorder
-+        ? {
-+            size: borderSize,
-+            color: borderColor,
-+            keyline: enableKeyline
-+              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
-+              : null,
-+            gridOverlay: enableGridOverlay
-+              ? {
-+                  enabled: true,
-+                  rows: gridOverlayRows,
-+                  columns: gridOverlayCols,
-+                  color: gridOverlayColor,
-+                  opacity: gridOverlayOpacity,
-+                  size: gridOverlaySize,
-+                }
-+              : null,
-+          }
-+        : enableKeyline || enableGridOverlay
-+        ? {
-+            size: 0,
-+            color: borderColor,
-+            keyline: enableKeyline
-+              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
-+              : null,
-+            gridOverlay: enableGridOverlay
-+              ? {
-+                  enabled: true,
-+                  rows: gridOverlayRows,
-+                  columns: gridOverlayCols,
-+                  color: gridOverlayColor,
-+                  opacity: gridOverlayOpacity,
-+                  size: gridOverlaySize,
-+                }
-+              : null,
-+          }
-+        : null,
++      border: getBorderSettingsObject(),
 +      collageGrid: enableCollageGrid
 +        ? {
 +            enabled: true,
@@ -6965,7 +8067,7 @@ index 267e321..cab0430 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -448,11 +476,48 @@ export default function ExportPanel({
+@@ -448,11 +564,48 @@ export default function ExportPanel({
      stripGps,
      filenameTemplate,
      enableWatermark,
@@ -7014,7 +8116,7 @@ index 267e321..cab0430 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -489,31 +554,107 @@ export default function ExportPanel({
+@@ -489,31 +642,71 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -7035,43 +8137,7 @@ index 267e321..cab0430 100644
 +              customY: watermarkCustomY,
              }
            : null,
-+      border: enableBorder
-+        ? {
-+            size: borderSize,
-+            color: borderColor,
-+            keyline: enableKeyline
-+              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
-+              : null,
-+            gridOverlay: enableGridOverlay
-+              ? {
-+                  enabled: true,
-+                  rows: gridOverlayRows,
-+                  columns: gridOverlayCols,
-+                  color: gridOverlayColor,
-+                  opacity: gridOverlayOpacity,
-+                  size: gridOverlaySize,
-+                }
-+              : null,
-+          }
-+        : enableKeyline || enableGridOverlay
-+        ? {
-+            size: 0,
-+            color: borderColor,
-+            keyline: enableKeyline
-+              ? { enabled: true, size: keylineSize, color: keylineColor, inset: keylineInset }
-+              : null,
-+            gridOverlay: enableGridOverlay
-+              ? {
-+                  enabled: true,
-+                  rows: gridOverlayRows,
-+                  columns: gridOverlayCols,
-+                  color: gridOverlayColor,
-+                  opacity: gridOverlayOpacity,
-+                  size: gridOverlaySize,
-+                }
-+              : null,
-+          }
-+        : null,
++      border: getBorderSettingsObject(),
 +      collageGrid: enableCollageGrid
 +        ? {
 +            enabled: true,
@@ -7128,7 +8194,7 @@ index 267e321..cab0430 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,332 +733,161 @@ export default function ExportPanel({
+@@ -592,332 +785,161 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
@@ -7609,7 +8675,7 @@ index 267e321..cab0430 100644
          ) : (
            <div className="flex items-center justify-center h-full">
              <Text
-@@ -932,17 +902,18 @@ export default function ExportPanel({
+@@ -932,17 +954,18 @@ export default function ExportPanel({
          )}
        </div>
  
@@ -7630,7 +8696,7 @@ index 267e321..cab0430 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +972,11 @@ export default function ExportPanel({
+@@ -1001,9 +1024,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
@@ -8573,7 +9639,7 @@ index 0000000..bada860
 +  }
 +}
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
-index 86285cd..39dee35 100644
+index 86285cd..153b4f3 100644
 --- a/src/components/ui/ExportImportProperties.tsx
 +++ b/src/components/ui/ExportImportProperties.tsx
 @@ -22,7 +22,15 @@ export const FILE_FORMATS: Array<FileFormat> = [
@@ -8646,7 +9712,7 @@ index 86285cd..39dee35 100644
    exportMasks?: boolean;
    preserveFolders?: boolean;
    destinationType?: string;
-@@ -61,14 +107,101 @@ export enum WatermarkAnchor {
+@@ -61,14 +107,157 @@ export enum WatermarkAnchor {
    BottomLeft = 'bottomLeft',
    BottomCenter = 'bottomCenter',
    BottomRight = 'bottomRight',
@@ -8708,12 +9774,46 @@ index 86285cd..39dee35 100644
 +  exifCustomText: string;
 +  exifBadgeBgColor: string;
 +  exifBadgeTextColor: string;
++
++  // Extended photographic framing properties
++  activeCreativePresetId?: string | null;
++  borderTopSize?: number;
++  borderBottomSize?: number;
++  borderLeftSize?: number;
++  borderRightSize?: number;
++  borderRadius?: number;
++  borderShadow?: boolean;
++  enableFilmStrip?: boolean;
++  filmFormat?: '35mm' | 'medium_6x6' | 'medium_6x7';
++  filmShowSprockets?: boolean;
++  filmShowFrameNumber?: boolean;
++  filmFrameNumber?: string;
++  filmEdgeMarkings?: string;
++  enableCinematicBars?: boolean;
++  cinematicRatio?: '2.39:1' | '2.35:1' | '2.00:1' | '16:9';
++  cinematicBarColor?: string;
++  analogEffect?: 'none' | 'vintage' | 'darkroom' | 'torn_edge' | 'light_leak';
++  lightLeakIntensity?: number;
++  fontFamily?: 'sans' | 'serif' | 'mono';
++  timestampStyle?: 'none' | 'digital_orange' | 'digital_green' | 'classic_stamp';
++  archiveCatalogLayout?: boolean;
 +}
++
++export type CreativePresetCategory =
++  | 'instant'
++  | 'film'
++  | 'editorial'
++  | 'cinematic'
++  | 'analog'
++  | 'camera'
++  | 'archive'
++  | 'custom';
 +
 +export interface CreativeExportPreset {
 +  id: string;
 +  name: string;
 +  isBuiltIn?: boolean;
++  category?: CreativePresetCategory;
 +  settings: CreativeExportSettings;
 +}
 +
@@ -8742,16 +9842,38 @@ index 86285cd..39dee35 100644
 +  borderEachTile: boolean;
 +}
 +
++export interface FilmStripSettings {
++  enabled: boolean;
++  format?: '35mm' | 'medium_6x6' | 'medium_6x7';
++  showSprockets?: boolean;
++  showFrameNumber?: boolean;
++  frameNumber?: string;
++  edgeMarkings?: string;
++}
++
++export interface TimestampSettings {
++  enabled: boolean;
++  style?: 'digital_orange' | 'digital_green' | 'classic_stamp';
++  text?: string;
++}
++
 +export interface BorderSettings {
 +  /** Border thickness as a percentage of each corresponding image dimension. */
 +  size: number;
 +  color: string;
 +  keyline?: KeylineSettings | null;
 +  gridOverlay?: GridOverlaySettings | null;
++  topSize?: number | null;
++  bottomSize?: number | null;
++  leftSize?: number | null;
++  rightSize?: number | null;
++  targetAspectRatio?: number | null;
++  filmStrip?: FilmStripSettings | null;
++  timestamp?: TimestampSettings | null;
  }
  
  export interface ExportState {
-@@ -117,11 +250,51 @@ export interface ExportPreset {
+@@ -117,11 +306,51 @@ export interface ExportPreset {
    preserveFolders?: boolean;
    filenameTemplate: string;
    enableWatermark: boolean;
@@ -8948,10 +10070,10 @@ index 6637d75..97a6786 100644
        if (isFrontendCached) {
          setEditor({
 diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
-index 598487c..ac5ac7d 100644
+index 598487c..e24e2b6 100644
 --- a/src/hooks/useExportSettings.ts
 +++ b/src/hooks/useExportSettings.ts
-@@ -1,145 +1,154 @@
+@@ -1,145 +1,199 @@
 -import { useState, useMemo, useCallback } from 'react';
 +import { useCallback, useMemo } from 'react';
 +import { useExportStore } from '../store/useExportStore';
@@ -9202,6 +10324,51 @@ index 598487c..ac5ac7d 100644
 +    exifBadgeTextColor: store.exifBadgeTextColor,
 +    setExifBadgeTextColor: (c: string) => store.setCreativeSetting('exifBadgeTextColor', c),
 +
++    // Extended Creative Framing Parameters
++    borderTopSize: store.borderTopSize,
++    setBorderTopSize: (s: number | undefined) => store.setCreativeSetting('borderTopSize', s),
++    borderBottomSize: store.borderBottomSize,
++    setBorderBottomSize: (s: number | undefined) => store.setCreativeSetting('borderBottomSize', s),
++    borderLeftSize: store.borderLeftSize,
++    setBorderLeftSize: (s: number | undefined) => store.setCreativeSetting('borderLeftSize', s),
++    borderRightSize: store.borderRightSize,
++    setBorderRightSize: (s: number | undefined) => store.setCreativeSetting('borderRightSize', s),
++    borderRadius: store.borderRadius,
++    setBorderRadius: (r: number | undefined) => store.setCreativeSetting('borderRadius', r),
++    borderShadow: store.borderShadow,
++    setBorderShadow: (s: boolean | undefined) => store.setCreativeSetting('borderShadow', s),
++
++    enableFilmStrip: store.enableFilmStrip,
++    setEnableFilmStrip: (f: boolean | undefined) => store.setCreativeSetting('enableFilmStrip', f),
++    filmFormat: store.filmFormat,
++    setFilmFormat: (fmt: any) => store.setCreativeSetting('filmFormat', fmt),
++    filmShowSprockets: store.filmShowSprockets,
++    setFilmShowSprockets: (s: boolean | undefined) => store.setCreativeSetting('filmShowSprockets', s),
++    filmShowFrameNumber: store.filmShowFrameNumber,
++    setFilmShowFrameNumber: (s: boolean | undefined) => store.setCreativeSetting('filmShowFrameNumber', s),
++    filmFrameNumber: store.filmFrameNumber,
++    setFilmFrameNumber: (n: string | undefined) => store.setCreativeSetting('filmFrameNumber', n),
++    filmEdgeMarkings: store.filmEdgeMarkings,
++    setFilmEdgeMarkings: (m: string | undefined) => store.setCreativeSetting('filmEdgeMarkings', m),
++
++    enableCinematicBars: store.enableCinematicBars,
++    setEnableCinematicBars: (c: boolean | undefined) => store.setCreativeSetting('enableCinematicBars', c),
++    cinematicRatio: store.cinematicRatio,
++    setCinematicRatio: (r: any) => store.setCreativeSetting('cinematicRatio', r),
++    cinematicBarColor: store.cinematicBarColor,
++    setCinematicBarColor: (c: string | undefined) => store.setCreativeSetting('cinematicBarColor', c),
++
++    analogEffect: store.analogEffect,
++    setAnalogEffect: (a: any) => store.setCreativeSetting('analogEffect', a),
++    lightLeakIntensity: store.lightLeakIntensity,
++    setLightLeakIntensity: (i: number | undefined) => store.setCreativeSetting('lightLeakIntensity', i),
++    fontFamily: store.fontFamily,
++    setFontFamily: (f: any) => store.setCreativeSetting('fontFamily', f),
++    timestampStyle: store.timestampStyle,
++    setTimestampStyle: (t: any) => store.setCreativeSetting('timestampStyle', t),
++    archiveCatalogLayout: store.archiveCatalogLayout,
++    setArchiveCatalogLayout: (l: any) => store.setCreativeSetting('archiveCatalogLayout', l),
++
 +    // Grid & Slicing Tools (Moved to Standard)
 +    enableGridTools: store.enableGridTools,
 +    setEnableGridTools: (e: boolean) => store.setStandardSetting('enableGridTools', e),
@@ -9408,10 +10575,10 @@ index 60dc8eb..8c6f670 100644
    "library": {
 diff --git a/src/store/useExportStore.ts b/src/store/useExportStore.ts
 new file mode 100644
-index 0000000..5d700cf
+index 0000000..062b283
 --- /dev/null
 +++ b/src/store/useExportStore.ts
-@@ -0,0 +1,804 @@
+@@ -0,0 +1,1409 @@
 +import { create } from 'zustand';
 +import {
 +  ExportPreset,
@@ -9453,13 +10620,223 @@ index 0000000..5d700cf
 +  exifCustomText: '',
 +  exifBadgeBgColor: '#ffffff',
 +  exifBadgeTextColor: '#111827',
++
++  // Extended photographic framing defaults
++  activeCreativePresetId: null,
++  borderTopSize: undefined,
++  borderBottomSize: undefined,
++  borderLeftSize: undefined,
++  borderRightSize: undefined,
++  borderRadius: 0,
++  borderShadow: false,
++  enableFilmStrip: false,
++  filmFormat: '35mm',
++  filmShowSprockets: true,
++  filmShowFrameNumber: true,
++  filmFrameNumber: '01',
++  filmEdgeMarkings: '36 EXP  •  35MM',
++  enableCinematicBars: false,
++  cinematicRatio: '2.39:1',
++  cinematicBarColor: '#000000',
++  analogEffect: 'none',
++  lightLeakIntensity: 50,
++  fontFamily: 'sans',
++  timestampStyle: 'none',
++  archiveCatalogLayout: false,
 +};
 +
 +export const BUILT_IN_CREATIVE_PRESETS: CreativeExportPreset[] = [
++  // ─── 1. INSTANT FAMILY ───
++  {
++    id: 'preset-polaroid-classic',
++    name: 'Polaroid Classic',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4,
++      borderColor: '#f7f6f2',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 4.0,
++      borderShadow: true,
++    },
++  },
++  {
++    id: 'preset-classic-polaroid-600',
++    name: 'Polaroid 600',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3,
++      borderColor: '#f5f4ef',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 3.8,
++    },
++  },
++  {
++    id: 'preset-sx-70',
++    name: 'SX-70',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.2,
++      borderColor: '#faf8f4',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 4.8,
++      borderShadow: true,
++    },
++  },
++  {
++    id: 'preset-instax-mini',
++    name: 'Instax Mini',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.5,
++      borderColor: '#ffffff',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 4.5,
++    },
++  },
++  {
++    id: 'preset-instax-square',
++    name: 'Instax Square',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4,
++      borderColor: '#ffffff',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 3.2,
++    },
++  },
++  {
++    id: 'preset-instax-wide',
++    name: 'Instax Wide',
++    isBuiltIn: true,
++    category: 'instant',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.5,
++      borderColor: '#fcfcfc',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 3.6,
++    },
++  },
++
++  // ─── 2. FILM FAMILY ───
++  {
++    id: 'preset-35mm-classic',
++    name: '35mm Classic',
++    isBuiltIn: true,
++    category: 'film',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 6,
++      borderColor: '#0d0d0d',
++      enableFilmStrip: true,
++      filmFormat: '35mm',
++      filmShowSprockets: true,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '01',
++      filmEdgeMarkings: '36 EXP  •  35MM',
++      fontFamily: 'mono',
++    },
++  },
++  {
++    id: 'preset-35mm-negative',
++    name: '35mm Negative',
++    isBuiltIn: true,
++    category: 'film',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 6.5,
++      borderColor: '#050505',
++      enableFilmStrip: true,
++      filmFormat: '35mm',
++      filmShowSprockets: true,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '01A',
++      filmEdgeMarkings: 'RAPID 400',
++      fontFamily: 'mono',
++    },
++  },
++  {
++    id: 'preset-35mm-contact',
++    name: '35mm Contact',
++    isBuiltIn: true,
++    category: 'film',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4.5,
++      borderColor: '#111111',
++      enableFilmStrip: true,
++      filmFormat: '35mm',
++      filmShowSprockets: true,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '01',
++      filmEdgeMarkings: 'CONTACT SHEET',
++      fontFamily: 'mono',
++    },
++  },
++  {
++    id: 'preset-medium-format-6x6',
++    name: 'Medium Format 6×6',
++    isBuiltIn: true,
++    category: 'film',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 5,
++      borderColor: '#0a0a0a',
++      enableFilmStrip: true,
++      filmFormat: 'medium_6x6',
++      filmShowSprockets: false,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '12',
++      filmEdgeMarkings: '120 FILM  •  6X6',
++      fontFamily: 'mono',
++    },
++  },
++  {
++    id: 'preset-medium-format-6x7',
++    name: 'Medium Format 6×7',
++    isBuiltIn: true,
++    category: 'film',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 5,
++      borderColor: '#0c0c0c',
++      enableFilmStrip: true,
++      filmFormat: 'medium_6x7',
++      filmShowSprockets: false,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '10',
++      filmEdgeMarkings: '120 FILM  •  6X7',
++      fontFamily: 'mono',
++    },
++  },
++
++  // ─── 3. EDITORIAL FAMILY ───
 +  {
 +    id: 'preset-gallery-white-mat',
 +    name: 'Fine-Art Gallery Mat',
 +    isBuiltIn: true,
++    category: 'editorial',
 +    settings: {
 +      ...DEFAULT_CREATIVE_SETTINGS,
 +      enableBorder: true,
@@ -9483,6 +10860,7 @@ index 0000000..5d700cf
 +    id: 'preset-museum-dark-framing',
 +    name: 'Museum Dark Framing',
 +    isBuiltIn: true,
++    category: 'editorial',
 +    settings: {
 +      ...DEFAULT_CREATIVE_SETTINGS,
 +      enableBorder: true,
@@ -9500,24 +10878,219 @@ index 0000000..5d700cf
 +    },
 +  },
 +  {
-+    id: 'preset-classic-polaroid-600',
-+    name: 'Classic Polaroid 600',
++    id: 'preset-minimal-white',
++    name: 'Minimal White',
 +    isBuiltIn: true,
++    category: 'editorial',
 +    settings: {
 +      ...DEFAULT_CREATIVE_SETTINGS,
 +      enableBorder: true,
-+      borderSize: 3,
-+      borderColor: '#f7f6f2',
-+      enablePolaroid: true,
-+      polaroidBottomMultiplier: 3.8,
-+      enableKeyline: false,
-+      enableExifBadge: false,
++      borderSize: 4,
++      borderColor: '#ffffff',
 +    },
 +  },
++  {
++    id: 'preset-minimal-black',
++    name: 'Minimal Black',
++    isBuiltIn: true,
++    category: 'editorial',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4,
++      borderColor: '#0d0d0d',
++    },
++  },
++  {
++    id: 'preset-warm-fine-art',
++    name: 'Warm Fine Art',
++    isBuiltIn: true,
++    category: 'editorial',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 6,
++      borderColor: '#f5f2eb',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 1.5,
++      enableKeyline: true,
++      keylineSize: 0.12,
++      keylineColor: '#68645c',
++      keylineInset: 0.6,
++      fontFamily: 'serif',
++    },
++  },
++  {
++    id: 'preset-gallery-print',
++    name: 'Gallery Print',
++    isBuiltIn: true,
++    category: 'editorial',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 8,
++      borderColor: '#fbfbf9',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 1.4,
++      enableKeyline: true,
++      keylineSize: 0.08,
++      keylineColor: '#333333',
++      keylineInset: 0.8,
++    },
++  },
++  {
++    id: 'preset-magazine-editorial',
++    name: 'Magazine Editorial',
++    isBuiltIn: true,
++    category: 'editorial',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.5,
++      borderColor: '#ffffff',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 1.6,
++      enableExifBadge: true,
++      exifBadgeStyle: 'bottom_strip',
++      exifBadgeAlignment: 'split',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: true,
++      exifShowDate: true,
++      exifBadgeBgColor: '#ffffff',
++      exifBadgeTextColor: '#18181b',
++    },
++  },
++
++  // ─── 4. CINEMATIC FAMILY ───
++  {
++    id: 'preset-cinematic-239',
++    name: 'Cinematic 2.39:1',
++    isBuiltIn: true,
++    category: 'cinematic',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 0,
++      borderColor: '#000000',
++      enableCinematicBars: true,
++      cinematicRatio: '2.39:1',
++      cinematicBarColor: '#000000',
++    },
++  },
++  {
++    id: 'preset-cinematic-235',
++    name: 'Cinematic 2.35:1',
++    isBuiltIn: true,
++    category: 'cinematic',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 0,
++      borderColor: '#000000',
++      enableCinematicBars: true,
++      cinematicRatio: '2.35:1',
++      cinematicBarColor: '#000000',
++    },
++  },
++  {
++    id: 'preset-cinematic-200',
++    name: 'Cinematic 2.00:1',
++    isBuiltIn: true,
++    category: 'cinematic',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 0,
++      borderColor: '#000000',
++      enableCinematicBars: true,
++      cinematicRatio: '2.00:1',
++      cinematicBarColor: '#000000',
++    },
++  },
++  {
++    id: 'preset-letterbox-169',
++    name: 'Letterbox 16:9',
++    isBuiltIn: true,
++    category: 'cinematic',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 0,
++      borderColor: '#000000',
++      enableCinematicBars: true,
++      cinematicRatio: '16:9',
++      cinematicBarColor: '#000000',
++    },
++  },
++
++  // ─── 5. ANALOG FAMILY ───
++  {
++    id: 'preset-vintage-print',
++    name: 'Vintage Print',
++    isBuiltIn: true,
++    category: 'analog',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 5,
++      borderColor: '#f4eedb',
++      borderRadius: 4,
++      borderShadow: true,
++      analogEffect: 'vintage',
++    },
++  },
++  {
++    id: 'preset-darkroom-print',
++    name: 'Darkroom Print',
++    isBuiltIn: true,
++    category: 'analog',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4.5,
++      borderColor: '#161616',
++      enableKeyline: true,
++      keylineSize: 0.1,
++      keylineColor: '#ffffff',
++      keylineInset: 0.2,
++      analogEffect: 'darkroom',
++    },
++  },
++  {
++    id: 'preset-torn-edge',
++    name: 'Torn Edge',
++    isBuiltIn: true,
++    category: 'analog',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 5,
++      borderColor: '#f6f3ea',
++      analogEffect: 'torn_edge',
++    },
++  },
++  {
++    id: 'preset-light-leak',
++    name: 'Light Leak',
++    isBuiltIn: true,
++    category: 'analog',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.5,
++      borderColor: '#111111',
++      analogEffect: 'light_leak',
++      lightLeakIntensity: 65,
++    },
++  },
++
++  // ─── 6. CAMERA & DATA FAMILY ───
 +  {
 +    id: 'preset-technical-exposure-strip',
 +    name: 'Technical Exposure Strip',
 +    isBuiltIn: true,
++    category: 'camera',
 +    settings: {
 +      ...DEFAULT_CREATIVE_SETTINGS,
 +      enableBorder: false,
@@ -9536,6 +11109,7 @@ index 0000000..5d700cf
 +    id: 'preset-minimalist-glass-pill',
 +    name: 'Minimalist Social Pill',
 +    isBuiltIn: true,
++    category: 'camera',
 +    settings: {
 +      ...DEFAULT_CREATIVE_SETTINGS,
 +      enableBorder: false,
@@ -9547,6 +11121,145 @@ index 0000000..5d700cf
 +      exifShowSettings: true,
 +      exifBadgeBgColor: 'rgba(0,0,0,0.6)',
 +      exifBadgeTextColor: '#ffffff',
++    },
++  },
++  {
++    id: 'preset-exif-minimal',
++    name: 'EXIF Minimal',
++    isBuiltIn: true,
++    category: 'camera',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 2.5,
++      borderColor: '#141414',
++      enableExifBadge: true,
++      exifBadgeStyle: 'bottom_strip',
++      exifBadgeAlignment: 'center',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: false,
++      exifShowDate: false,
++      exifBadgeBgColor: '#141414',
++      exifBadgeTextColor: '#e4e4e7',
++    },
++  },
++  {
++    id: 'preset-exif-classic',
++    name: 'EXIF Classic',
++    isBuiltIn: true,
++    category: 'camera',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3,
++      borderColor: '#fcfcfc',
++      enableExifBadge: true,
++      exifBadgeStyle: 'bottom_strip',
++      exifBadgeAlignment: 'split',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: true,
++      exifShowDate: true,
++      exifBadgeBgColor: '#fcfcfc',
++      exifBadgeTextColor: '#18181b',
++    },
++  },
++  {
++    id: 'preset-camera-bottom-strip',
++    name: 'Camera Bottom Strip',
++    isBuiltIn: true,
++    category: 'camera',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 2,
++      borderColor: '#111111',
++      enableExifBadge: true,
++      exifBadgeStyle: 'bottom_strip',
++      exifBadgeAlignment: 'center',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: true,
++      exifShowDate: true,
++      exifBadgeBgColor: '#111111',
++      exifBadgeTextColor: '#e5e5e5',
++    },
++  },
++  {
++    id: 'preset-floating-camera-pill',
++    name: 'Floating Camera Pill',
++    isBuiltIn: true,
++    category: 'camera',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: false,
++      enableExifBadge: true,
++      exifBadgeStyle: 'overlay_badge',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: true,
++      exifShowDate: true,
++      exifBadgeBgColor: 'rgba(15, 23, 42, 0.75)',
++      exifBadgeTextColor: '#ffffff',
++    },
++  },
++  {
++    id: 'preset-digital-timestamp',
++    name: 'Digital Timestamp',
++    isBuiltIn: true,
++    category: 'camera',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: false,
++      timestampStyle: 'digital_orange',
++    },
++  },
++
++  // ─── 7. ARCHIVE FAMILY ───
++  {
++    id: 'preset-archive-catalog',
++    name: 'Archive Catalog',
++    isBuiltIn: true,
++    category: 'archive',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 3.5,
++      borderColor: '#ece9e1',
++      enablePolaroid: true,
++      polaroidBottomMultiplier: 2.2,
++      archiveCatalogLayout: true,
++      fontFamily: 'mono',
++      enableExifBadge: true,
++      exifBadgeStyle: 'bottom_strip',
++      exifBadgeAlignment: 'split',
++      exifShowCamera: true,
++      exifShowLens: true,
++      exifShowSettings: true,
++      exifShowDate: true,
++      exifCustomText: 'RAPIDRAW ARCHIVE',
++      exifBadgeBgColor: '#ece9e1',
++      exifBadgeTextColor: '#27272a',
++    },
++  },
++  {
++    id: 'preset-contact-sheet',
++    name: 'Contact Sheet',
++    isBuiltIn: true,
++    category: 'archive',
++    settings: {
++      ...DEFAULT_CREATIVE_SETTINGS,
++      enableBorder: true,
++      borderSize: 4.5,
++      borderColor: '#0a0a0a',
++      enableFilmStrip: true,
++      filmFormat: '35mm',
++      filmShowSprockets: true,
++      filmShowFrameNumber: true,
++      filmFrameNumber: '001',
++      filmEdgeMarkings: 'ARCHIVAL CONTACT SHEET',
++      fontFamily: 'mono',
 +    },
 +  },
 +];
@@ -9751,7 +11464,7 @@ index 0000000..5d700cf
 +  loadSettingsForImage: (path: string) => void;
 +
 +  // Granular individual reverts
-+  resetSection: (section: 'framing' | 'polaroid' | 'keyline' | 'watermark' | 'exifBadge') => void;
++  resetSection: (section: 'framing' | 'polaroid' | 'keyline' | 'watermark' | 'exifBadge' | 'film' | 'analog' | 'cinematic') => void;
 +  resetAllCreativeFilters: () => void;
 +
 +  // Creative Presets Management
@@ -9815,7 +11528,6 @@ index 0000000..5d700cf
 +
 +    setCreativeSetting: (key, value) => {
 +      const state = get();
-+      const nextSettings = { ...state, [key]: value };
 +      const currentPath = state.currentImagePath;
 +
 +      if (currentPath) {
@@ -9883,6 +11595,29 @@ index 0000000..5d700cf
 +        exifCustomText: state.exifCustomText,
 +        exifBadgeBgColor: state.exifBadgeBgColor,
 +        exifBadgeTextColor: state.exifBadgeTextColor,
++
++        // Extended photographic framing
++        activeCreativePresetId: state.activeCreativePresetId,
++        borderTopSize: state.borderTopSize,
++        borderBottomSize: state.borderBottomSize,
++        borderLeftSize: state.borderLeftSize,
++        borderRightSize: state.borderRightSize,
++        borderRadius: state.borderRadius,
++        borderShadow: state.borderShadow,
++        enableFilmStrip: state.enableFilmStrip,
++        filmFormat: state.filmFormat,
++        filmShowSprockets: state.filmShowSprockets,
++        filmShowFrameNumber: state.filmShowFrameNumber,
++        filmFrameNumber: state.filmFrameNumber,
++        filmEdgeMarkings: state.filmEdgeMarkings,
++        enableCinematicBars: state.enableCinematicBars,
++        cinematicRatio: state.cinematicRatio,
++        cinematicBarColor: state.cinematicBarColor,
++        analogEffect: state.analogEffect,
++        lightLeakIntensity: state.lightLeakIntensity,
++        fontFamily: state.fontFamily,
++        timestampStyle: state.timestampStyle,
++        archiveCatalogLayout: state.archiveCatalogLayout,
 +      };
 +
 +      const updated = { ...state.imageCreativeSettings, [path]: currentCreative };
@@ -9903,6 +11638,7 @@ index 0000000..5d700cf
 +
 +      set({
 +        currentImagePath: path,
++        activeCreativePresetId: saved?.activeCreativePresetId ?? null,
 +        ...merged,
 +      });
 +    },
@@ -9917,6 +11653,12 @@ index 0000000..5d700cf
 +            enableBorder: DEFAULT_CREATIVE_SETTINGS.enableBorder,
 +            borderSize: DEFAULT_CREATIVE_SETTINGS.borderSize,
 +            borderColor: DEFAULT_CREATIVE_SETTINGS.borderColor,
++            borderTopSize: DEFAULT_CREATIVE_SETTINGS.borderTopSize,
++            borderBottomSize: DEFAULT_CREATIVE_SETTINGS.borderBottomSize,
++            borderLeftSize: DEFAULT_CREATIVE_SETTINGS.borderLeftSize,
++            borderRightSize: DEFAULT_CREATIVE_SETTINGS.borderRightSize,
++            borderRadius: DEFAULT_CREATIVE_SETTINGS.borderRadius,
++            borderShadow: DEFAULT_CREATIVE_SETTINGS.borderShadow,
 +          };
 +          break;
 +        case 'polaroid':
@@ -9931,6 +11673,29 @@ index 0000000..5d700cf
 +            keylineSize: DEFAULT_CREATIVE_SETTINGS.keylineSize,
 +            keylineColor: DEFAULT_CREATIVE_SETTINGS.keylineColor,
 +            keylineInset: DEFAULT_CREATIVE_SETTINGS.keylineInset,
++          };
++          break;
++        case 'film':
++          resetValues = {
++            enableFilmStrip: DEFAULT_CREATIVE_SETTINGS.enableFilmStrip,
++            filmFormat: DEFAULT_CREATIVE_SETTINGS.filmFormat,
++            filmShowSprockets: DEFAULT_CREATIVE_SETTINGS.filmShowSprockets,
++            filmShowFrameNumber: DEFAULT_CREATIVE_SETTINGS.filmShowFrameNumber,
++            filmFrameNumber: DEFAULT_CREATIVE_SETTINGS.filmFrameNumber,
++            filmEdgeMarkings: DEFAULT_CREATIVE_SETTINGS.filmEdgeMarkings,
++          };
++          break;
++        case 'cinematic':
++          resetValues = {
++            enableCinematicBars: DEFAULT_CREATIVE_SETTINGS.enableCinematicBars,
++            cinematicRatio: DEFAULT_CREATIVE_SETTINGS.cinematicRatio,
++            cinematicBarColor: DEFAULT_CREATIVE_SETTINGS.cinematicBarColor,
++          };
++          break;
++        case 'analog':
++          resetValues = {
++            analogEffect: DEFAULT_CREATIVE_SETTINGS.analogEffect,
++            lightLeakIntensity: DEFAULT_CREATIVE_SETTINGS.lightLeakIntensity,
 +          };
 +          break;
 +        case 'watermark':
@@ -9961,6 +11726,8 @@ index 0000000..5d700cf
 +            exifCustomText: DEFAULT_CREATIVE_SETTINGS.exifCustomText,
 +            exifBadgeBgColor: DEFAULT_CREATIVE_SETTINGS.exifBadgeBgColor,
 +            exifBadgeTextColor: DEFAULT_CREATIVE_SETTINGS.exifBadgeTextColor,
++            timestampStyle: DEFAULT_CREATIVE_SETTINGS.timestampStyle,
++            archiveCatalogLayout: DEFAULT_CREATIVE_SETTINGS.archiveCatalogLayout,
 +          };
 +          break;
 +      }
@@ -9980,6 +11747,7 @@ index 0000000..5d700cf
 +        id: `preset-${Date.now()}`,
 +        name,
 +        isBuiltIn: false,
++        category: 'custom',
 +        settings: {
 +          enableBorder: state.enableBorder,
 +          borderSize: state.borderSize,
@@ -10012,6 +11780,28 @@ index 0000000..5d700cf
 +          exifCustomText: state.exifCustomText,
 +          exifBadgeBgColor: state.exifBadgeBgColor,
 +          exifBadgeTextColor: state.exifBadgeTextColor,
++
++          activeCreativePresetId: null,
++          borderTopSize: state.borderTopSize,
++          borderBottomSize: state.borderBottomSize,
++          borderLeftSize: state.borderLeftSize,
++          borderRightSize: state.borderRightSize,
++          borderRadius: state.borderRadius,
++          borderShadow: state.borderShadow,
++          enableFilmStrip: state.enableFilmStrip,
++          filmFormat: state.filmFormat,
++          filmShowSprockets: state.filmShowSprockets,
++          filmShowFrameNumber: state.filmShowFrameNumber,
++          filmFrameNumber: state.filmFrameNumber,
++          filmEdgeMarkings: state.filmEdgeMarkings,
++          enableCinematicBars: state.enableCinematicBars,
++          cinematicRatio: state.cinematicRatio,
++          cinematicBarColor: state.cinematicBarColor,
++          analogEffect: state.analogEffect,
++          lightLeakIntensity: state.lightLeakIntensity,
++          fontFamily: state.fontFamily,
++          timestampStyle: state.timestampStyle,
++          archiveCatalogLayout: state.archiveCatalogLayout,
 +        },
 +      };
 +
@@ -10023,21 +11813,31 @@ index 0000000..5d700cf
 +
 +    applyCreativePreset: (preset) => {
 +      const state = get();
-+      state.setCreativeSettingsBatch(preset.settings);
++      const nextSettings: Partial<CreativeExportSettings> = {
++        ...DEFAULT_CREATIVE_SETTINGS,
++        ...preset.settings,
++        activeCreativePresetId: preset.id,
++      };
++      state.setCreativeSettingsBatch(nextSettings);
 +      set({ activeCreativePresetId: preset.id });
 +    },
 +
 +    applyCreativePresetToPaths: (preset, paths) => {
 +      const state = get();
 +      const updatedAll = { ...state.imageCreativeSettings };
++      const nextSettings: Partial<CreativeExportSettings> = {
++        ...DEFAULT_CREATIVE_SETTINGS,
++        ...preset.settings,
++        activeCreativePresetId: preset.id,
++      };
 +      paths.forEach((p) => {
-+        updatedAll[p] = { ...preset.settings };
++        updatedAll[p] = { ...(updatedAll[p] || {}), ...nextSettings };
 +      });
 +      savePersistedCreativeSettings(updatedAll);
 +
 +      // If active image is in paths, apply directly to active state
 +      if (state.currentImagePath && paths.includes(state.currentImagePath)) {
-+        set({ ...preset.settings, imageCreativeSettings: updatedAll, activeCreativePresetId: preset.id });
++        set({ ...nextSettings, imageCreativeSettings: updatedAll, activeCreativePresetId: preset.id });
 +      } else {
 +        set({ imageCreativeSettings: updatedAll });
 +      }
@@ -10074,35 +11874,7 @@ index 0000000..5d700cf
 +        ...(preset.destinationType ? { destinationType: preset.destinationType } : {}),
 +        ...(preset.subfolder !== undefined ? { subfolder: preset.subfolder } : {}),
 +
-+        // Creative fields in standard presets
-+        ...(preset.enableBorder !== undefined ? { enableBorder: preset.enableBorder } : {}),
-+        ...(preset.borderSize !== undefined ? { borderSize: preset.borderSize } : {}),
-+        ...(preset.borderColor ? { borderColor: preset.borderColor } : {}),
-+        ...(preset.enablePolaroid !== undefined ? { enablePolaroid: preset.enablePolaroid } : {}),
-+        ...(preset.polaroidBottomMultiplier !== undefined ? { polaroidBottomMultiplier: preset.polaroidBottomMultiplier } : {}),
-+        ...(preset.enableKeyline !== undefined ? { enableKeyline: preset.enableKeyline } : {}),
-+        ...(preset.keylineSize !== undefined ? { keylineSize: preset.keylineSize } : {}),
-+        ...(preset.keylineColor ? { keylineColor: preset.keylineColor } : {}),
-+        ...(preset.keylineInset !== undefined ? { keylineInset: preset.keylineInset } : {}),
-+        ...(preset.enableWatermark !== undefined ? { enableWatermark: preset.enableWatermark } : {}),
-+        ...(preset.watermarkType ? { watermarkType: preset.watermarkType } : {}),
-+        ...(preset.watermarkText !== undefined ? { watermarkText: preset.watermarkText } : {}),
-+        ...(preset.watermarkColor ? { watermarkColor: preset.watermarkColor } : {}),
-+        ...(preset.watermarkPath !== undefined ? { watermarkPath: preset.watermarkPath } : {}),
-+        ...(preset.watermarkAnchor ? { watermarkAnchor: preset.watermarkAnchor as any } : {}),
-+        ...(preset.watermarkScale !== undefined ? { watermarkScale: preset.watermarkScale } : {}),
-+        ...(preset.watermarkSpacing !== undefined ? { watermarkSpacing: preset.watermarkSpacing } : {}),
-+        ...(preset.watermarkOpacity !== undefined ? { watermarkOpacity: preset.watermarkOpacity } : {}),
-+        ...(preset.enableExifBadge !== undefined ? { enableExifBadge: preset.enableExifBadge } : {}),
-+        ...(preset.exifBadgeStyle ? { exifBadgeStyle: preset.exifBadgeStyle } : {}),
-+        ...(preset.exifBadgeAlignment ? { exifBadgeAlignment: preset.exifBadgeAlignment } : {}),
-+        ...(preset.exifShowCamera !== undefined ? { exifShowCamera: preset.exifShowCamera } : {}),
-+        ...(preset.exifShowLens !== undefined ? { exifShowLens: preset.exifShowLens } : {}),
-+        ...(preset.exifShowSettings !== undefined ? { exifShowSettings: preset.exifShowSettings } : {}),
-+        ...(preset.exifShowDate !== undefined ? { exifShowDate: preset.exifShowDate } : {}),
-+        ...(preset.exifCustomText !== undefined ? { exifCustomText: preset.exifCustomText } : {}),
-+        ...(preset.exifBadgeBgColor ? { exifBadgeBgColor: preset.exifBadgeBgColor } : {}),
-+        ...(preset.exifBadgeTextColor ? { exifBadgeTextColor: preset.exifBadgeTextColor } : {}),
++        // Note: Creative framing fields are preserved per-image and intentionally NOT clobbered here by standard export presets.
 +
 +        // Grid & Splitter
 +        ...(preset.enableGridTools !== undefined

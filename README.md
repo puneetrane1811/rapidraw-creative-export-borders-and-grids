@@ -50,10 +50,23 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
   <em>Left: Live canvas proof with custom fine-art mat, contrasting inset keyline, Polaroid chin, and EXIF metadata. Right: The integrated Export Studio inspector controls drawer.</em>
 </p>
 
+### 🎞️ Curated Photographic Preset Families
+- **Instant Family**: *Classic Polaroid 600*, *SX-70 Warm Chin*, *Instax Mini Frame*, *Instax Square Modern*, and *Wide Format Peel-Apart*.
+- **Film Family**: *35mm Contact Frame*, *35mm Sprocket Holes* (authentic perforation geometry & generic edge markings), *Medium Format 6x6 Rebate*, *Medium Format 6x7 Border*, and *Large Format 4x5 Sheet Film*.
+- **Editorial Family**: *Fine-Art Gallery Mat*, *Museum Dark Framing*, *Minimalist Keyline Float*, *Magazine Spread Margin*, and *Exhibition Wide Mat*.
+- **Cinematic Family**: Non-destructive presentation letterboxing for *2.39:1 Anamorphic Scope*, *2.35:1 Widescreen Letterbox*, *2.00:1 Univisium Frame*, and *16:9 Broadcast Matte*.
+- **Analog Family**: *Darkroom Print Border* (with hairline keyline), *Vintage Light Leak Edge*, *Cyanotype Deep Margin*, and *Silver Gelatin Border*.
+- **Camera & Data Family**: *Technical Exposure Strip*, *Minimalist Social Pill*, *Vintage Quartz Date Stamp* (amber & green LED glows), and *Field Journal Data Margin*.
+- **Archive Family**: *Contact Sheet Single Frame*, *Catalog Card Mat*, and *Specimen Archive Border*.
+- **Quick Category Filters**: Fast discovery using horizontal category filter chips (`All`, `Instant`, `Film`, `Editorial`, `Cinematic`, `Analog`, `Camera & Data`, `Archive`, `Custom`).
+- **Batch Application & Persistent Retention**: Presets applied to single or multi-selected photos are automatically saved to persistent local storage and remembered across sessions without tab-switch resets.
+
 ### 🖼️ Fine-Art Mats & Museum Inset Keylines
-- **Outer Mat**: Proportional border framing (0.5% to 50%) in any custom color.
+- **Outer Mat**: Proportional border framing (0.5% to 50%) in any custom color with independent Top / Bottom / Left / Right margin control.
 - **Museum Inset Keyline (Fillet)**: Contrasting hairline inner border inset at any distance inside the outer mat with customizable stroke thickness (1px–10px) and dedicated color selection.
 - **Vintage Polaroid Format**: Authentic instant-film aesthetic with an elongated bottom chin multiplier ($1.0\times$ to $5.0\times$).
+- **Retro Digital Date Stamps**: Authentic quartz-crystal camera timestamp (amber or emerald green LED with luminous bloom) dynamically parsed from EXIF capture dates.
+
 
 ### 📷 Dynamic EXIF Camera Badges
 - **Gallery Matte Strip**: Extends the canvas downward with an elegant 2-line technical strip:
