@@ -4969,10 +4969,10 @@ index 8469a86..bcb6ea8 100644
              <div className="absolute inset-0 pointer-events-none z-50">
 diff --git a/src/components/panel/editor/overlays/CreativeExportOverlay.tsx b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
 new file mode 100644
-index 0000000..0cf0749
+index 0000000..bea8fef
 --- /dev/null
 +++ b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
-@@ -0,0 +1,590 @@
+@@ -0,0 +1,594 @@
 +import React, { useMemo, useCallback, useEffect } from 'react';
 +import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 +import { useExportStore } from '../../../../store/useExportStore';
@@ -5032,6 +5032,7 @@ index 0000000..0cf0749
 +    watermarkCustomPlacement,
 +    watermarkCustomX,
 +    watermarkCustomY,
++    enableGridTools,
 +    enableGridOverlay,
 +    gridOverlayRows,
 +    gridOverlayCols,
@@ -5048,6 +5049,9 @@ index 0000000..0cf0749
 +    collageGutter,
 +    collageCellFit,
 +  } = useExportStore();
++
++  const isTileSplitActive = enableGridTools && enableTileSplit;
++  const isGridOverlayActive = enableGridTools && enableGridOverlay;
 +
 +  const effectiveCollagePaths = useMemo(() => {
 +    if (multiSelectedPaths.length > 0) return multiSelectedPaths;
@@ -5094,8 +5098,8 @@ index 0000000..0cf0749
 +      !enableKeyline &&
 +      !enableExifBadge &&
 +      !enableWatermark &&
-+      !enableGridOverlay &&
-+      !enableTileSplit &&
++      !isGridOverlayActive &&
++      !isTileSplitActive &&
 +      !isCollageActive)
 +  ) {
 +    return null;
@@ -5480,7 +5484,7 @@ index 0000000..0cf0749
 +      )}
 +
 +      {/* 6. Composition Grid Overlay (Standard Export) */}
-+      {enableGridOverlay && (
++      {isGridOverlayActive && (
 +        <svg
 +          className="absolute inset-0 pointer-events-none"
 +          style={{ width: `${imageWidth}px`, height: `${imageHeight}px` }}
@@ -5521,7 +5525,7 @@ index 0000000..0cf0749
 +      )}
 +
 +      {/* 7. Multi-Tile Splitter Slice Guides (Standard Export) */}
-+      {enableTileSplit && (
++      {isTileSplitActive && (
 +        <svg
 +          className="absolute inset-0 pointer-events-none"
 +          style={{ width: `${imageWidth}px`, height: `${imageHeight}px` }}
@@ -6533,7 +6537,7 @@ index 0000000..aecf216
 +  return { camera, lens, settings, date };
 +}
 diff --git a/src/components/panel/right/ExportPanel.tsx b/src/components/panel/right/ExportPanel.tsx
-index 267e321..25ca5ea 100644
+index 267e321..cab0430 100644
 --- a/src/components/panel/right/ExportPanel.tsx
 +++ b/src/components/panel/right/ExportPanel.tsx
 @@ -1,21 +1,16 @@
@@ -6578,7 +6582,7 @@ index 267e321..25ca5ea 100644
  
  interface ExportPanelProps {
    exportState: ExportState;
-@@ -43,137 +41,6 @@ interface ExportPanelProps {
+@@ -43,136 +41,7 @@ interface ExportPanelProps {
    onClose?: () => void;
  }
  
@@ -6712,11 +6716,11 @@ index 267e321..25ca5ea 100644
 -  const i = Math.floor(Math.log(bytes) / Math.log(k));
 -  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 -};
--
++let hasAppliedLastUsedOnce = false;
+ 
  export default function ExportPanel({
    exportState,
-   multiSelectedPaths,
-@@ -187,6 +54,8 @@ export default function ExportPanel({
+@@ -187,6 +56,8 @@ export default function ExportPanel({
  }: ExportPanelProps) {
    const { t } = useTranslation();
  
@@ -6725,7 +6729,7 @@ index 267e321..25ca5ea 100644
    const resizeModeOptions = useMemo(
      () => [
        { label: t('export.resize.modes.longEdge'), value: 'longEdge' },
-@@ -232,6 +101,12 @@ export default function ExportPanel({
+@@ -232,6 +103,12 @@ export default function ExportPanel({
      setFilenameTemplate,
      enableWatermark,
      setEnableWatermark,
@@ -6738,7 +6742,7 @@ index 267e321..25ca5ea 100644
      watermarkPath,
      setWatermarkPath,
      watermarkAnchor,
-@@ -242,6 +117,56 @@ export default function ExportPanel({
+@@ -242,6 +119,58 @@ export default function ExportPanel({
      setWatermarkSpacing,
      watermarkOpacity,
      setWatermarkOpacity,
@@ -6762,6 +6766,8 @@ index 267e321..25ca5ea 100644
 +    setKeylineColor,
 +    keylineInset,
 +    setKeylineInset,
++    enableGridTools,
++    setEnableGridTools,
 +    enableGridOverlay,
 +    setEnableGridOverlay,
 +    gridOverlayRows,
@@ -6795,7 +6801,7 @@ index 267e321..25ca5ea 100644
      preserveFolders,
      setPreserveFolders,
      handleApplyPreset,
-@@ -250,8 +175,31 @@ export default function ExportPanel({
+@@ -250,16 +179,38 @@ export default function ExportPanel({
      setDestinationType,
      subfolder,
      setSubfolder,
@@ -6827,7 +6833,17 @@ index 267e321..25ca5ea 100644
    const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
  
    const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
-@@ -292,6 +240,7 @@ export default function ExportPanel({
+-  const initDone = useRef(false);
+ 
+   useEffect(() => {
+-    if (initDone.current || appSettings === null || !isVisible) return;
+-    initDone.current = true;
++    if (hasAppliedLastUsedOnce || appSettings === null || !isVisible) return;
++    hasAppliedLastUsedOnce = true;
+     const lastUsed = appSettings.exportPresets?.find((p) => p.id === '__last_used__');
+     if (lastUsed) {
+       handleApplyPreset(lastUsed);
+@@ -292,6 +243,7 @@ export default function ExportPanel({
    const osPlatform = useOsPlatform();
    const isAndroid = osPlatform === 'android';
    const activePanels = useUIStore((state) => state.activePanels);
@@ -6835,7 +6851,7 @@ index 267e321..25ca5ea 100644
    const isPanelReallyActive = Object.values(activePanels).includes(Panel.Export);
  
    const { status, progress, errorMessage } = exportState;
-@@ -370,8 +319,10 @@ export default function ExportPanel({
+@@ -370,8 +322,10 @@ export default function ExportPanel({
          }
          setIsEstimating(true);
          try {
@@ -6847,7 +6863,7 @@ index 267e321..25ca5ea 100644
              exportSettings,
              outputFormat: format,
              currentEditPath: currentPath || null,
-@@ -384,7 +335,7 @@ export default function ExportPanel({
+@@ -384,7 +338,7 @@ export default function ExportPanel({
            setIsEstimating(false);
          }
        }, 500),
@@ -6856,7 +6872,7 @@ index 267e321..25ca5ea 100644
    );
  
    useEffect(() => {
-@@ -403,15 +354,89 @@ export default function ExportPanel({
+@@ -403,15 +357,89 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -6924,7 +6940,7 @@ index 267e321..25ca5ea 100644
 +            backgroundColor: borderColor,
 +          }
 +        : null,
-+      tileSplit: enableTileSplit
++      tileSplit: (enableGridTools && enableTileSplit)
 +        ? {
 +            enabled: true,
 +            columns: tileSplitColumns,
@@ -6949,7 +6965,7 @@ index 267e321..25ca5ea 100644
      };
      const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
      const runEstimate = () =>
-@@ -448,11 +473,48 @@ export default function ExportPanel({
+@@ -448,11 +476,48 @@ export default function ExportPanel({
      stripGps,
      filenameTemplate,
      enableWatermark,
@@ -6998,7 +7014,7 @@ index 267e321..25ca5ea 100644
      debouncedEstimateSize,
      exportMasks,
      preserveFolders,
-@@ -489,31 +551,107 @@ export default function ExportPanel({
+@@ -489,31 +554,107 @@ export default function ExportPanel({
        stripGps,
        exportMasks: exportMasks,
        watermark:
@@ -7066,7 +7082,7 @@ index 267e321..25ca5ea 100644
 +            backgroundColor: borderColor,
 +          }
 +        : null,
-+      tileSplit: enableTileSplit
++      tileSplit: (enableGridTools && enableTileSplit)
 +        ? {
 +            enabled: true,
 +            columns: tileSplitColumns,
@@ -7099,7 +7115,7 @@ index 267e321..25ca5ea 100644
        let outputFolderOrFile = '';
        const isOriginalFolder = destinationType === 'originalFolder';
 -      const shouldChooseOutputFile = numImages === 1 && !preserveFolders && !isOriginalFolder;
-+      const isSingleOutput = (numImages === 1 || (enableCollageGrid && numImages > 1)) && !enableTileSplit;
++      const isSingleOutput = (numImages === 1 || (enableCollageGrid && numImages > 1)) && !(enableGridTools && enableTileSplit);
 +      const shouldChooseOutputFile = isSingleOutput && !preserveFolders && !isOriginalFolder;
  
        if (isOriginalFolder) {
@@ -7112,14 +7128,14 @@ index 267e321..25ca5ea 100644
          const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
          const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
  
-@@ -592,332 +730,159 @@ export default function ExportPanel({
+@@ -592,332 +733,161 @@ export default function ExportPanel({
  
    const canExport = numImages > 0;
    const isLut = fileFormat === FileFormats.Cube;
 -  const itemLabel = isLut ? t('export.labels.lut') : t('export.labels.image');
 -  const itemLabelPlural = isLut ? t('export.labels.lut_plural') : t('export.labels.image_plural');
 +  const isCollageActive = enableCollageGrid && numImages > 1;
-+  const isTileSplitActive = enableTileSplit;
++  const isTileSplitActive = enableGridTools && enableTileSplit;
 +
 +  const exportOutputCount = useMemo(() => {
 +    const base = isCollageActive ? 1 : numImages;
@@ -7568,6 +7584,8 @@ index 267e321..25ca5ea 100644
 +              setCollageGutter={setCollageGutter}
 +              collageCellFit={collageCellFit}
 +              setCollageCellFit={setCollageCellFit}
++              enableGridTools={enableGridTools}
++              setEnableGridTools={setEnableGridTools}
 +              enableTileSplit={enableTileSplit}
 +              setEnableTileSplit={setEnableTileSplit}
 +              tileSplitColumns={tileSplitColumns}
@@ -7591,7 +7609,7 @@ index 267e321..25ca5ea 100644
          ) : (
            <div className="flex items-center justify-center h-full">
              <Text
-@@ -932,17 +897,18 @@ export default function ExportPanel({
+@@ -932,17 +902,18 @@ export default function ExportPanel({
          )}
        </div>
  
@@ -7612,7 +7630,7 @@ index 267e321..25ca5ea 100644
              </span>
            ) : null}
          </Text>
-@@ -1001,9 +967,11 @@ export default function ExportPanel({
+@@ -1001,9 +972,11 @@ export default function ExportPanel({
              ) : (
                <>
                  <FileInput size={18} className="mr-2" />{' '}
@@ -7629,10 +7647,10 @@ index 267e321..25ca5ea 100644
            </Button>
 diff --git a/src/components/panel/right/StandardExportTab.tsx b/src/components/panel/right/StandardExportTab.tsx
 new file mode 100644
-index 0000000..98b354e
+index 0000000..113852e
 --- /dev/null
 +++ b/src/components/panel/right/StandardExportTab.tsx
-@@ -0,0 +1,820 @@
+@@ -0,0 +1,841 @@
 +import React from 'react';
 +import { motion, AnimatePresence } from 'framer-motion';
 +import { useTranslation } from 'react-i18next';
@@ -7714,6 +7732,8 @@ index 0000000..98b354e
 +  setCollageCellFit?: (v: 'fit' | 'fill') => void;
 +
 +  // Grid Tools & Overlays
++  enableGridTools?: boolean;
++  setEnableGridTools?: (v: boolean) => void;
 +  enableTileSplit?: boolean;
 +  setEnableTileSplit?: (v: boolean) => void;
 +  tileSplitColumns?: number;
@@ -7788,6 +7808,8 @@ index 0000000..98b354e
 +  setCollageGutter,
 +  collageCellFit,
 +  setCollageCellFit,
++  enableGridTools,
++  setEnableGridTools,
 +  enableTileSplit,
 +  setEnableTileSplit,
 +  tileSplitColumns,
@@ -7815,6 +7837,7 @@ index 0000000..98b354e
 +  const storeCollageGutter = useExportStore((s) => s.collageGutter);
 +  const storeCollageCellFit = useExportStore((s) => s.collageCellFit);
 +
++  const storeEnableGridTools = useExportStore((s) => s.enableGridTools);
 +  const storeEnableTileSplit = useExportStore((s) => s.enableTileSplit);
 +  const storeTileSplitColumns = useExportStore((s) => s.tileSplitColumns);
 +  const storeTileSplitRows = useExportStore((s) => s.tileSplitRows);
@@ -7828,6 +7851,12 @@ index 0000000..98b354e
 +
 +  const setStandardSetting = useExportStore((s) => s.setStandardSetting);
 +  const setShowExportProofing = useExportStore((s) => s.setShowExportProofing);
++
++  const effEnableGridTools = storeEnableGridTools;
++  const effSetEnableGridTools = (v: boolean) => {
++    setStandardSetting('enableGridTools', v);
++    if (setEnableGridTools) setEnableGridTools(v);
++  };
 +
 +  const effEnableCollageGrid = storeEnableCollageGrid;
 +  const effSetEnableCollageGrid = (v: boolean) => {
@@ -8274,117 +8303,127 @@ index 0000000..98b354e
 +
 +          {/* Grid Tools & Overlays */}
 +          <Section title={t('export.grid.toolsAndOverlaysTitle', 'Grid Tools & Overlays')}>
-+            <div className="space-y-4">
-+              {/* Sub-tool 1: Multi-Tile Splitter */}
-+              <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
-+                <Switch
-+                  label={t('export.grid.tileSplitTitle', 'Multi-Tile Splitter (Instagram / Panorama)')}
-+                  checked={effEnableTileSplit}
-+                  onChange={effSetEnableTileSplit}
-+                  disabled={isExporting}
-+                  trackClassName="bg-surface"
-+                />
-+                {effEnableTileSplit && (
-+                  <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
-+                    <div className="grid grid-cols-2 gap-3">
-+                      <div>
-+                        <Text variant={TextVariants.label} className="mb-1">
-+                          {t('export.grid.tileCols', 'Split Columns')}
-+                        </Text>
-+                        <GridNumberInput
-+                          min={1}
-+                          max={10}
-+                          value={effTileSplitColumns}
-+                          disabled={isExporting}
-+                          onChange={effSetTileSplitColumns}
-+                        />
-+                      </div>
-+                      <div>
-+                        <Text variant={TextVariants.label} className="mb-1">
-+                          {t('export.grid.tileRows', 'Split Rows')}
-+                        </Text>
-+                        <GridNumberInput
-+                          min={1}
-+                          max={10}
-+                          value={effTileSplitRows}
-+                          disabled={isExporting}
-+                          onChange={effSetTileSplitRows}
-+                        />
-+                      </div>
-+                    </div>
-+                    <Switch
-+                      label={t('export.grid.borderEachTile', 'Apply framing border to each individual tile')}
-+                      checked={effTileBorderEachTile}
-+                      onChange={effSetTileBorderEachTile}
-+                      disabled={isExporting}
-+                      trackClassName="bg-surface"
-+                    />
-+                  </div>
-+                )}
-+              </div>
++            <Switch
++              label={t('export.grid.enableToolsAndOverlays', 'Enable Grid Tools & Overlays')}
++              checked={effEnableGridTools}
++              onChange={effSetEnableGridTools}
++              disabled={isExporting}
++              trackClassName="bg-surface"
++            />
 +
-+              {/* Sub-tool 2: Composition Grid Overlay */}
-+              <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
-+                <Switch
-+                  label={t('export.border.addGridOverlay', 'Composition Grid Overlay')}
-+                  checked={effEnableGridOverlay}
-+                  onChange={effSetEnableGridOverlay}
-+                  disabled={isExporting}
-+                  trackClassName="bg-surface"
-+                />
-+                {effEnableGridOverlay && (
-+                  <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
-+                    <div className="grid grid-cols-2 gap-3">
-+                      <div>
-+                        <Text variant={TextVariants.label} className="mb-1">
-+                          {t('export.border.gridOverlayCols', 'Grid Columns')}
-+                        </Text>
-+                        <GridNumberInput
-+                          min={2}
-+                          max={12}
-+                          value={effGridOverlayCols}
-+                          disabled={isExporting}
-+                          onChange={effSetGridOverlayCols}
-+                        />
++            {effEnableGridTools && (
++              <div className="space-y-4 pl-2 border-l-2 border-surface mt-3">
++                {/* Sub-tool 1: Multi-Tile Splitter */}
++                <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
++                  <Switch
++                    label={t('export.grid.tileSplitTitle', 'Multi-Tile Splitter (Instagram / Panorama)')}
++                    checked={effEnableTileSplit}
++                    onChange={effSetEnableTileSplit}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                  {effEnableTileSplit && (
++                    <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
++                      <div className="grid grid-cols-2 gap-3">
++                        <div>
++                          <Text variant={TextVariants.label} className="mb-1">
++                            {t('export.grid.tileCols', 'Split Columns')}
++                          </Text>
++                          <GridNumberInput
++                            min={1}
++                            max={10}
++                            value={effTileSplitColumns}
++                            disabled={isExporting}
++                            onChange={effSetTileSplitColumns}
++                          />
++                        </div>
++                        <div>
++                          <Text variant={TextVariants.label} className="mb-1">
++                            {t('export.grid.tileRows', 'Split Rows')}
++                          </Text>
++                          <GridNumberInput
++                            min={1}
++                            max={10}
++                            value={effTileSplitRows}
++                            disabled={isExporting}
++                            onChange={effSetTileSplitRows}
++                          />
++                        </div>
 +                      </div>
-+                      <div>
-+                        <Text variant={TextVariants.label} className="mb-1">
-+                          {t('export.border.gridOverlayRows', 'Grid Rows')}
-+                        </Text>
-+                        <GridNumberInput
-+                          min={2}
-+                          max={12}
-+                          value={effGridOverlayRows}
-+                          disabled={isExporting}
-+                          onChange={effSetGridOverlayRows}
-+                        />
-+                      </div>
-+                    </div>
-+                    <Slider
-+                      label={t('export.border.gridOverlayOpacity', 'Grid Opacity (%)')}
-+                      min={5}
-+                      max={100}
-+                      step={1}
-+                      value={effGridOverlayOpacity}
-+                      onChange={(e) => effSetGridOverlayOpacity(Number(e.target.value))}
-+                      disabled={isExporting}
-+                      defaultValue={50}
-+                    />
-+                    <div className="flex items-center justify-between gap-3">
-+                      <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor', 'Grid Line Color')}</Text>
-+                      <input
-+                        aria-label={t('export.border.gridOverlayColor', 'Grid Line Color')}
-+                        className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                      <Switch
++                        label={t('export.grid.borderEachTile', 'Apply framing border to each individual tile')}
++                        checked={effTileBorderEachTile}
++                        onChange={effSetTileBorderEachTile}
 +                        disabled={isExporting}
-+                        onChange={(e) => effSetGridOverlayColor(e.target.value)}
-+                        type="color"
-+                        value={effGridOverlayColor}
++                        trackClassName="bg-surface"
 +                      />
 +                    </div>
-+                  </div>
-+                )}
++                  )}
++                </div>
++
++                {/* Sub-tool 2: Composition Grid Overlay */}
++                <div className="p-3 rounded-lg bg-surface/30 border border-surface/50 space-y-3">
++                  <Switch
++                    label={t('export.border.addGridOverlay', 'Composition Grid Overlay')}
++                    checked={effEnableGridOverlay}
++                    onChange={effSetEnableGridOverlay}
++                    disabled={isExporting}
++                    trackClassName="bg-surface"
++                  />
++                  {effEnableGridOverlay && (
++                    <div className="space-y-4 pl-2 border-l-2 border-accent/40 mt-2">
++                      <div className="grid grid-cols-2 gap-3">
++                        <div>
++                          <Text variant={TextVariants.label} className="mb-1">
++                            {t('export.border.gridOverlayCols', 'Grid Columns')}
++                          </Text>
++                          <GridNumberInput
++                            min={2}
++                            max={12}
++                            value={effGridOverlayCols}
++                            disabled={isExporting}
++                            onChange={effSetGridOverlayCols}
++                          />
++                        </div>
++                        <div>
++                          <Text variant={TextVariants.label} className="mb-1">
++                            {t('export.border.gridOverlayRows', 'Grid Rows')}
++                          </Text>
++                          <GridNumberInput
++                            min={2}
++                            max={12}
++                            value={effGridOverlayRows}
++                            disabled={isExporting}
++                            onChange={effSetGridOverlayRows}
++                          />
++                        </div>
++                      </div>
++                      <Slider
++                        label={t('export.border.gridOverlayOpacity', 'Grid Opacity (%)')}
++                        min={5}
++                        max={100}
++                        step={1}
++                        value={effGridOverlayOpacity}
++                        onChange={(e) => effSetGridOverlayOpacity(Number(e.target.value))}
++                        disabled={isExporting}
++                        defaultValue={50}
++                      />
++                      <div className="flex items-center justify-between gap-3">
++                        <Text variant={TextVariants.label}>{t('export.border.gridOverlayColor', 'Grid Line Color')}</Text>
++                        <input
++                          aria-label={t('export.border.gridOverlayColor', 'Grid Line Color')}
++                          className="h-8 w-12 cursor-pointer rounded bg-surface disabled:cursor-not-allowed"
++                          disabled={isExporting}
++                          onChange={(e) => effSetGridOverlayColor(e.target.value)}
++                          type="color"
++                          value={effGridOverlayColor}
++                        />
++                      </div>
++                    </div>
++                  )}
++                </div>
 +              </div>
-+            </div>
++            )}
 +          </Section>
 +        </>
 +      )}
@@ -8534,7 +8573,7 @@ index 0000000..bada860
 +  }
 +}
 diff --git a/src/components/ui/ExportImportProperties.tsx b/src/components/ui/ExportImportProperties.tsx
-index 86285cd..cec772b 100644
+index 86285cd..39dee35 100644
 --- a/src/components/ui/ExportImportProperties.tsx
 +++ b/src/components/ui/ExportImportProperties.tsx
 @@ -22,7 +22,15 @@ export const FILE_FORMATS: Array<FileFormat> = [
@@ -8712,7 +8751,7 @@ index 86285cd..cec772b 100644
  }
  
  export interface ExportState {
-@@ -117,11 +250,50 @@ export interface ExportPreset {
+@@ -117,11 +250,51 @@ export interface ExportPreset {
    preserveFolders?: boolean;
    filenameTemplate: string;
    enableWatermark: boolean;
@@ -8741,6 +8780,7 @@ index 86285cd..cec772b 100644
 +  gridOverlayCols?: number;
 +  gridOverlayColor?: string;
 +  gridOverlayOpacity?: number;
++  enableGridTools?: boolean;
 +  enableCollageGrid?: boolean;
 +  collageColumns?: number;
 +  collageRows?: number;
@@ -8908,10 +8948,10 @@ index 6637d75..97a6786 100644
        if (isFrontendCached) {
          setEditor({
 diff --git a/src/hooks/useExportSettings.ts b/src/hooks/useExportSettings.ts
-index 598487c..9fe877c 100644
+index 598487c..ac5ac7d 100644
 --- a/src/hooks/useExportSettings.ts
 +++ b/src/hooks/useExportSettings.ts
-@@ -1,145 +1,152 @@
+@@ -1,145 +1,154 @@
 -import { useState, useMemo, useCallback } from 'react';
 +import { useCallback, useMemo } from 'react';
 +import { useExportStore } from '../store/useExportStore';
@@ -9163,6 +9203,8 @@ index 598487c..9fe877c 100644
 +    setExifBadgeTextColor: (c: string) => store.setCreativeSetting('exifBadgeTextColor', c),
 +
 +    // Grid & Slicing Tools (Moved to Standard)
++    enableGridTools: store.enableGridTools,
++    setEnableGridTools: (e: boolean) => store.setStandardSetting('enableGridTools', e),
 +    enableGridOverlay: store.enableGridOverlay,
 +    setEnableGridOverlay: (g: boolean) => store.setStandardSetting('enableGridOverlay', g),
 +    gridOverlayRows: store.gridOverlayRows,
@@ -9218,7 +9260,7 @@ index 609b36c..64c5e36 100644
        },
        toggle_left_panel: {
 diff --git a/src/i18n/locales/en.json b/src/i18n/locales/en.json
-index 60dc8eb..7081b82 100644
+index 60dc8eb..8c6f670 100644
 --- a/src/i18n/locales/en.json
 +++ b/src/i18n/locales/en.json
 @@ -2,8 +2,8 @@
@@ -9250,7 +9292,7 @@ index 60dc8eb..7081b82 100644
      "advanced": {
        "exportMasks": "Export masks as separate files",
        "preserveFolders": "Preserve Folder Structure",
-@@ -786,6 +791,41 @@
+@@ -786,6 +791,43 @@
        "mb": "MB",
        "tb": "TB"
      },
@@ -9281,7 +9323,9 @@ index 60dc8eb..7081b82 100644
 +      "enableTileSplit": "Split into Grid Tiles",
 +      "tileCols": "Tile Columns",
 +      "tileRows": "Tile Rows",
-+      "borderEachTile": "Border Each Tile"
++      "borderEachTile": "Border Each Tile",
++      "toolsAndOverlaysTitle": "Grid Tools & Overlays",
++      "enableToolsAndOverlays": "Enable Grid Tools & Overlays"
 +    },
 +    "preview": {
 +      "title": "Live Export Preview",
@@ -9292,7 +9336,7 @@ index 60dc8eb..7081b82 100644
      "destination": {
        "customFolder": "Custom folder",
        "originalFolder": "Original image folder",
-@@ -806,6 +846,10 @@
+@@ -806,6 +848,10 @@
        "tiffBitDepth8": "8-bit"
      },
      "labels": {
@@ -9303,7 +9347,7 @@ index 60dc8eb..7081b82 100644
        "image": "Image",
        "image_plural": "Images",
        "lut": "LUT",
-@@ -828,6 +872,7 @@
+@@ -828,6 +874,7 @@
      },
      "sections": {
        "advanced": "Advanced",
@@ -9311,7 +9355,7 @@ index 60dc8eb..7081b82 100644
        "destination": "Destination",
        "fileNaming": "File Naming",
        "fileSettings": "File Settings",
-@@ -843,6 +888,7 @@
+@@ -843,6 +890,7 @@
        "estimatedSize": "Estimated file size: ~{{size}}",
        "estimatedTotalSize": "Estimated total size: ~{{size}}",
        "estimatingSize": "Estimating size...",
@@ -9319,7 +9363,7 @@ index 60dc8eb..7081b82 100644
        "exportMultiple": "Export {{count}} {{label}}",
        "exportMultiple_one": "Export {{count}} {{label}}",
        "exportMultiple_other": "Export {{count}} {{label}}",
-@@ -873,7 +919,41 @@
+@@ -873,7 +921,41 @@
        "previewText": "Preview",
        "scale": "Scale",
        "spacing": "Spacing",
@@ -9364,10 +9408,10 @@ index 60dc8eb..7081b82 100644
    "library": {
 diff --git a/src/store/useExportStore.ts b/src/store/useExportStore.ts
 new file mode 100644
-index 0000000..1c72955
+index 0000000..5d700cf
 --- /dev/null
 +++ b/src/store/useExportStore.ts
-@@ -0,0 +1,688 @@
+@@ -0,0 +1,804 @@
 +import { create } from 'zustand';
 +import {
 +  ExportPreset,
@@ -9548,6 +9592,105 @@ index 0000000..1c72955
 +  }
 +};
 +
++export interface GridExportSettings {
++  enableCollageGrid: boolean;
++  collageColumns: number;
++  collageRows: number;
++  collageGutter: number;
++  collageCellFit: 'fit' | 'fill';
++  enableGridTools: boolean;
++  enableTileSplit: boolean;
++  tileSplitColumns: number;
++  tileSplitRows: number;
++  tileBorderEachTile: boolean;
++  enableGridOverlay: boolean;
++  gridOverlayRows: number;
++  gridOverlayCols: number;
++  gridOverlayColor: string;
++  gridOverlayOpacity: number;
++  gridOverlaySize: number;
++}
++
++export const DEFAULT_GRID_SETTINGS: GridExportSettings = {
++  enableCollageGrid: false,
++  collageColumns: 2,
++  collageRows: 2,
++  collageGutter: 1.0,
++  collageCellFit: 'fit',
++  enableGridTools: false,
++  enableTileSplit: false,
++  tileSplitColumns: 3,
++  tileSplitRows: 1,
++  tileBorderEachTile: false,
++  enableGridOverlay: false,
++  gridOverlayRows: 3,
++  gridOverlayCols: 3,
++  gridOverlayColor: '#ffffff',
++  gridOverlayOpacity: 50,
++  gridOverlaySize: 1,
++};
++
++const LOCAL_STORAGE_GRID_SETTINGS_KEY = 'rapidraw_export_grid_settings';
++
++const GRID_SETTING_KEYS = new Set([
++  'enableCollageGrid',
++  'collageColumns',
++  'collageRows',
++  'collageGutter',
++  'collageCellFit',
++  'enableGridTools',
++  'enableTileSplit',
++  'tileSplitColumns',
++  'tileSplitRows',
++  'tileBorderEachTile',
++  'enableGridOverlay',
++  'gridOverlayRows',
++  'gridOverlayCols',
++  'gridOverlayColor',
++  'gridOverlayOpacity',
++  'gridOverlaySize',
++]);
++
++const loadPersistedGridSettings = (): GridExportSettings => {
++  try {
++    const raw = localStorage.getItem(LOCAL_STORAGE_GRID_SETTINGS_KEY);
++    if (raw) {
++      const parsed = JSON.parse(raw);
++      return {
++        ...DEFAULT_GRID_SETTINGS,
++        ...parsed,
++        collageColumns:
++          typeof parsed.collageColumns === 'number' && parsed.collageColumns >= 1
++            ? parsed.collageColumns
++            : DEFAULT_GRID_SETTINGS.collageColumns,
++        collageRows:
++          typeof parsed.collageRows === 'number' && parsed.collageRows >= 1
++            ? parsed.collageRows
++            : DEFAULT_GRID_SETTINGS.collageRows,
++        collageGutter:
++          typeof parsed.collageGutter === 'number' && parsed.collageGutter >= 0
++            ? parsed.collageGutter
++            : DEFAULT_GRID_SETTINGS.collageGutter,
++        collageCellFit: parsed.collageCellFit === 'fill' ? 'fill' : 'fit',
++        enableGridTools: Boolean(parsed.enableGridTools),
++      };
++    }
++  } catch (err) {
++    console.error('Failed to load grid settings from localStorage:', err);
++  }
++  return DEFAULT_GRID_SETTINGS;
++};
++
++const savePersistedGridSettings = (settings: Partial<GridExportSettings>) => {
++  try {
++    const current = loadPersistedGridSettings();
++    const updated = { ...current, ...settings };
++    localStorage.setItem(LOCAL_STORAGE_GRID_SETTINGS_KEY, JSON.stringify(updated));
++  } catch (err) {
++    console.error('Failed to save grid settings to localStorage:', err);
++  }
++};
++
 +export interface ExportStateStore extends CreativeExportSettings {
 +  // Standard Export Parameters
 +  fileFormat: string;
@@ -9567,6 +9710,7 @@ index 0000000..1c72955
 +  subfolder: string;
 +
 +  // Moved from Creative to Standard Export
++  enableGridTools: boolean;
 +  enableGridOverlay: boolean;
 +  gridOverlayRows: number;
 +  gridOverlayCols: number;
@@ -9624,6 +9768,7 @@ index 0000000..1c72955
 +export const useExportStore = create<ExportStateStore>((set, get) => {
 +  const initialImageCreativeSettings = loadPersistedCreativeSettings();
 +  const initialCreativePresets = loadPersistedCreativePresets();
++  const initialGridSettings = loadPersistedGridSettings();
 +
 +  return {
 +    // Initial Standard Export State
@@ -9643,24 +9788,8 @@ index 0000000..1c72955
 +    destinationType: 'customFolder',
 +    subfolder: '',
 +
-+    // Standard Grid & Slicing Tools
-+    enableGridOverlay: false,
-+    gridOverlayRows: 3,
-+    gridOverlayCols: 3,
-+    gridOverlayColor: '#ffffff',
-+    gridOverlayOpacity: 50,
-+    gridOverlaySize: 1,
-+
-+    enableCollageGrid: false,
-+    collageColumns: 2,
-+    collageRows: 2,
-+    collageGutter: 1.0,
-+    collageCellFit: 'fit',
-+
-+    enableTileSplit: false,
-+    tileSplitColumns: 3,
-+    tileSplitRows: 1,
-+    tileBorderEachTile: false,
++    // Standard Grid & Slicing Tools (Persisted)
++    ...initialGridSettings,
 +
 +    // Initial Creative Export State
 +    ...DEFAULT_CREATIVE_SETTINGS,
@@ -9679,6 +9808,9 @@ index 0000000..1c72955
 +    // Actions
 +    setStandardSetting: (key, value) => {
 +      set({ [key]: value } as any);
++      if (GRID_SETTING_KEYS.has(key as string)) {
++        savePersistedGridSettings({ [key]: value });
++      }
 +    },
 +
 +    setCreativeSetting: (key, value) => {
@@ -9923,6 +10055,8 @@ index 0000000..1c72955
 +
 +    applyExportPreset: (preset) => {
 +      if (!preset) return;
++      const isLastUsed = preset.id === '__last_used__';
++      const persistedGrid = loadPersistedGridSettings();
 +      set({
 +        ...(preset.fileFormat ? { fileFormat: preset.fileFormat } : {}),
 +        ...(preset.jpegQuality !== undefined ? { jpegQuality: preset.jpegQuality } : {}),
@@ -9971,20 +10105,45 @@ index 0000000..1c72955
 +        ...(preset.exifBadgeTextColor ? { exifBadgeTextColor: preset.exifBadgeTextColor } : {}),
 +
 +        // Grid & Splitter
-+        ...(preset.enableCollageGrid !== undefined ? { enableCollageGrid: preset.enableCollageGrid } : {}),
-+        ...(preset.collageColumns !== undefined ? { collageColumns: preset.collageColumns } : {}),
-+        ...(preset.collageRows !== undefined ? { collageRows: preset.collageRows } : {}),
-+        ...(preset.collageGutter !== undefined ? { collageGutter: preset.collageGutter } : {}),
-+        ...(preset.collageCellFit ? { collageCellFit: preset.collageCellFit } : {}),
++        ...(preset.enableGridTools !== undefined
++          ? { enableGridTools: preset.enableGridTools }
++          : isLastUsed
++          ? { enableGridTools: persistedGrid.enableGridTools }
++          : {}),
++        ...(preset.enableCollageGrid !== undefined
++          ? { enableCollageGrid: preset.enableCollageGrid }
++          : isLastUsed
++          ? { enableCollageGrid: persistedGrid.enableCollageGrid }
++          : {}),
++        ...(preset.collageColumns != null
++          ? { collageColumns: Math.max(1, preset.collageColumns) }
++          : isLastUsed
++          ? { collageColumns: persistedGrid.collageColumns }
++          : {}),
++        ...(preset.collageRows != null
++          ? { collageRows: Math.max(1, preset.collageRows) }
++          : isLastUsed
++          ? { collageRows: persistedGrid.collageRows }
++          : {}),
++        ...(preset.collageGutter != null
++          ? { collageGutter: preset.collageGutter }
++          : isLastUsed
++          ? { collageGutter: persistedGrid.collageGutter }
++          : {}),
++        ...(preset.collageCellFit
++          ? { collageCellFit: preset.collageCellFit }
++          : isLastUsed
++          ? { collageCellFit: persistedGrid.collageCellFit }
++          : {}),
 +        ...(preset.enableTileSplit !== undefined ? { enableTileSplit: preset.enableTileSplit } : {}),
-+        ...(preset.tileSplitColumns !== undefined ? { tileSplitColumns: preset.tileSplitColumns } : {}),
-+        ...(preset.tileSplitRows !== undefined ? { tileSplitRows: preset.tileSplitRows } : {}),
++        ...(preset.tileSplitColumns != null ? { tileSplitColumns: Math.max(1, preset.tileSplitColumns) } : {}),
++        ...(preset.tileSplitRows != null ? { tileSplitRows: Math.max(1, preset.tileSplitRows) } : {}),
 +        ...(preset.tileBorderEachTile !== undefined ? { tileBorderEachTile: preset.tileBorderEachTile } : {}),
 +        ...(preset.enableGridOverlay !== undefined ? { enableGridOverlay: preset.enableGridOverlay } : {}),
-+        ...(preset.gridOverlayRows !== undefined ? { gridOverlayRows: preset.gridOverlayRows } : {}),
-+        ...(preset.gridOverlayCols !== undefined ? { gridOverlayCols: preset.gridOverlayCols } : {}),
++        ...(preset.gridOverlayRows != null ? { gridOverlayRows: Math.max(2, preset.gridOverlayRows) } : {}),
++        ...(preset.gridOverlayCols != null ? { gridOverlayCols: Math.max(2, preset.gridOverlayCols) } : {}),
 +        ...(preset.gridOverlayColor ? { gridOverlayColor: preset.gridOverlayColor } : {}),
-+        ...(preset.gridOverlayOpacity !== undefined ? { gridOverlayOpacity: preset.gridOverlayOpacity } : {}),
++        ...(preset.gridOverlayOpacity != null ? { gridOverlayOpacity: preset.gridOverlayOpacity } : {}),
 +      });
 +    },
 +
@@ -10025,6 +10184,7 @@ index 0000000..1c72955
 +        keylineSize: state.keylineSize,
 +        keylineColor: state.keylineColor,
 +        keylineInset: state.keylineInset,
++        enableGridTools: state.enableGridTools,
 +        enableGridOverlay: state.enableGridOverlay,
 +        gridOverlayRows: state.gridOverlayRows,
 +        gridOverlayCols: state.gridOverlayCols,
