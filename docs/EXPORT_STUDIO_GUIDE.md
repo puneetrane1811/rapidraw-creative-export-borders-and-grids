@@ -73,15 +73,15 @@ In earlier development iterations, export was moved to a separate standalone vie
 │                                                 │ 📁 Presets [Save] [Apply] │
 │      ┌───────────────────────────────────┐      │ 🖼️ Framing & Polaroid [↺] │
 │      │  Outer Mat Border                 │      │ 📏 Inset Keyline       [↺] │
-│      │   ┌───────────────────────────┐   │      │ 📷 EXIF Camera Badge   [↺] │
-│      │   │                           │   │      │ 🔤 Watermark (Text/Img)[↺] │
-│      │   │      DEVELOPED PHOTO      │   │      │ ───────────────────────── │
-│      │   │                           │   │      │ [ Reset All Filters ]     │
-│      │   └───────────────────────────┘   │      │ [ Proceed to Export → ]   │
-│      │  📷 SONY A7IV • 50mm f/1.8 • ISO100│     │                           │
+│      │   ┌─────────────┬─────────────┐   │      │ 📷 EXIF Camera Badge   [↺] │
+│      │   │   Photo 1   │   Photo 2   │   │      │ 🔤 Watermark (Text/Img)[↺] │
+│      │   ├─────────────┼─────────────┤   │      │ ▦ Photo Collage & Grid [↺] │
+│      │   │   Photo 3   │   Photo 4   │   │      │ ───────────────────────── │
+│      │   └─────────────┴─────────────┘   │      │ [ Reset All Filters ]     │
+│      │  📷 SONY A7IV • 50mm f/1.8 • ISO100│     │ [ Proceed to Export → ]   │
 │      └───────────────────────────────────┘      │                           │
 ├─────────────────────────────────────────────────┴───────────────────────────┤
-│ BOTTOM FILMSTRIP: [✓ Photo 1] [  Photo 2] [✓ Photo 3] [  Photo 4] ...        │
+│ BOTTOM FILMSTRIP: [✓ Photo 1] [✓ Photo 2] [✓ Photo 3] [✓ Photo 4] ...        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,20 +91,21 @@ The right-hand panel switcher hosts:
 - **`Crop`**: Geometry, rotation, perspective, and aspect ratio cropping.
 - **`Masks` & `Inpaint`**: Local adjustments and AI inpainting.
 - **`Presets`**: Color grading and film simulation presets.
-- **`Export Studio`**: Framing mats, polaroid formats, inset keylines, EXIF badges, and watermarks.
+- **`Export Studio`**: Framing mats, polaroid formats, inset keylines, EXIF badges, watermarks, and live multi-photo collage grids.
 - **`Export`**: Standard export formats, quality, sizing, filename templates, collages, and tile splitters.
 
 ### Single-Canvas Live Proofing Engine
 - The creative overlay (`CreativeExportOverlay.tsx`) mounts directly inside `ImageCanvas.tsx`.
 - Runs at 60fps with zero flicker or latency.
 - Scales, pans, and magnifies in perfect hardware-accelerated lockstep with the editor's `TransformWrapper`.
+- **Live Multi-Photo Collage Compositing**: When 2 or more photos are selected in the filmstrip and collage mode is active, the center canvas automatically lays out all selected photos in real time inside the configured grid ($N \times M$), complete with custom gutter spacing, cell fit modes, and outer framing.
 
 ### Proof Export Frame Toolbar Button (`F`)
 - Located in `EditorToolbar.tsx` with a sparkles icon (`✨`).
 - Press <kbd>F</kbd> on your keyboard or click the toolbar icon to toggle the creative framing overlay on/off at any time.
 
 ### Creative Export Tab
-- Hosts dedicated accordions for **Presets**, **Framing & Polaroid**, **Inset Keyline**, **EXIF Camera Badge**, and **Watermarks**.
+- Hosts dedicated accordions for **Presets**, **Framing & Polaroid**, **Inset Keyline**, **EXIF Camera Badge**, **Watermarks**, and **Photo Collage & Grid**.
 - Every accordion includes an independent section revert button (`RotateCcw`).
 - Includes a master **Reset All Creative Filters** button and a **Proceed to Export →** button that automatically navigates to the Export tab.
 
@@ -198,13 +199,16 @@ Quickly apply curated finishing styles with 1 click:
 - Sizing constraints: Original, Fit to Width, Fit to Height, Long Edge, Short Edge, or Custom Megapixels.
 - Sharpening on export: None, Low, Standard, High.
 
-### Grid Export (Collages / Contact Sheets)
-- Assembles multiple selected photos into a unified contact sheet or collage on a single canvas.
-- Configurable grid columns and rows.
+### Grid Export & Real-Time Photo Collage Proofing
+- **Live Center-Canvas Proofing**: When "Enable Photo Collage" is toggled on and two or more photos are selected in the filmstrip, the editor canvas instantly transitions from single-image view to a live composite grid layout.
+- **Dynamic Viewport Aspect Ratio**: The editor automatically computes the composite grid's total bounding dimensions ($W_{\text{grid}} \times H_{\text{grid}}$), taking into account the cell dimensions, column/row count, and gutter spacing. The image render size and zoom/pan viewport immediately adapt to center the collage with zero clipping.
+- **Unified Creative Framing**: Outer mat borders, museum inset keylines, EXIF bottom strip badges, and watermark signatures wrap seamlessly around the entire multi-photo collage.
+- **Configurable Dimensions**: Adjustable grid columns (1–10) and rows (1–10) with live size badge indicators.
 - **Cell Sizing Modes**:
-  - **Fit (Letterbox)**: Preserves original aspect ratio without cropping.
-  - **Fill (Center-Crop)**: Fills each cell entirely for uniform layout.
-- Customizable cell gutters (inner spacing) and outer mat borders.
+  - **Fit (Letterbox)**: Preserves original aspect ratios within each cell without cropping.
+  - **Fill (Center-Crop)**: Fills each cell entirely for a clean, uniform, border-to-border aesthetic.
+- **Gutter Spacing**: Adjustable inner cell margins (0% to 10%) with background color matching the active mat border.
+- **Granular Reset**: Instant revert button (`RotateCcw`) in both the Export Studio and Export tabs to reset collage grid settings without impacting other creative filters.
 
 ### Multi-Tile Grid Splitter (Instagram Slicing)
 - Slices the processed photo into an $N \times M$ grid of separate files.
