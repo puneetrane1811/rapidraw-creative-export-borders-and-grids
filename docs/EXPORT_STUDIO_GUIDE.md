@@ -145,6 +145,15 @@ Every photo's creative parameters are automatically preserved in `useExportStore
 
 ## 4. Creative Presets & Batch Processing
 
+<p align="center">
+  <img src="images/export-framing-presets.png" width="48%" alt="Curated Photographic Framing Presets Dropdown & Archival Mat Live Proofing" />
+  &nbsp;
+  <img src="images/export-framing-new-feature-toggles.png" width="48%" alt="Export Studio Contextual Feature Toggles and Category Filter Bar" />
+</p>
+<p align="center">
+  <em>Left: The categorized preset selector spanning Instant, Film, Editorial, Cinematic, Analog, Camera & Metadata, and Archival families with live center-stage proofing. Right: The expanded Export Studio drawer featuring dedicated toggle sections, category filter chips, and granular reset controls.</em>
+</p>
+
 ### Built-In Curated Photographic Preset Families
 Quickly apply professional darkroom and gallery styles across 7 dedicated families:
 

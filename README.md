@@ -42,6 +42,41 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
 ## 🎨 Creative Superpowers
 
 <p align="center">
+  <img src="docs/images/export-framing-presets.png" width="48%" alt="Curated Photographic Framing Presets Dropdown & Archival Mat Live Proofing" />
+  &nbsp;
+  <img src="docs/images/export-framing-new-feature-toggles.png" width="48%" alt="Export Studio Contextual Feature Toggles and Category Filter Bar" />
+</p>
+<p align="center">
+  <em>Left: The categorized preset selector spanning Instant, Film, Editorial, Cinematic, Analog, Camera & Metadata, and Archival families with live center-stage proofing. Right: The expanded Export Studio drawer featuring dedicated toggle sections, category filter chips, and granular reset controls.</em>
+</p>
+
+### 🎞️ Curated Photographic Preset Families & Contextual Toggles
+The enhanced **Export Studio** introduces a comprehensive library of over 30 curated photographic framing presets, organized by aesthetic tradition, paired with clean, modular controls:
+
+- **Categorized Preset Menu** *(see left screenshot above)*:
+  - **Instant Family**: *Classic Polaroid 600*, *SX-70 Warm Chin*, *Instax Mini Frame*, *Instax Square Modern*, and *Wide Format Peel-Apart*.
+  - **Film Strips & Rebates**: *35mm Classic*, *35mm Negative*, *35mm Contact Frame*, *35mm Sprocket Holes* (authentic perforation geometry & generic edge markings: `▲ 36 EXP • 35MM`, `ISO 400`, `FRAME 01 • ▶▶`), *Medium Format 6x6 Rebate*, *Medium Format 6x7 Border*, and *Large Format 4x5 Sheet Film*.
+  - **Editorial & Fine Art**: *Fine-Art Gallery Mat*, *Museum Dark Framing*, *Minimal White*, *Minimal Black*, *Warm Fine Art*, *Gallery Print*, and *Magazine Editorial*.
+  - **Cinematic Presentation**: Non-destructive presentation letterboxing for *2.39:1 Anamorphic Scope*, *2.35:1 Widescreen Letterbox*, *2.00:1 Univisium Frame*, and *16:9 Broadcast Matte*.
+  - **Analog & Darkroom**: *Vintage Print*, *Darkroom Print* (with crisp white hairline border), *Torn Edge*, and *Light Leak* (warm ambient edge wash).
+  - **Camera & Metadata**: *Technical Exposure Strip*, *Minimalist Social Pill*, *EXIF Minimal*, *EXIF Classic*, *Camera Bottom Strip*, *Floating Camera Pill*, and *Digital Timestamp* (retro quartz LED font).
+  - **Archival & Documentary**: *Archive Catalog* (museum exhibition card mat with archival typography, as shown in the center canvas), and *Contact Sheet Single Frame*.
+
+- **Context-Aware Feature Toggles** *(see right screenshot above)*:
+  - Every styling dimension is neatly organized behind an independent enable/disable switch, keeping the sidebar streamlined and clutter-free:
+    1. **Framing & Mats**: Outer mat sizing with independent Top, Bottom, Left, and Right margin controls.
+    2. **Polaroid Chin & Instant Proportions**: Elongated bottom chin multiplier ($1.0\times$ to $5.0\times$) for authentic instant-film geometry.
+    3. **Film Rebate & Sprocket Holes**: Authentic 35mm perforation cutouts and edge rebate text.
+    4. **Cinematic Aspect Letterbox**: Presentation-only aspect letterboxing without destructive cropping of photo pixels.
+    5. **Fine-Art Inset Keyline**: Contrasting inner fillet border with independent stroke thickness, inset distance, and color picker.
+    6. **Analog & Print Treatments**: Darkroom print hairline margins and ambient light leaks.
+    7. **EXIF Badges & Digital Timestamp**: Dynamic technical strips, floating social glass pills, and quartz-crystal capture date stamps.
+    8. **Typography & Watermarks**: Text branding with drop-shadows and PNG logo overlays with interactive positioning.
+  - **Granular Reverts (`RotateCcw`)**: Every toggle section includes an independent revert button to reset only that specific tool without altering other active adjustments.
+  - **Category Filter Chips**: Horizontal filter chips (`All`, `Instant`, `Film`, `Editorial`, `Cinematic`, `Analog`, `Camera & Data`, `Archive`, `Custom`) at the top of the panel allow instant discovery of preset styles without scrolling through large lists.
+  - **Batch Application & Persistent Retention**: Selecting a preset with multiple images highlighted automatically applies and persists the preset across all selected photos in `localStorage`—staying locked across tab switches and app restarts.
+
+<p align="center">
   <img src="docs/images/polaroid-exif-badge.png" width="48%" alt="Fine-Art Mat with Inset Keyline and EXIF Badge" />
   &nbsp;
   <img src="docs/images/export-studio-panel.png" width="48%" alt="Export Studio Controls Drawer" />
@@ -50,16 +85,6 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
   <em>Left: Live canvas proof with custom fine-art mat, contrasting inset keyline, Polaroid chin, and EXIF metadata. Right: The integrated Export Studio inspector controls drawer.</em>
 </p>
 
-### 🎞️ Curated Photographic Preset Families
-- **Instant Family**: *Classic Polaroid 600*, *SX-70 Warm Chin*, *Instax Mini Frame*, *Instax Square Modern*, and *Wide Format Peel-Apart*.
-- **Film Family**: *35mm Contact Frame*, *35mm Sprocket Holes* (authentic perforation geometry & generic edge markings), *Medium Format 6x6 Rebate*, *Medium Format 6x7 Border*, and *Large Format 4x5 Sheet Film*.
-- **Editorial Family**: *Fine-Art Gallery Mat*, *Museum Dark Framing*, *Minimalist Keyline Float*, *Magazine Spread Margin*, and *Exhibition Wide Mat*.
-- **Cinematic Family**: Non-destructive presentation letterboxing for *2.39:1 Anamorphic Scope*, *2.35:1 Widescreen Letterbox*, *2.00:1 Univisium Frame*, and *16:9 Broadcast Matte*.
-- **Analog Family**: *Darkroom Print Border* (with hairline keyline), *Vintage Light Leak Edge*, *Cyanotype Deep Margin*, and *Silver Gelatin Border*.
-- **Camera & Data Family**: *Technical Exposure Strip*, *Minimalist Social Pill*, *Vintage Quartz Date Stamp* (amber & green LED glows), and *Field Journal Data Margin*.
-- **Archive Family**: *Contact Sheet Single Frame*, *Catalog Card Mat*, and *Specimen Archive Border*.
-- **Quick Category Filters**: Fast discovery using horizontal category filter chips (`All`, `Instant`, `Film`, `Editorial`, `Cinematic`, `Analog`, `Camera & Data`, `Archive`, `Custom`).
-- **Batch Application & Persistent Retention**: Presets applied to single or multi-selected photos are automatically saved to persistent local storage and remembered across sessions without tab-switch resets.
 
 ### 🖼️ Fine-Art Mats & Museum Inset Keylines
 - **Outer Mat**: Proportional border framing (0.5% to 50%) in any custom color with independent Top / Bottom / Left / Right margin control.
