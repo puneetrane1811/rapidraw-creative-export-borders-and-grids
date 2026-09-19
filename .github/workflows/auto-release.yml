@@ -204,13 +204,14 @@ jobs:
 
             Automated cross-platform production build of **RapidRAW** featuring native creative framing, collages, tile splitting, interactive watermarks, and real-time live preview.
 
-            ### ✨ What's Included
-            - **🗂️ Dual-Tab Architecture**: Seamless separation between Standard Export and Creative Export with persistent tab memory.
-            - **🖼️ Real-Time Live Export Preview**: Interactive sticky preview canvas with 60fps rendering and full-screen darkroom inspection modal.
-            - **🔤 Interactive Watermarking**: Real-time text and logo watermarks with drop-shadow, opacity slider, zero-dependency font engine, and interactive canvas drag positioning.
-            - **📐 Multi-Photo Collages**: Contact sheets with custom gutters and high-contrast Fit vs. Fill sizing modes.
-            - **📱 Multi-Tile Grid Splitting**: Slices panoramas and photos into Instagram swipeable carousels and profile grid mosaics.
-            - **🎨 Fine-Art Keylines & Grids**: Inset keyline fillets and composition proofing grid overlays.
+            ### ✨ What's Included (v2)
+            - **✨ Editor-Integrated Export Studio**: Creative framing, fine-art mats, Polaroid chins, keyline fillets, EXIF badges, watermarks, collages, and multi-tile grids directly inside the primary editor canvas.
+            - **💾 Per-Image Retention & History**: Creative export filter parameters stay attached to each photo across workspace switching and sessions, exactly like RAW development adjustments.
+            - **↺ Individual Non-Destructive Resets**: Reset specific filters or the entire studio back to defaults with dedicated per-section undo controls.
+            - **🏷️ Custom User Presets**: Save and load custom styling recipes (frames, mats, badges, watermarks) across photo libraries.
+            - **📷 EXIF Metadata Badges**: Render aperture, shutter speed, ISO, and focal length directly onto borders or photo canvas with automatic EXIF parsing.
+            - **🔤 Interactive Watermarking**: Text and logo watermarks with drop-shadow, opacity slider, and interactive drag positioning.
+            - **📐 Multi-Photo Collages & Grids**: High-contrast contact sheets, split carousels, and Instagram grid slice exports.
 
             ### 📦 Available Downloads
             - **macOS (Apple Silicon)**: `.dmg` disk image installer
