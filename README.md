@@ -63,9 +63,11 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
 
 ### 🔲 Contact Sheets, Collages & Tile Slicing
 - **⚡ Real-Time Live Canvas Grid**: Defined directly in the Final Export tab—when you enable photo collage mode, your $N \times M$ contact sheet composites live right inside the center editor canvas with dynamic aspect ratio adaptation, responsive columns/rows/gutters, and full zoom/pan support!
+- **💾 Persistent Grid Preferences**: Your custom grid dimensions (columns, rows, spacing, and cell fit mode) are saved automatically to persistent local storage and remembered across sessions—never clobbered or reset to defaults.
 - **$N \times M$ Contact Sheets**: Combine multiple selected photos into a unified grid collage with configurable cell gutters and *Fit (Letterbox)* vs. *Fill (Center-Crop)* modes.
-- **Multi-Tile Splitter**: Slices panoramas and wide compositions into seamless $N \times M$ tiles for swipeable Instagram carousels and $3 \times 3$ grid profile mosaics.
-- **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom composition guides with live opacity controls.
+- **🎛️ Minimized Grid Tools & Overlays**: Equipped with a master toggle that keeps composition tools and slice settings minimized by default. When enabled, it expands to offer:
+  - **Multi-Tile Splitter**: Slices panoramas and wide compositions into seamless $N \times M$ tiles for swipeable Instagram carousels and $3 \times 3$ grid profile mosaics.
+  - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom composition guides with live opacity controls.
 
 ### 🏷️ Dynamic Filename Templates & Watermarks
 - **Token Engine**: Name exports automatically using `{camera}`, `{lens}`, `{iso}`, `{focal}`, `{aperture}`, `{shutter}`, `{date}`, `{time}`, and `{seq}`.

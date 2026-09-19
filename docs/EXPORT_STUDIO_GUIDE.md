@@ -114,9 +114,10 @@ The right-hand panel switcher hosts:
   - File formats (JPEG, PNG, TIFF, WebP) and quality controls.
   - Sizing constraints and output dimensions.
   - Dynamic token-based filename templates.
-  - **Grid Export (Collages)**: Combine selected photos into $N \times M$ contact sheets.
-  - **Multi-Tile Grid Splitter**: Slice images into $N \times M$ tiles for Instagram carousels.
-  - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom guides.
+  - **Grid Export (Collages)**: Combine selected photos into $N \times M$ contact sheets with persistent dimension retention.
+  - **Grid Tools & Overlays**: Minimized by default with a master toggle. Expands on demand to provide:
+    - **Multi-Tile Grid Splitter**: Slice images into $N \times M$ tiles for Instagram carousels.
+    - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom guides with adjustable opacity and color.
 
 ### Filmstrip & Multi-Selection
 - The persistent horizontal filmstrip at the bottom allows instant photo switching.
@@ -200,25 +201,21 @@ Quickly apply curated finishing styles with 1 click:
 - Sharpening on export: None, Low, Standard, High.
 
 ### Grid Export & Real-Time Photo Collage Proofing
-- **Live Center-Canvas Proofing**: When "Enable Photo Collage" is toggled on and two or more photos are selected in the filmstrip, the editor canvas instantly transitions from single-image view to a live composite grid layout.
+- **Live Center-Canvas Proofing**: When "Enable Photo Collage" is toggled on and photos are selected in the filmstrip, the editor canvas instantly transitions from single-image view to a live composite grid layout.
 - **Dynamic Viewport Aspect Ratio**: The editor automatically computes the composite grid's total bounding dimensions ($W_{\text{grid}} \times H_{\text{grid}}$), taking into account the cell dimensions, column/row count, and gutter spacing. The image render size and zoom/pan viewport immediately adapt to center the collage with zero clipping.
 - **Unified Creative Framing**: Outer mat borders, museum inset keylines, EXIF bottom strip badges, and watermark signatures wrap seamlessly around the entire multi-photo collage.
-- **Configurable Dimensions**: Adjustable grid columns (1–10) and rows (1–10) with live size badge indicators.
+- **Persistent Dimensions**: Custom column (1–10) and row (1–10) preferences, gutter margins, and fit/fill modes are saved automatically to `localStorage` (`rapidraw_export_grid_settings`) and preserved across tab switches and app restarts—never reverting to default 3×3 values.
 - **Cell Sizing Modes**:
   - **Fit (Letterbox)**: Preserves original aspect ratios within each cell without cropping.
   - **Fill (Center-Crop)**: Fills each cell entirely for a clean, uniform, border-to-border aesthetic.
 - **Gutter Spacing**: Adjustable inner cell margins (0% to 10%) with background color matching the active mat border.
-- **Granular Reset**: Instant revert button (`RotateCcw`) in both the Export Studio and Export tabs to reset collage grid settings without impacting other creative filters.
+- **Clean Feature Separation**: Collage definition belongs exclusively to the Final Export tab; the Creative Export Studio remains dedicated purely to fine-art framing.
 
-### Multi-Tile Grid Splitter (Instagram Slicing)
-- Slices the processed photo into an $N \times M$ grid of separate files.
-- Ideal for panoramic Instagram carousels and $3 \times 3$ grid profile mosaics.
-- Optional border padding applied per individual tile.
-
-### Composition Grid Overlays
-- Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines.
-- Proof composition, horizon alignment, and visual balance.
-- Adjustable grid color, opacity slider, and line thickness.
+### Minimized Grid Tools & Overlays
+- **Collapsed by Default**: Equipped with an **"Enable Grid Tools & Overlays"** master toggle to keep the export drawer clean and uncluttered.
+- When enabled, expands in an indented sub-panel providing:
+  - **Multi-Tile Grid Splitter (Instagram Slicing)**: Slices the processed photo into an $N \times M$ grid of separate files for panoramic Instagram carousels and $3 \times 3$ grid profile mosaics, with optional border framing per individual tile.
+  - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) or custom $N \times M$ grid lines to proof composition, horizon alignment, and visual balance with adjustable color, opacity slider, and line thickness. Both guides and export slice tasks are suppressed when the master section toggle is off.
 
 ### Dynamic Filename Template Engine
 - Robust token-based output file naming for single and batch exports:
@@ -266,8 +263,11 @@ src/
    - Manages all standard export options and creative export options in a single reactive Zustand store.
    - `imageCreativeSettings`: Dictionary keyed by file path (`Record<string, CreativeExportOptions>`).
    - `activeImagePath`: Synchronized with `useUIStore.activePhotoIndex`.
-   - On image switch, `loadImageCreativeSettings(path)` loads saved settings or creates defaults.
-   - Persisted to `localStorage` under `rapidraw_creative_settings_by_path`.
+   - On image switch, `saveSettingsForImage(prevPath)` and `loadSettingsForImage(path)` synchronize with persistent storage.
+   - Persisted in `localStorage`:
+     - **`rapidraw_creative_settings_by_path`**: Per-photo creative framing, fine-art mats, polaroid chins, keylines, EXIF metadata badges, and watermarks.
+     - **`rapidraw_export_grid_settings`**: User-preferred multi-photo collage grid parameters (columns, rows, spacing, and cell fit mode) and overlay configurations.
+     - **`rapidraw_creative_presets`**: Custom named creative presets created by the user.
 2. **`CreativeExportOverlay`**:
    - Mounts inside `ImageCanvas.tsx` at the exact render size of the developed photo.
    - Positioned with `zIndex: 25` and `overflow: visible` to render outer mats beyond the photo bounds.
