@@ -200,20 +200,25 @@ RapidRAW Source Tree
 
 ---
 
-## 📂 Included Files
+## 📂 Included Files & Patch Versions
 
-| File | Description |
-| :--- | :--- |
-| [`RapidRAW_1.6.4_aarch64.dmg`](./RapidRAW_1.6.4_aarch64.dmg) | Production Apple Silicon macOS installer with full single-canvas Creative Export Studio. |
-| [`center-stage-creative-export-studio.patch`](./center-stage-creative-export-studio.patch) | **Patch 2**: Creative Export Studio integration into Editor, single-canvas overlay, per-image retention, and preset manager. |
-| [`creative-export-borders-and-grids.patch`](./creative-export-borders-and-grids.patch) | **Patch 1**: Core Creative Export engine (Rust backend, EXIF badges, templates, borders, watermarks). |
-| [`docs/EXPORT_STUDIO_GUIDE.md`](./docs/EXPORT_STUDIO_GUIDE.md) | Comprehensive user manual, architecture guide, and token reference. |
-| [`build-creative-export-borders-and-grids.sh`](./build-creative-export-borders-and-grids.sh) | Automated local build script that applies patches and builds macOS DMG. |
-| [`update-and-build.sh`](./update-and-build.sh) | Convenience wrapper for updating upstream and building the DMG. |
-| [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | Continuous cloud automation: monitors upstream, builds macOS, Windows & Linux, and publishes releases. |
-| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | On-demand macOS compilation workflow. |
+| File | Version | Description |
+| :--- | :--- | :--- |
+| [`creative-export-borders-and-grids-v2.patch`](./creative-export-borders-and-grids-v2.patch) | **v2 (Active / Recommended)** | **Standalone v2 Patch**: Neatly integrates Creative Export Studio directly into the default Image Editor with single-canvas 60fps proofing, Proof Frame (`F`), per-image retention in `localStorage`, and preset manager. Applies in a single step against upstream RapidRAW (`main` / `v1.6.4`). |
+| [`creative-export-borders-and-grids-v1.patch`](./creative-export-borders-and-grids-v1.patch) | **v1 (Legacy)** | **Original v1 Patch**: Offers creative export explicitly inside the export tab as a creative export feature. Retained for archival reference; will eventually be deprecated. |
+| [`creative-export-borders-and-grids.patch`](./creative-export-borders-and-grids.patch) | **v2 (Default Alias)** | Convenience alias matching `creative-export-borders-and-grids-v2.patch` for automated build scripts and tooling. |
+| [`RapidRAW_1.6.4_aarch64.dmg`](./RapidRAW_1.6.4_aarch64.dmg) | **v2 Build** | Production Apple Silicon macOS installer built from v2. |
+| [`docs/EXPORT_STUDIO_GUIDE.md`](./docs/EXPORT_STUDIO_GUIDE.md) | Documentation | Comprehensive user manual, architecture guide, and token reference. |
+| [`build-creative-export-borders-and-grids.sh`](./build-creative-export-borders-and-grids.sh) | Build Automation | Automated local build script that applies v2 (default) or v1 and builds macOS DMG. |
+| [`update-and-build.sh`](./update-and-build.sh) | Build Automation | Convenience wrapper for updating upstream and building the DMG. |
+| [`.github/workflows/auto-release.yml`](./.github/workflows/auto-release.yml) | CI/CD | Continuous cloud automation: monitors upstream, applies v2 patch, builds macOS, Windows & Linux, and publishes releases. |
+| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | CI/CD | On-demand macOS compilation workflow. |
 | [`.github/workflows/build-windows.yml`](./.github/workflows/build-windows.yml) | On-demand Windows compilation workflow. |
-| [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml) | On-demand Linux compilation workflow. |
+| [`.github/workflows/build-linux.yml`](./.github/workflows/build-linux.yml) | CI/CD | On-demand Linux compilation workflow. |
+
+> [!NOTE]
+> **Deprecation Notice (Intermediate Export Studio)**:
+> The intermediate prototype that introduced a separate export view window (`activeView: 'export'`) with a duplicate preview canvas has been **deprecated and removed** from this repository. All development and release assets are now consolidated on **v2**.
 
 ---
 
@@ -221,26 +226,26 @@ RapidRAW Source Tree
 
 ### Option A: Automated Local Rebuild
 ```bash
-# Build against latest main branch:
+# Build v2 against latest main branch (Default):
 ./build-creative-export-borders-and-grids.sh
 
-# Build against a specific tag (e.g. v1.6.4):
+# Build v2 against a specific upstream tag:
 ./build-creative-export-borders-and-grids.sh v1.6.4
+
+# Build v1 (legacy):
+./build-creative-export-borders-and-grids.sh main v1
 ```
 
-### Option B: Manual Dual-Patch Workflow
+### Option B: Manual Single-Patch Workflow (v2)
 ```bash
 # 1. Clone RapidRAW
 git clone https://github.com/CyberTimon/RapidRAW.git
 cd RapidRAW
 
-# 2. Apply Patch 1: Baseline Creative Export Engine
-git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
+# 2. Apply v2 Patch in a single clean step
+git apply --ignore-whitespace /path/to/creative-export-borders-and-grids-v2.patch
 
-# 3. Apply Patch 2: Center Stage Export Studio (Editor Integrated)
-git apply --ignore-whitespace /path/to/center-stage-creative-export-studio.patch
-
-# 4. Install dependencies and compile
+# 3. Install dependencies and compile
 npm ci
 npm run tauri -- build --bundles dmg --no-sign
 ```
@@ -263,16 +268,13 @@ npm run tauri -- build --bundles dmg --no-sign
 
 ## ⚠️ Upstream Maintenance & Conflicts
 
-Because this extension is architected as two modular patches:
-1. **Patch 1 (`creative-export-borders-and-grids.patch`)** focuses strictly on the export backend math, EXIF parsing, and baseline components.
-2. **Patch 2 (`center-stage-creative-export-studio.patch`)** focuses on the center-stage workspace, filmroll integration, and zoom toolbar.
+The **v2 Patch (`creative-export-borders-and-grids-v2.patch`)** is a clean, consolidated diff directly against upstream RapidRAW.
 
 If upstream RapidRAW modifies surrounding navigation or export files in future versions:
 ```bash
-git apply --reject creative-export-borders-and-grids.patch
-git apply --reject center-stage-creative-export-studio.patch
+git apply --reject creative-export-borders-and-grids-v2.patch
 ```
-Inspect any `.rej` files and apply the small contextual changes manually.
+Inspect any generated `.rej` files and resolve the contextual changes.
 
 ---
 

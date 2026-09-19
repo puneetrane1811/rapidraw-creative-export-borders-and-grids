@@ -278,34 +278,40 @@ Located in `src-tauri/src/export_processing.rs`:
 
 ---
 
-## 7. Dual-Patch Modular Maintenance
+## 7. Patch Versions & Maintenance (v2 Recommended, v1 Legacy)
 
-This repository provides two clean modular patches against upstream RapidRAW:
+This repository maintains two distinct patch versions against upstream RapidRAW:
 
 ```
 Upstream RapidRAW (v1.6.4 / main)
    │
-   ├── [Patch 1] creative-export-borders-and-grids.patch
-   │             (Core Rust backend, borders, EXIF badges, filename templates, watermarks)
+   ├── [v2 Patch - Active / Recommended] creative-export-borders-and-grids-v2.patch
+   │   (Direct Editor integration, single-canvas overlay, Proof Frame 'F', per-image retention, preset manager)
    │
-   └── [Patch 2] center-stage-creative-export-studio.patch
-                 (Direct Editor integration, single-canvas overlay, per-image retention, preset manager)
+   └── [v1 Patch - Legacy] creative-export-borders-and-grids-v1.patch
+       (Original version: creative export offered explicitly inside the export tab; will eventually be deprecated)
 ```
 
-### Applying Both Patches Manually
+> [!NOTE]
+> **Deprecation Notice (Intermediate Export Studio)**:
+> The intermediate development prototype that featured a separate export view window (`activeView: 'export'`) with a duplicate preview canvas has been **permanently deprecated and removed**. All active development is concentrated on **v2**.
+
+### Applying the v2 Patch Manually (Single Step)
 ```bash
 git clone https://github.com/CyberTimon/RapidRAW.git
 cd RapidRAW
 
-# Step 1: Apply baseline creative export engine
-git apply --ignore-whitespace /path/to/creative-export-borders-and-grids.patch
+# Apply v2 Patch in a single clean step
+git apply --ignore-whitespace /path/to/creative-export-borders-and-grids-v2.patch
 
-# Step 2: Apply Editor-integrated Creative Export Studio
-git apply --ignore-whitespace /path/to/center-stage-creative-export-studio.patch
-
-# Step 3: Build macOS DMG
+# Build macOS DMG
 npm ci
 npm run tauri -- build --bundles dmg --no-sign
+```
+
+### Applying the v1 Patch (Legacy)
+```bash
+git apply --ignore-whitespace /path/to/creative-export-borders-and-grids-v1.patch
 ```
 
 ---

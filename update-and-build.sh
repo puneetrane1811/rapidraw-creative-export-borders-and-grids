@@ -3,12 +3,20 @@ set -euo pipefail
 
 # Default to latest main if no branch/tag is provided
 TARGET_REF="${1:-main}"
+PATCH_ARG="${2:-v2}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
 WORK_DIR="$BASE_DIR/work"
 BUILD_DIR="$BASE_DIR/build_temp"
-PATCH_FILE="$SCRIPT_DIR/creative-export-borders-and-grids.patch"
+
+if [ "$PATCH_ARG" = "v1" ]; then
+  PATCH_FILE="$SCRIPT_DIR/creative-export-borders-and-grids-v1.patch"
+elif [ -f "$PATCH_ARG" ]; then
+  PATCH_FILE="$PATCH_ARG"
+else
+  PATCH_FILE="$SCRIPT_DIR/creative-export-borders-and-grids-v2.patch"
+fi
 
 echo "=== RapidRAW Creative Export Borders & Grids Builder ==="
 echo "Target ref: $TARGET_REF"
@@ -25,16 +33,10 @@ curl -fL --silent --show-error "https://github.com/CyberTimon/RapidRAW/archive/r
 unzip -q "$BUILD_DIR/source.zip" -d "$BUILD_DIR"
 SRC_DIR=$(find "$BUILD_DIR" -maxdepth 1 -type d -name "RapidRAW-*" | head -n 1)
 
-# 2. Apply patches
-echo "--> Applying creative-export-borders-and-grids.patch..."
+# 2. Apply patch (Clean single-step application)
+echo "--> Applying $(basename "$PATCH_FILE")..."
 cd "$SRC_DIR"
 patch -p1 < "$PATCH_FILE"
-
-STUDIO_PATCH="$SCRIPT_DIR/center-stage-creative-export-studio.patch"
-if [ -f "$STUDIO_PATCH" ]; then
-  echo "--> Applying center-stage-creative-export-studio.patch..."
-  patch -p1 < "$STUDIO_PATCH"
-fi
 
 # 3. Reuse isolated toolchains and ONNX libraries
 export PATH="$WORK_DIR/toolchains/node/bin:$WORK_DIR/toolchains/cargo/bin:$PATH"
