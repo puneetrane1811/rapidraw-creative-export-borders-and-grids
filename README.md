@@ -62,7 +62,7 @@ Most RAW editors stop at pixel adjustments, leaving photographers to wrestle wit
 - **Social Glass Pill**: Translucent, rounded floating pill overlay in the bottom-right corner with customizable opacity and font palette.
 
 ### 🔲 Contact Sheets, Collages & Tile Slicing
-- **⚡ Real-Time Live Canvas Grid**: When you select multiple photos in the filmstrip and enable collage mode, your $N \times M$ contact sheet composites live right inside the center editor canvas with dynamic aspect ratio adaptation and full zoom/pan support!
+- **⚡ Real-Time Live Canvas Grid**: Defined directly in the Final Export tab—when you enable photo collage mode, your $N \times M$ contact sheet composites live right inside the center editor canvas with dynamic aspect ratio adaptation, responsive columns/rows/gutters, and full zoom/pan support!
 - **$N \times M$ Contact Sheets**: Combine multiple selected photos into a unified grid collage with configurable cell gutters and *Fit (Letterbox)* vs. *Fill (Center-Crop)* modes.
 - **Multi-Tile Splitter**: Slices panoramas and wide compositions into seamless $N \times M$ tiles for swipeable Instagram carousels and $3 \times 3$ grid profile mosaics.
 - **Composition Grid Overlays**: Rule of Thirds ($3 \times 3$) and custom composition guides with live opacity controls.

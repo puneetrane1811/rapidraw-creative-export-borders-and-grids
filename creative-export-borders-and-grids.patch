@@ -4723,7 +4723,7 @@ index 0645d3c..2784ba1 100644
  
          <div className="grow" />
 diff --git a/src/components/panel/Editor.tsx b/src/components/panel/Editor.tsx
-index 64c298b..b6ed4d3 100644
+index 64c298b..72c8514 100644
 --- a/src/components/panel/Editor.tsx
 +++ b/src/components/panel/Editor.tsx
 @@ -24,6 +24,7 @@ import { useEditorStore } from '../../store/useEditorStore';
@@ -4734,7 +4734,7 @@ index 64c298b..b6ed4d3 100644
  import { useAiMasking } from '../../hooks/useAiMasking';
  import { useEditorActions } from '../../hooks/useEditorActions';
  
-@@ -371,10 +372,32 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect,
+@@ -371,10 +372,38 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect,
    const isMasking = activePanel === Panel.Masks;
    const isAiEditing = activePanel === Panel.Ai;
  
@@ -4744,7 +4744,13 @@ index 64c298b..b6ed4d3 100644
 +  const collageGutter = useExportStore((s) => s.collageGutter);
 +  const multiSelectedPaths = useLibraryStore((s) => s.multiSelectedPaths);
 +
-+  const isCollageActive = enableCollageGrid && multiSelectedPaths.length > 1;
++  const effectiveCollagePaths = useMemo(() => {
++    if (multiSelectedPaths.length > 0) return multiSelectedPaths;
++    if (selectedImage?.path) return [selectedImage.path];
++    return [];
++  }, [multiSelectedPaths, selectedImage?.path]);
++
++  const isCollageActive = enableCollageGrid && effectiveCollagePaths.length > 0;
 +
    const croppedDimensions = useMemo<ImageDimensions | null>(() => {
      if (!selectedImage?.width || !selectedImage?.height) {
@@ -4767,7 +4773,7 @@ index 64c298b..b6ed4d3 100644
      if (adjustments.crop) {
        return { width: adjustments.crop.width, height: adjustments.crop.height } as ImageDimensions;
      }
-@@ -386,7 +409,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect,
+@@ -386,7 +415,15 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect,
        return { width, height } as ImageDimensions;
      }
      return null;
@@ -4878,7 +4884,7 @@ index 1743d86..037def1 100644
              className="bg-surface text-text-primary p-2 rounded-full hover:bg-card-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed relative"
              onClick={onToggleFullScreen}
 diff --git a/src/components/panel/editor/ImageCanvas.tsx b/src/components/panel/editor/ImageCanvas.tsx
-index 8469a86..4078da7 100644
+index 8469a86..bcb6ea8 100644
 --- a/src/components/panel/editor/ImageCanvas.tsx
 +++ b/src/components/panel/editor/ImageCanvas.tsx
 @@ -12,8 +12,11 @@ import { RenderSize } from '../../../hooks/useImageRenderSize';
@@ -4893,17 +4899,22 @@ index 8469a86..4078da7 100644
  import { calculateStraightenAngle } from '../../../utils/cropUtils';
  import { toast } from 'react-toastify';
  
-@@ -1436,6 +1439,9 @@ const ImageCanvas = memo(
+@@ -1436,6 +1439,14 @@ const ImageCanvas = memo(
      const retainedPatchRef = useRef<typeof interactivePatch>(null);
  
      const isWgpuActive = appSettings?.useWgpuRenderer !== false && selectedImage?.isReady && hasRenderedFirstFrame;
 +    const enableCollageGrid = useExportStore((s) => s.enableCollageGrid);
 +    const multiSelectedPaths = useLibraryStore((s) => s.multiSelectedPaths);
-+    const isCollageActive = enableCollageGrid && multiSelectedPaths.length > 1;
++    const effectiveCollagePaths = useMemo(() => {
++      if (multiSelectedPaths.length > 0) return multiSelectedPaths;
++      if (selectedImage?.path) return [selectedImage.path];
++      return [];
++    }, [multiSelectedPaths, selectedImage?.path]);
++    const isCollageActive = enableCollageGrid && effectiveCollagePaths.length > 0;
      const { t } = useTranslation();
      const osPlatform = useOsPlatform();
      const modifierKey = osPlatform === 'macos' ? 'Cmd' : 'Ctrl';
-@@ -3095,7 +3101,7 @@ const ImageCanvas = memo(
+@@ -3095,7 +3106,7 @@ const ImageCanvas = memo(
                        }
                  }
                >
@@ -4912,7 +4923,7 @@ index 8469a86..4078da7 100644
                    <image
                      href={displayState.base}
                      x="0"
-@@ -3106,7 +3112,7 @@ const ImageCanvas = memo(
+@@ -3106,7 +3117,7 @@ const ImageCanvas = memo(
                    />
                  )}
  
@@ -4921,7 +4932,7 @@ index 8469a86..4078da7 100644
                    <image
                      href={displayState.fade}
                      x="0"
-@@ -3121,7 +3127,7 @@ const ImageCanvas = memo(
+@@ -3121,7 +3132,7 @@ const ImageCanvas = memo(
                    />
                  )}
  
@@ -4930,7 +4941,7 @@ index 8469a86..4078da7 100644
                    <image
                      href={visiblePatch.url}
                      x={`${visiblePatch.normX * 100}%`}
-@@ -3151,6 +3157,25 @@ const ImageCanvas = memo(
+@@ -3151,6 +3162,25 @@ const ImageCanvas = memo(
                    }}
                  />
                )}
@@ -4958,10 +4969,10 @@ index 8469a86..4078da7 100644
              <div className="absolute inset-0 pointer-events-none z-50">
 diff --git a/src/components/panel/editor/overlays/CreativeExportOverlay.tsx b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
 new file mode 100644
-index 0000000..d09ba3c
+index 0000000..0cf0749
 --- /dev/null
 +++ b/src/components/panel/editor/overlays/CreativeExportOverlay.tsx
-@@ -0,0 +1,584 @@
+@@ -0,0 +1,590 @@
 +import React, { useMemo, useCallback, useEffect } from 'react';
 +import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 +import { useExportStore } from '../../../../store/useExportStore';
@@ -5038,7 +5049,13 @@ index 0000000..d09ba3c
 +    collageCellFit,
 +  } = useExportStore();
 +
-+  const isCollageActive = enableCollageGrid && multiSelectedPaths.length > 1;
++  const effectiveCollagePaths = useMemo(() => {
++    if (multiSelectedPaths.length > 0) return multiSelectedPaths;
++    if (selectedImage?.path) return [selectedImage.path];
++    return [];
++  }, [multiSelectedPaths, selectedImage?.path]);
++
++  const isCollageActive = enableCollageGrid && effectiveCollagePaths.length > 0;
 +
 +  const getPhotoUrl = useCallback(
 +    (path: string) => {
@@ -5060,13 +5077,13 @@ index 0000000..d09ba3c
 +
 +  useEffect(() => {
 +    if (!isCollageActive) return;
-+    const missing = multiSelectedPaths.filter(
++    const missing = effectiveCollagePaths.filter(
 +      (p) => !thumbnails[p] && !mediumThumbnails[p] && !previews[p]?.url
 +    );
 +    if (missing.length > 0) {
 +      invoke('update_thumbnail_queue', { paths: missing }).catch(() => {});
 +    }
-+  }, [isCollageActive, multiSelectedPaths, thumbnails, mediumThumbnails, previews]);
++  }, [isCollageActive, effectiveCollagePaths, thumbnails, mediumThumbnails, previews]);
 +
 +  const exifData = useMemo(() => formatExifSummary(selectedImage?.exif), [selectedImage?.exif]);
 +
@@ -5217,7 +5234,7 @@ index 0000000..d09ba3c
 +          }}
 +        >
 +          {Array.from({ length: Math.max(1, collageColumns) * Math.max(1, collageRows) }).map((_, idx) => {
-+            const path = multiSelectedPaths[idx];
++            const path = effectiveCollagePaths[idx];
 +            const url = path ? getPhotoUrl(path) : null;
 +            return (
 +              <div
@@ -5548,10 +5565,10 @@ index 0000000..d09ba3c
 +}
 diff --git a/src/components/panel/right/CreativeExportTab.tsx b/src/components/panel/right/CreativeExportTab.tsx
 new file mode 100644
-index 0000000..a7abe05
+index 0000000..4660c05
 --- /dev/null
 +++ b/src/components/panel/right/CreativeExportTab.tsx
-@@ -0,0 +1,943 @@
+@@ -0,0 +1,808 @@
 +import React, { useState } from 'react';
 +import { useTranslation } from 'react-i18next';
 +import {
@@ -5567,7 +5584,6 @@ index 0000000..a7abe05
 +  Camera,
 +  Layers,
 +  Square,
-+  LayoutGrid,
 +} from 'lucide-react';
 +import clsx from 'clsx';
 +import Switch from '../../ui/Switch';
@@ -5631,12 +5647,6 @@ index 0000000..a7abe05
 +    applyCreativePresetToPaths,
 +    deleteCreativePreset,
 +    setShowExportProofing,
-+    enableCollageGrid,
-+    collageColumns,
-+    collageRows,
-+    collageGutter,
-+    collageCellFit,
-+    setStandardSetting,
 +  } = useExportStore();
 +
 +  const [isNewPresetModalOpen, setIsNewPresetModalOpen] = useState(false);
@@ -5650,7 +5660,6 @@ index 0000000..a7abe05
 +    keyline: false,
 +    exifBadge: true,
 +    watermark: false,
-+    collage: true,
 +  });
 +
 +  const toggleSection = (section: string) => {
@@ -6348,133 +6357,6 @@ index 0000000..a7abe05
 +                    </option>
 +                  ))}
 +                </select>
-+              </div>
-+            </div>
-+          )}
-+        </div>
-+
-+        {/* 6. Photo Collage & Multi-Photo Grid Section */}
-+        <div className="border border-surface rounded-lg overflow-hidden bg-surface/30">
-+          <div
-+            className="p-3 bg-surface/60 flex items-center justify-between cursor-pointer"
-+            onClick={() => toggleSection('collage')}
-+          >
-+            <div className="flex items-center gap-2">
-+              <span onClick={(e) => e.stopPropagation()}>
-+                <Switch
-+                  id="switch-collage"
-+                  label=""
-+                  checked={enableCollageGrid}
-+                  onChange={(checked) => {
-+                    setStandardSetting('enableCollageGrid', checked);
-+                    if (checked) setShowExportProofing(true);
-+                  }}
-+                />
-+              </span>
-+              <span className="text-xs font-semibold text-text-primary uppercase tracking-wide flex items-center gap-1.5">
-+                <LayoutGrid size={14} className="text-accent" />
-+                Photo Collage & Grid
-+              </span>
-+              {enableCollageGrid && multiSelectedPaths.length > 1 && (
-+                <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-accent/20 text-accent font-semibold">
-+                  {collageColumns}×{collageRows}
-+                </span>
-+              )}
-+            </div>
-+            <div className="flex items-center gap-1">
-+              <button
-+                onClick={(e) => {
-+                  e.stopPropagation();
-+                  resetSection('collage');
-+                }}
-+                className="p-1 rounded hover:bg-surface text-text-secondary hover:text-text-primary transition-colors"
-+                data-tooltip="Reset Collage Grid"
-+              >
-+                <RotateCcw size={13} />
-+              </button>
-+            </div>
-+          </div>
-+
-+          {openSections.collage && enableCollageGrid && (
-+            <div className="p-3.5 space-y-4 border-t border-surface">
-+              {/* Photo selection badge / helper */}
-+              <div className="flex items-center justify-between bg-surface/80 px-3 py-2 rounded-md border border-surface text-xs">
-+                <span className="text-text-secondary">Selected in Filmstrip:</span>
-+                <span
-+                  className={clsx(
-+                    'font-medium px-2 py-0.5 rounded text-xs',
-+                    multiSelectedPaths.length > 1
-+                      ? 'bg-accent text-button-text font-semibold'
-+                      : 'bg-surface text-amber-400',
-+                  )}
-+                >
-+                  {multiSelectedPaths.length > 1
-+                    ? `${multiSelectedPaths.length} photos composited`
-+                    : '1 photo (Select 2+ in filmstrip)'}
-+                </span>
-+              </div>
-+
-+              {/* Grid Columns & Rows */}
-+              <div className="grid grid-cols-2 gap-3">
-+                <Slider
-+                  label="Columns"
-+                  min={1}
-+                  max={10}
-+                  step={1}
-+                  value={collageColumns}
-+                  defaultValue={2}
-+                  onChange={(e) => setStandardSetting('collageColumns', Number(e.target.value))}
-+                />
-+                <Slider
-+                  label="Rows"
-+                  min={1}
-+                  max={10}
-+                  step={1}
-+                  value={collageRows}
-+                  defaultValue={2}
-+                  onChange={(e) => setStandardSetting('collageRows', Number(e.target.value))}
-+                />
-+              </div>
-+
-+              {/* Gutter / Margin */}
-+              <Slider
-+                label="Gutter Spacing (%)"
-+                min={0}
-+                max={10}
-+                step={0.1}
-+                value={collageGutter}
-+                defaultValue={1.0}
-+                suffix="%"
-+                onChange={(e) => setStandardSetting('collageGutter', Number(e.target.value))}
-+              />
-+
-+              {/* Cell Fit Mode */}
-+              <div>
-+                <span className="text-xs text-text-secondary mb-1.5 block font-medium">Cell Fit Mode</span>
-+                <div className="grid grid-cols-2 gap-1.5 bg-surface/80 p-1 rounded-lg border border-surface">
-+                  <button
-+                    onClick={() => setStandardSetting('collageCellFit', 'fit')}
-+                    className={clsx(
-+                      'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                      collageCellFit === 'fit'
-+                        ? 'bg-accent text-button-text shadow-sm'
-+                        : 'text-text-secondary hover:text-text-primary',
-+                    )}
-+                  >
-+                    Fit (Letterbox)
-+                  </button>
-+                  <button
-+                    onClick={() => setStandardSetting('collageCellFit', 'fill')}
-+                    className={clsx(
-+                      'py-1.5 px-2 text-xs rounded-md transition-colors font-medium',
-+                      collageCellFit === 'fill'
-+                        ? 'bg-accent text-button-text shadow-sm'
-+                        : 'text-text-secondary hover:text-text-primary',
-+                    )}
-+                  >
-+                    Fill (Crop)
-+                  </button>
-+                </div>
 +              </div>
 +            </div>
 +          )}
@@ -7747,10 +7629,10 @@ index 267e321..25ca5ea 100644
            </Button>
 diff --git a/src/components/panel/right/StandardExportTab.tsx b/src/components/panel/right/StandardExportTab.tsx
 new file mode 100644
-index 0000000..960dac9
+index 0000000..98b354e
 --- /dev/null
 +++ b/src/components/panel/right/StandardExportTab.tsx
-@@ -0,0 +1,742 @@
+@@ -0,0 +1,820 @@
 +import React from 'react';
 +import { motion, AnimatePresence } from 'framer-motion';
 +import { useTranslation } from 'react-i18next';
@@ -7926,38 +7808,100 @@ index 0000000..960dac9
 +  setGridOverlayOpacity,
 +}: StandardExportTabProps) {
 +  const { t } = useTranslation();
-+  const exportStore = useExportStore();
 +
-+  const effEnableCollageGrid = enableCollageGrid ?? exportStore.enableCollageGrid;
-+  const effSetEnableCollageGrid = setEnableCollageGrid ?? ((v: boolean) => exportStore.setStandardSetting('enableCollageGrid', v));
-+  const effCollageColumns = collageColumns ?? exportStore.collageColumns;
-+  const effSetCollageColumns = setCollageColumns ?? ((v: number) => exportStore.setStandardSetting('collageColumns', v));
-+  const effCollageRows = collageRows ?? exportStore.collageRows;
-+  const effSetCollageRows = setCollageRows ?? ((v: number) => exportStore.setStandardSetting('collageRows', v));
-+  const effCollageGutter = collageGutter ?? exportStore.collageGutter;
-+  const effSetCollageGutter = setCollageGutter ?? ((v: number) => exportStore.setStandardSetting('collageGutter', v));
-+  const effCollageCellFit = collageCellFit ?? exportStore.collageCellFit;
-+  const effSetCollageCellFit = setCollageCellFit ?? ((v: 'fit' | 'fill') => exportStore.setStandardSetting('collageCellFit', v));
++  const storeEnableCollageGrid = useExportStore((s) => s.enableCollageGrid);
++  const storeCollageColumns = useExportStore((s) => s.collageColumns);
++  const storeCollageRows = useExportStore((s) => s.collageRows);
++  const storeCollageGutter = useExportStore((s) => s.collageGutter);
++  const storeCollageCellFit = useExportStore((s) => s.collageCellFit);
 +
-+  const effEnableTileSplit = enableTileSplit ?? exportStore.enableTileSplit;
-+  const effSetEnableTileSplit = setEnableTileSplit ?? ((v: boolean) => exportStore.setStandardSetting('enableTileSplit', v));
-+  const effTileSplitColumns = tileSplitColumns ?? exportStore.tileSplitColumns;
-+  const effSetTileSplitColumns = setTileSplitColumns ?? ((v: number) => exportStore.setStandardSetting('tileSplitColumns', v));
-+  const effTileSplitRows = tileSplitRows ?? exportStore.tileSplitRows;
-+  const effSetTileSplitRows = setTileSplitRows ?? ((v: number) => exportStore.setStandardSetting('tileSplitRows', v));
-+  const effTileBorderEachTile = tileBorderEachTile ?? exportStore.tileBorderEachTile;
-+  const effSetTileBorderEachTile = setTileBorderEachTile ?? ((v: boolean) => exportStore.setStandardSetting('tileBorderEachTile', v));
++  const storeEnableTileSplit = useExportStore((s) => s.enableTileSplit);
++  const storeTileSplitColumns = useExportStore((s) => s.tileSplitColumns);
++  const storeTileSplitRows = useExportStore((s) => s.tileSplitRows);
++  const storeTileBorderEachTile = useExportStore((s) => s.tileBorderEachTile);
 +
-+  const effEnableGridOverlay = enableGridOverlay ?? exportStore.enableGridOverlay;
-+  const effSetEnableGridOverlay = setEnableGridOverlay ?? ((v: boolean) => exportStore.setStandardSetting('enableGridOverlay', v));
-+  const effGridOverlayRows = gridOverlayRows ?? exportStore.gridOverlayRows;
-+  const effSetGridOverlayRows = setGridOverlayRows ?? ((v: number) => exportStore.setStandardSetting('gridOverlayRows', v));
-+  const effGridOverlayCols = gridOverlayCols ?? exportStore.gridOverlayCols;
-+  const effSetGridOverlayCols = setGridOverlayCols ?? ((v: number) => exportStore.setStandardSetting('gridOverlayCols', v));
-+  const effGridOverlayColor = gridOverlayColor ?? exportStore.gridOverlayColor;
-+  const effSetGridOverlayColor = setGridOverlayColor ?? ((v: string) => exportStore.setStandardSetting('gridOverlayColor', v));
-+  const effGridOverlayOpacity = gridOverlayOpacity ?? exportStore.gridOverlayOpacity;
-+  const effSetGridOverlayOpacity = setGridOverlayOpacity ?? ((v: number) => exportStore.setStandardSetting('gridOverlayOpacity', v));
++  const storeEnableGridOverlay = useExportStore((s) => s.enableGridOverlay);
++  const storeGridOverlayRows = useExportStore((s) => s.gridOverlayRows);
++  const storeGridOverlayCols = useExportStore((s) => s.gridOverlayCols);
++  const storeGridOverlayColor = useExportStore((s) => s.gridOverlayColor);
++  const storeGridOverlayOpacity = useExportStore((s) => s.gridOverlayOpacity);
++
++  const setStandardSetting = useExportStore((s) => s.setStandardSetting);
++  const setShowExportProofing = useExportStore((s) => s.setShowExportProofing);
++
++  const effEnableCollageGrid = storeEnableCollageGrid;
++  const effSetEnableCollageGrid = (v: boolean) => {
++    setStandardSetting('enableCollageGrid', v);
++    if (v) setShowExportProofing(true);
++    if (setEnableCollageGrid) setEnableCollageGrid(v);
++  };
++  const effCollageColumns = storeCollageColumns;
++  const effSetCollageColumns = (v: number) => {
++    setStandardSetting('collageColumns', v);
++    if (setCollageColumns) setCollageColumns(v);
++  };
++  const effCollageRows = storeCollageRows;
++  const effSetCollageRows = (v: number) => {
++    setStandardSetting('collageRows', v);
++    if (setCollageRows) setCollageRows(v);
++  };
++  const effCollageGutter = storeCollageGutter;
++  const effSetCollageGutter = (v: number) => {
++    setStandardSetting('collageGutter', v);
++    if (setCollageGutter) setCollageGutter(v);
++  };
++  const effCollageCellFit = storeCollageCellFit;
++  const effSetCollageCellFit = (v: 'fit' | 'fill') => {
++    setStandardSetting('collageCellFit', v);
++    if (setCollageCellFit) setCollageCellFit(v);
++  };
++
++  const effEnableTileSplit = storeEnableTileSplit;
++  const effSetEnableTileSplit = (v: boolean) => {
++    setStandardSetting('enableTileSplit', v);
++    if (setEnableTileSplit) setEnableTileSplit(v);
++  };
++  const effTileSplitColumns = storeTileSplitColumns;
++  const effSetTileSplitColumns = (v: number) => {
++    setStandardSetting('tileSplitColumns', v);
++    if (setTileSplitColumns) setTileSplitColumns(v);
++  };
++  const effTileSplitRows = storeTileSplitRows;
++  const effSetTileSplitRows = (v: number) => {
++    setStandardSetting('tileSplitRows', v);
++    if (setTileSplitRows) setTileSplitRows(v);
++  };
++  const effTileBorderEachTile = storeTileBorderEachTile;
++  const effSetTileBorderEachTile = (v: boolean) => {
++    setStandardSetting('tileBorderEachTile', v);
++    if (setTileBorderEachTile) setTileBorderEachTile(v);
++  };
++
++  const effEnableGridOverlay = storeEnableGridOverlay;
++  const effSetEnableGridOverlay = (v: boolean) => {
++    setStandardSetting('enableGridOverlay', v);
++    if (setEnableGridOverlay) setEnableGridOverlay(v);
++  };
++  const effGridOverlayRows = storeGridOverlayRows;
++  const effSetGridOverlayRows = (v: number) => {
++    setStandardSetting('gridOverlayRows', v);
++    if (setGridOverlayRows) setGridOverlayRows(v);
++  };
++  const effGridOverlayCols = storeGridOverlayCols;
++  const effSetGridOverlayCols = (v: number) => {
++    setStandardSetting('gridOverlayCols', v);
++    if (setGridOverlayCols) setGridOverlayCols(v);
++  };
++  const effGridOverlayColor = storeGridOverlayColor;
++  const effSetGridOverlayColor = (v: string) => {
++    setStandardSetting('gridOverlayColor', v);
++    if (setGridOverlayColor) setGridOverlayColor(v);
++  };
++  const effGridOverlayOpacity = storeGridOverlayOpacity;
++  const effSetGridOverlayOpacity = (v: number) => {
++    setStandardSetting('gridOverlayOpacity', v);
++    if (setGridOverlayOpacity) setGridOverlayOpacity(v);
++  };
 +
 +  const formatExt = React.useMemo(() => {
 +    return FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpg';
@@ -8225,45 +8169,60 @@ index 0000000..960dac9
 +
 +          {/* Grid Export (Collages) */}
 +          <Section title={t('export.grid.collageTitle', 'Grid Export (Collages)')}>
-+            {numImages < 2 && (
-+              <Text variant={TextVariants.small} color={TextColors.secondary} className="text-xs italic mb-2 block">
-+                {t('export.grid.singleImageCollageHint', 'Select 2 or more photos in the filmstrip to composite a collage.')}
-+              </Text>
-+            )}
-+            <Switch
-+              label={t('export.grid.enableCollage', 'Enable Photo Collage')}
-+              checked={effEnableCollageGrid}
-+              onChange={effSetEnableCollageGrid}
-+              disabled={isExporting}
-+              trackClassName="bg-surface"
-+            />
++            <div className="flex items-center justify-between">
++              <Switch
++                label={t('export.grid.enableCollage', 'Enable Photo Collage')}
++                checked={effEnableCollageGrid}
++                onChange={effSetEnableCollageGrid}
++                disabled={isExporting}
++                trackClassName="bg-surface"
++              />
++              {effEnableCollageGrid && (
++                <span className="px-2 py-0.5 rounded text-xs bg-accent/20 text-accent font-semibold">
++                  {effCollageColumns} × {effCollageRows} Grid
++                </span>
++              )}
++            </div>
++
 +            {effEnableCollageGrid && (
-+              <div className="space-y-4 pl-2 border-l-2 border-surface mt-2">
++              <div className="space-y-4 pl-2 border-l-2 border-surface mt-3">
++                {/* Photo selection status indicator */}
++                <div className="flex items-center justify-between bg-surface/60 px-3 py-2 rounded-md border border-surface text-xs">
++                  <span className="text-text-secondary">Filmstrip Selection:</span>
++                  <span
++                    className={`font-medium px-2 py-0.5 rounded text-xs ${
++                      numImages > 1
++                        ? 'bg-accent text-button-text font-semibold'
++                        : 'bg-surface text-amber-400'
++                    }`}
++                  >
++                    {numImages > 1
++                      ? `${numImages} photos composited live in canvas`
++                      : '1 photo (Cmd/Ctrl+click filmstrip to add more)'}
++                  </span>
++                </div>
++
 +                <div className="grid grid-cols-2 gap-3">
-+                  <div>
-+                    <Text variant={TextVariants.label} className="mb-1">
-+                      {t('export.grid.collageCols', 'Columns')}
-+                    </Text>
-+                    <GridNumberInput
-+                      min={1}
-+                      max={10}
-+                      value={effCollageColumns}
-+                      disabled={isExporting}
-+                      onChange={effSetCollageColumns}
-+                    />
-+                  </div>
-+                  <div>
-+                    <Text variant={TextVariants.label} className="mb-1">
-+                      {t('export.grid.collageRows', 'Rows')}
-+                    </Text>
-+                    <GridNumberInput
-+                      min={1}
-+                      max={10}
-+                      value={effCollageRows}
-+                      disabled={isExporting}
-+                      onChange={effSetCollageRows}
-+                    />
-+                  </div>
++                  <Slider
++                    label={t('export.grid.collageCols', 'Columns')}
++                    min={1}
++                    max={10}
++                    step={1}
++                    value={effCollageColumns}
++                    disabled={isExporting}
++                    defaultValue={2}
++                    onChange={(e) => effSetCollageColumns(Number(e.target.value))}
++                  />
++                  <Slider
++                    label={t('export.grid.collageRows', 'Rows')}
++                    min={1}
++                    max={10}
++                    step={1}
++                    value={effCollageRows}
++                    disabled={isExporting}
++                    defaultValue={2}
++                    onChange={(e) => effSetCollageRows(Number(e.target.value))}
++                  />
 +                </div>
 +
 +                <Slider
@@ -8275,6 +8234,7 @@ index 0000000..960dac9
 +                  onChange={(e) => effSetCollageGutter(Number(e.target.value))}
 +                  disabled={isExporting}
 +                  defaultValue={1.0}
++                  suffix="%"
 +                />
 +
 +                <div>
@@ -9404,10 +9364,10 @@ index 60dc8eb..7081b82 100644
    "library": {
 diff --git a/src/store/useExportStore.ts b/src/store/useExportStore.ts
 new file mode 100644
-index 0000000..695f69c
+index 0000000..1c72955
 --- /dev/null
 +++ b/src/store/useExportStore.ts
-@@ -0,0 +1,697 @@
+@@ -0,0 +1,688 @@
 +import { create } from 'zustand';
 +import {
 +  ExportPreset,
@@ -9647,7 +9607,7 @@ index 0000000..695f69c
 +  loadSettingsForImage: (path: string) => void;
 +
 +  // Granular individual reverts
-+  resetSection: (section: 'framing' | 'polaroid' | 'keyline' | 'watermark' | 'exifBadge' | 'collage') => void;
++  resetSection: (section: 'framing' | 'polaroid' | 'keyline' | 'watermark' | 'exifBadge') => void;
 +  resetAllCreativeFilters: () => void;
 +
 +  // Creative Presets Management
@@ -9871,15 +9831,6 @@ index 0000000..695f69c
 +            exifBadgeTextColor: DEFAULT_CREATIVE_SETTINGS.exifBadgeTextColor,
 +          };
 +          break;
-+        case 'collage':
-+          set({
-+            enableCollageGrid: false,
-+            collageColumns: 2,
-+            collageRows: 2,
-+            collageGutter: 1.0,
-+            collageCellFit: 'fit',
-+          });
-+          return;
 +      }
 +
 +      state.setCreativeSettingsBatch(resetValues);

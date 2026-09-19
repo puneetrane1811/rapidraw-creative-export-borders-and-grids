@@ -75,10 +75,10 @@ In earlier development iterations, export was moved to a separate standalone vie
 │      │  Outer Mat Border                 │      │ 📏 Inset Keyline       [↺] │
 │      │   ┌─────────────┬─────────────┐   │      │ 📷 EXIF Camera Badge   [↺] │
 │      │   │   Photo 1   │   Photo 2   │   │      │ 🔤 Watermark (Text/Img)[↺] │
-│      │   ├─────────────┼─────────────┤   │      │ ▦ Photo Collage & Grid [↺] │
-│      │   │   Photo 3   │   Photo 4   │   │      │ ───────────────────────── │
-│      │   └─────────────┴─────────────┘   │      │ [ Reset All Filters ]     │
-│      │  📷 SONY A7IV • 50mm f/1.8 • ISO100│     │ [ Proceed to Export → ]   │
+│      │   ├─────────────┼─────────────┤   │      │ ───────────────────────── │
+│      │   │   Photo 3   │   Photo 4   │   │      │ [ Reset All Filters ]     │
+│      │   └─────────────┴─────────────┘   │      │ [ Proceed to Export → ]   │
+│      │  📷 SONY A7IV • 50mm f/1.8 • ISO100│     │                           │
 │      └───────────────────────────────────┘      │                           │
 ├─────────────────────────────────────────────────┴───────────────────────────┤
 │ BOTTOM FILMSTRIP: [✓ Photo 1] [✓ Photo 2] [✓ Photo 3] [✓ Photo 4] ...        │
@@ -91,21 +91,21 @@ The right-hand panel switcher hosts:
 - **`Crop`**: Geometry, rotation, perspective, and aspect ratio cropping.
 - **`Masks` & `Inpaint`**: Local adjustments and AI inpainting.
 - **`Presets`**: Color grading and film simulation presets.
-- **`Export Studio`**: Framing mats, polaroid formats, inset keylines, EXIF badges, watermarks, and live multi-photo collage grids.
-- **`Export`**: Standard export formats, quality, sizing, filename templates, collages, and tile splitters.
+- **`Export Studio`**: Framing mats, polaroid formats, inset keylines, EXIF badges, and watermarks.
+- **`Export`**: Standard export formats, quality, sizing, filename templates, real-time multi-photo collage grids, and tile splitters.
 
 ### Single-Canvas Live Proofing Engine
 - The creative overlay (`CreativeExportOverlay.tsx`) mounts directly inside `ImageCanvas.tsx`.
 - Runs at 60fps with zero flicker or latency.
 - Scales, pans, and magnifies in perfect hardware-accelerated lockstep with the editor's `TransformWrapper`.
-- **Live Multi-Photo Collage Compositing**: When 2 or more photos are selected in the filmstrip and collage mode is active, the center canvas automatically lays out all selected photos in real time inside the configured grid ($N \times M$), complete with custom gutter spacing, cell fit modes, and outer framing.
+- **Live Multi-Photo Collage Compositing**: When photo collage mode is enabled in the final Export tab, the center canvas automatically lays out all selected photos in real time inside the configured grid ($N \times M$), complete with custom gutter spacing, cell fit modes, and outer framing.
 
 ### Proof Export Frame Toolbar Button (`F`)
 - Located in `EditorToolbar.tsx` with a sparkles icon (`✨`).
 - Press <kbd>F</kbd> on your keyboard or click the toolbar icon to toggle the creative framing overlay on/off at any time.
 
 ### Creative Export Tab
-- Hosts dedicated accordions for **Presets**, **Framing & Polaroid**, **Inset Keyline**, **EXIF Camera Badge**, **Watermarks**, and **Photo Collage & Grid**.
+- Dedicated exclusively to creative finishing aesthetics: **Presets**, **Framing & Polaroid**, **Inset Keyline**, **EXIF Camera Badge**, and **Watermarks**.
 - Every accordion includes an independent section revert button (`RotateCcw`).
 - Includes a master **Reset All Creative Filters** button and a **Proceed to Export →** button that automatically navigates to the Export tab.
 
